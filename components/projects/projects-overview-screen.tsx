@@ -222,7 +222,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
                       </div>
 
                       <div className="flex flex-col gap-[5px]">
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
                           <StatusBadge status={display.status} />
                           <span className="text-[11.5px] font-medium text-[var(--muted)]">
                             {display.progress}%
