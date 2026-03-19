@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { getSeedProjects, mergeProjects } from "@/lib/projects/mock-data";
@@ -20,6 +20,7 @@ const secondaryNavItems = [
 
 export function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
+  const [projectsOpen, setProjectsOpen] = useState(true);
   const projects = useMemo(
     () => mergeProjects(getSeedProjects(), loadStoredProjects()),
     []
@@ -42,50 +43,55 @@ export function DashboardShell({ children }: DashboardShellProps) {
             <div className="px-2 pb-1 pt-[10px] text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
               Workspace
             </div>
-            <Link
-              href="/projects"
-              className="flex items-center gap-2 rounded-[6px] bg-[var(--background)] px-2 py-1.5 text-[13px] font-medium text-[var(--foreground)]"
+            <button
+              type="button"
+              aria-expanded={projectsOpen}
+              onClick={() => setProjectsOpen((current) => !current)}
+              className="flex w-full items-center gap-2 rounded-[6px] bg-[var(--background)] px-2 py-1.5 text-left text-[13px] font-medium text-[var(--foreground)]"
             >
               <ProjectsIcon />
-              <span>Projects</span>
-            </Link>
+              <span className="flex-1">Projects</span>
+              <ChevronIcon open={projectsOpen} />
+            </button>
           </div>
 
-          <div className="px-2 pb-[6px]">
-            <div className="space-y-[1px]">
-              <Link
-                href="/projects"
-                className={[
-                  "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
-                  pathname === "/projects"
-                    ? "font-medium text-[var(--foreground)]"
-                    : "text-[var(--muted-soft)] hover:text-[var(--muted)]"
-                ].join(" ")}
-              >
-                All projects
-              </Link>
+          {projectsOpen ? (
+            <div className="px-2 pb-[6px]">
+              <div className="space-y-[1px]">
+                <Link
+                  href="/projects"
+                  className={[
+                    "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
+                    pathname === "/projects"
+                      ? "font-medium text-[var(--foreground)]"
+                      : "text-[var(--muted-soft)] hover:text-[var(--muted)]"
+                  ].join(" ")}
+                >
+                  All projects
+                </Link>
 
-              {projects.map((project) => {
-                const active = pathname === `/projects/${project.id}`;
+                {projects.map((project) => {
+                  const active = pathname === `/projects/${project.id}`;
 
-                return (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    className={[
-                      "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
-                      active
-                        ? "font-medium text-[var(--foreground)]"
-                        : "text-[var(--muted-soft)] hover:text-[var(--muted)]"
-                    ].join(" ")}
-                    title={project.name}
-                  >
-                    {project.name}
-                  </Link>
-                );
-              })}
+                  return (
+                    <Link
+                      key={project.id}
+                      href={`/projects/${project.id}`}
+                      className={[
+                        "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
+                        active
+                          ? "font-medium text-[var(--foreground)]"
+                          : "text-[var(--muted-soft)] hover:text-[var(--muted)]"
+                      ].join(" ")}
+                      title={project.name}
+                    >
+                      {project.name}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="px-2 py-[10px]">
             <div className="px-2 pb-1 pt-[10px] text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
@@ -183,6 +189,27 @@ function SettingsIcon() {
         stroke="currentColor"
         strokeWidth="1.3"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      aria-hidden="true"
+      className={["transition-transform", open ? "rotate-90" : ""].join(" ")}
+    >
+      <path
+        d="m4.5 2.5 3 3.5-3 3.5"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
