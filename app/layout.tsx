@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
-import { Instrument_Sans, Newsreader } from "next/font/google";
+import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
 
 import "./globals.css";
 
-const instrumentSans = Instrument_Sans({
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans"
-});
-
-const newsreader = Newsreader({
-  subsets: ["latin"],
-  variable: "--font-serif"
 });
 
 export const metadata: Metadata = {
@@ -26,7 +21,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${instrumentSans.variable} ${newsreader.variable}`}>
+    <html lang="en" className={inter.variable}>
       <body>{children}</body>
     </html>
   );

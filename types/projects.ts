@@ -4,7 +4,7 @@ export type FileStatus = "Queued" | "Processing" | "Review" | "Done" | "Error";
 
 export type ProjectOrigin = "seed" | "custom";
 
-export type ProjectFilter = "All" | "Active" | "Review" | "Error" | "Completed";
+export type ProjectFilter = "All" | "Active" | "Review" | "Done";
 
 export interface ProjectFileRecord {
   id: string;

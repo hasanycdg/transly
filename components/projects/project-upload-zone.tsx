@@ -6,12 +6,14 @@ type ProjectUploadZoneProps = {
   files: File[];
   inputId: string;
   onFilesSelected: (files: File[]) => void;
+  variant?: "card" | "strip";
 };
 
 export function ProjectUploadZone({
   files,
   inputId,
-  onFilesSelected
+  onFilesSelected,
+  variant = "card"
 }: ProjectUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -24,12 +26,86 @@ export function ProjectUploadZone({
     setIsDragging(false);
   }
 
-  return (
-    <section className="rounded-[22px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow)] md:p-5">
+  return variant === "strip" ? (
+    <section className="rounded-[24px] border border-[var(--border)] bg-white">
+      <label
+        htmlFor={inputId}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          setIsDragging(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          handleFiles(event.dataTransfer.files);
+        }}
+        className={[
+          "flex cursor-pointer flex-col gap-5 px-9 py-8 transition lg:flex-row lg:items-center lg:justify-between",
+          isDragging ? "bg-[rgba(20,20,20,0.02)]" : ""
+        ].join(" ")}
+      >
+        <input
+          id={inputId}
+          type="file"
+          accept=".xliff,.xlf,.po,.strings,.resx"
+          multiple
+          className="hidden"
+          onChange={(event) => handleFiles(event.target.files)}
+        />
+
+        <div className="flex items-center gap-7">
+          <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-[16px] border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--foreground)]">
+            <UploadIcon />
+          </div>
+          <div>
+            <p className="text-[18px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
+              Drop files to upload
+            </p>
+            <p className="mt-1 text-[15px] text-[var(--muted)]">
+              XLIFF, .po, or .strings - or click to browse
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          {[".XLIFF", ".PO", ".strings"].map((extension) => (
+            <span
+              key={extension}
+              className="inline-flex h-10 items-center rounded-[12px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 text-[14px] font-medium text-[rgba(20,20,20,0.48)]"
+            >
+              {extension}
+            </span>
+          ))}
+        </div>
+      </label>
+
+      {files.length > 0 ? (
+        <div className="border-t border-[var(--border)] px-8 py-4">
+          <div className="flex flex-wrap gap-2">
+            {files.map((file) => (
+              <span
+                key={`${file.name}-${file.size}`}
+                className="rounded-[12px] border border-[var(--border)] bg-[var(--background-strong)] px-3 py-2 text-xs font-medium text-[var(--foreground)]"
+              >
+                {file.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  ) : (
+    <section className="rounded-[26px] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow)] md:p-6">
       <div>
-        <h3 className="text-[22px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
-          Upload Zone
+        <h3 className="text-[24px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
+          Upload translation files
         </h3>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Support for .xliff, .po, .strings, and .resx with multi-file uploads.
+        </p>
       </div>
 
       <label
@@ -47,10 +123,10 @@ export function ProjectUploadZone({
           handleFiles(event.dataTransfer.files);
         }}
         className={[
-          "mt-4 flex min-h-[230px] cursor-pointer flex-col items-center justify-center rounded-[18px] border border-dashed px-6 py-8 text-center transition",
+          "mt-5 flex min-h-[228px] cursor-pointer flex-col items-center justify-center rounded-[22px] border border-dashed px-6 py-8 text-center transition",
           isDragging
-            ? "border-[rgba(20,20,20,0.22)] bg-[rgba(20,20,20,0.03)]"
-            : "border-[rgba(20,20,20,0.14)] bg-[rgba(249,249,248,0.85)] hover:border-[rgba(20,20,20,0.2)]"
+            ? "border-[var(--border-strong)] bg-[rgba(20,20,20,0.03)]"
+            : "border-[rgba(20,20,20,0.14)] bg-[var(--background)] hover:border-[var(--border-strong)]"
         ].join(" ")}
       >
         <input
@@ -61,7 +137,7 @@ export function ProjectUploadZone({
           className="hidden"
           onChange={(event) => handleFiles(event.target.files)}
         />
-        <div className="flex h-14 w-14 items-center justify-center text-[var(--foreground)]">
+        <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[var(--border)] bg-white text-[var(--foreground)]">
           <UploadIcon />
         </div>
         <p className="mt-5 text-[18px] font-medium text-[var(--foreground)]">
@@ -70,7 +146,7 @@ export function ProjectUploadZone({
         <p className="mt-1 max-w-md text-sm leading-6 text-[var(--muted)]">
           or click to browse from your computer
         </p>
-        <span className="mt-5 inline-flex min-h-10 items-center justify-center rounded-xl border border-[rgba(20,20,20,0.22)] bg-white px-5 text-sm font-medium text-[var(--foreground)]">
+        <span className="mt-5 inline-flex min-h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-white px-5 text-sm font-medium text-[var(--foreground)]">
           Browse Files
         </span>
       </label>
@@ -80,7 +156,7 @@ export function ProjectUploadZone({
           files.map((file) => (
             <span
               key={`${file.name}-${file.size}`}
-              className="rounded-full border border-[var(--border)] bg-[rgba(20,20,20,0.03)] px-3 py-2 text-xs font-medium text-[var(--foreground)]"
+              className="rounded-[12px] border border-[var(--border)] bg-[var(--background-strong)] px-3 py-2 text-xs font-medium text-[var(--foreground)]"
             >
               {file.name}
             </span>
@@ -95,16 +171,15 @@ export function ProjectUploadZone({
 
 function UploadIcon() {
   return (
-    <svg width="46" height="46" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
-        d="M7.75 18.25h8.5a3.75 3.75 0 0 0 .46-7.47 5.25 5.25 0 0 0-10.25-1.2 3.75 3.75 0 0 0 1.29 7.67Z"
+        d="M6.75 18.25h10.5"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.7"
         strokeLinecap="round"
-        strokeLinejoin="round"
       />
-      <path d="M12 8.75v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="m8.75 11.75 3.25-3.25 3.25 3.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 5.75v8.75" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="m8.75 9.25 3.25-3.5 3.25 3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

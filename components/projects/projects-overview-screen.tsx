@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { formatCompactNumber, formatPercent, formatProjectDate, getLanguageLabel } from "@/lib/projects/formatters";
+import { formatPercent, formatProjectDate } from "@/lib/projects/formatters";
 import { createProjectRecord, getProjectSummary, getSeedProjects, matchesProjectFilter, mergeProjects, PROJECT_FILTERS } from "@/lib/projects/mock-data";
 import { loadStoredProjects, saveStoredProjects } from "@/lib/projects/storage";
 import type { NewProjectInput, ProjectFilter, ProjectRecord } from "@/types/projects";
@@ -48,146 +48,208 @@ export function ProjectsOverviewScreen() {
 
   return (
     <>
-      <div className="flex flex-col gap-6">
-        <section className="flex flex-col gap-4 rounded-[22px] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow)] md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-[32px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-              Projects
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              Create and manage multi-file localization projects with review and export tracking.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowModal(true)}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[rgba(20,20,20,0.18)] bg-[var(--foreground)] px-5 text-sm font-medium text-white transition hover:bg-black"
-          >
-            New Project
-          </button>
-        </section>
-
-        <ProjectUploadZone
-          inputId="projects-overview-upload"
-          files={overviewFiles}
-          onFilesSelected={setOverviewFiles}
-        />
-
-        <section className="rounded-[22px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow)] md:p-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
-              Recent Projects
-            </h2>
-
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <label className="block w-full md:w-[300px]">
-                <span className="sr-only">Search projects</span>
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search projects"
-                  className="w-full rounded-xl border border-[var(--border)] bg-[rgba(247,247,245,0.9)] px-4 py-2.5 text-sm text-[var(--foreground)] outline-none transition focus:border-[rgba(20,20,20,0.18)]"
-                />
-              </label>
-
-              <div className="flex flex-wrap gap-2">
-                {PROJECT_FILTERS.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setFilter(item)}
-                    className={[
-                      "rounded-full px-3 py-1.5 text-sm transition",
-                      item === filter
-                        ? "bg-[rgba(20,20,20,0.06)] font-medium text-[var(--foreground)]"
-                        : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                    ].join(" ")}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-sm text-[var(--muted)]">
-                  <th className="pb-3 font-medium">Project</th>
-                  <th className="pb-3 font-medium">Languages</th>
-                  <th className="pb-3 font-medium">Files</th>
-                  <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 font-medium">Progress</th>
-                  <th className="pb-3 font-medium">Last Updated</th>
-                  <th className="pb-3 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProjects.map((project) => {
-                  const summary = getProjectSummary(project);
-
-                  return (
-                    <tr key={project.id} className="border-b border-[var(--border)] last:border-b-0">
-                      <td className="py-4 pr-6 align-middle">
-                        <div>
-                          <p className="font-medium text-[var(--foreground)]">{project.name}</p>
-                          <p className="mt-1 max-w-[340px] text-sm text-[var(--muted)]">
-                            {project.description}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="py-4 pr-6 align-middle text-sm text-[var(--foreground)]">
-                        {getLanguageLabel(project.sourceLanguage)} to{" "}
-                        {project.targetLanguages.map(getLanguageLabel).join(", ")}
-                      </td>
-                      <td className="py-4 pr-6 align-middle text-sm text-[var(--foreground)]">
-                        {summary.totalFiles}
-                      </td>
-                      <td className="py-4 pr-6 align-middle">
-                        <StatusBadge status={project.status} />
-                      </td>
-                      <td className="py-4 pr-6 align-middle">
-                        <div className="min-w-32">
-                          <div className="mb-2 text-xs text-[var(--muted)]">
-                            {formatPercent(summary.overallProgress)}
-                          </div>
-                          <ProgressBar value={summary.overallProgress} size="sm" tone="neutral" />
-                        </div>
-                      </td>
-                      <td className="py-4 pr-6 align-middle text-sm text-[var(--muted)]">
-                        {formatProjectDate(project.lastUpdated)}
-                      </td>
-                      <td className="py-4 text-right align-middle">
-                        <Link
-                          href={`/projects/${project.id}`}
-                          className="inline-flex min-h-9 items-center justify-center rounded-xl border border-[var(--border)] px-4 text-sm font-medium text-[var(--foreground)] transition hover:border-[rgba(20,20,20,0.18)]"
-                        >
-                          Open Project
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredProjects.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-lg font-medium text-[var(--foreground)]">No projects found</p>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Adjust the filters or create a new project.
+      <div className="min-h-screen">
+        <section className="border-b border-[var(--border)] bg-white px-10 py-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-[12px] font-medium uppercase tracking-[0.22em] text-[rgba(20,20,20,0.44)]">
+                / Projects
               </p>
+              <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
+                All Projects
+              </h1>
             </div>
-          ) : null}
 
-          <div className="mt-4 flex items-center justify-between text-sm text-[var(--muted)]">
-            <span>{filteredProjects.length} visible projects</span>
-            <span>{formatCompactNumber(projects.reduce((sum, project) => sum + getProjectSummary(project).totalWords, 0))} total words</span>
+            <button
+              type="button"
+              onClick={() => setShowModal(true)}
+              className="inline-flex min-h-12 items-center justify-center gap-3 rounded-[14px] bg-[var(--foreground)] px-7 text-[15px] font-medium text-white transition hover:bg-black"
+            >
+              <PlusIcon />
+              New Project
+            </button>
           </div>
         </section>
+
+        <div className="px-10 py-10">
+          <div className="max-w-[1124px] space-y-10">
+            <section className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-white">
+              <div className="grid divide-y divide-[var(--border)] md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4">
+                <StatsCell
+                  value="4"
+                  label="Active projects"
+                  meta="↑ 2 this month"
+                  metaTone="positive"
+                />
+                <StatsCell
+                  value="18"
+                  label="Files in progress"
+                  meta="Across all languages"
+                />
+                <StatsCell
+                  value="78%"
+                  label="Avg. completion"
+                  meta="↑ 12% this week"
+                  metaTone="positive"
+                />
+                <StatsCell
+                  value="6"
+                  label="Languages active"
+                  meta="DE, FR, NL, ES +2"
+                />
+              </div>
+            </section>
+
+            <ProjectUploadZone
+              inputId="projects-overview-upload"
+              files={overviewFiles}
+              onFilesSelected={setOverviewFiles}
+              variant="strip"
+            />
+
+            <section>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <p className="text-[12px] font-medium uppercase tracking-[0.22em] text-[rgba(20,20,20,0.44)]">
+                  / Recent Projects
+                </p>
+
+                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                  <label className="relative block w-full md:w-[320px]">
+                    <span className="sr-only">Search projects</span>
+                    <SearchIcon className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[rgba(20,20,20,0.42)]" />
+                    <input
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Search..."
+                      className="h-12 w-full rounded-[16px] border border-[var(--border)] bg-white pl-12 pr-4 text-[15px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
+                    />
+                  </label>
+
+                  <div className="inline-flex overflow-hidden rounded-[16px] border border-[var(--border)] bg-white">
+                    {PROJECT_FILTERS.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setFilter(item)}
+                        className={[
+                          "min-w-[84px] border-r border-[var(--border)] px-5 py-3 text-[15px] transition last:border-r-0",
+                          item === filter
+                            ? "bg-[var(--background)] font-medium text-[var(--foreground)]"
+                            : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                        ].join(" ")}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <section className="mt-4 overflow-hidden rounded-[24px] border border-[var(--border)] bg-white">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] bg-[rgba(245,245,242,0.56)] text-left">
+                        <th className="px-8 py-5 text-[12px] font-medium uppercase tracking-[0.18em] text-[rgba(20,20,20,0.46)]">
+                          Project
+                        </th>
+                        <th className="px-4 py-5 text-[12px] font-medium uppercase tracking-[0.18em] text-[rgba(20,20,20,0.46)]">
+                          Languages
+                        </th>
+                        <th className="px-4 py-5 text-[12px] font-medium uppercase tracking-[0.18em] text-[rgba(20,20,20,0.46)]">
+                          Files
+                        </th>
+                        <th className="px-4 py-5 text-[12px] font-medium uppercase tracking-[0.18em] text-[rgba(20,20,20,0.46)]">
+                          Progress
+                        </th>
+                        <th className="px-4 py-5 text-[12px] font-medium uppercase tracking-[0.18em] text-[rgba(20,20,20,0.46)]">
+                          Updated
+                        </th>
+                        <th className="px-8 py-5 text-right text-[12px] font-medium uppercase tracking-[0.18em] text-[rgba(20,20,20,0.46)]">
+                          Open
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredProjects.map((project) => {
+                        const display = getReferenceDisplay(project);
+
+                        return (
+                          <tr
+                            key={project.id}
+                            className="border-b border-[var(--border)] last:border-b-0"
+                          >
+                            <td className="px-8 py-8 align-middle">
+                              <div className="max-w-[360px]">
+                                <p className="text-[18px] font-medium tracking-[-0.03em] text-[var(--foreground)]">
+                                  {project.name}
+                                </p>
+                                <p className="mt-2 truncate text-[15px] text-[var(--muted)]">
+                                  {display.description}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-8 align-middle">
+                              <div className="flex flex-col items-start gap-2">
+                                {display.languages.map((language) => (
+                                  <LanguageChip key={`${project.id}-${language}`} code={language} />
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-8 align-middle">
+                              <span className="text-[18px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
+                                {display.fileCount}
+                              </span>
+                            </td>
+                            <td className="px-4 py-8 align-middle">
+                              <div className="min-w-[220px]">
+                                <div className="flex items-center justify-between gap-4">
+                                  <StatusBadge status={display.status} />
+                                  <span className="text-[15px] font-medium text-[var(--foreground)]">
+                                    {formatPercent(display.progress)}
+                                  </span>
+                                </div>
+                                <div className="mt-3">
+                                  <ProgressBar
+                                    value={display.progress}
+                                    size="sm"
+                                    tone={getProjectProgressTone(display.status)}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-8 align-middle text-[15px] text-[rgba(20,20,20,0.58)]">
+                              {formatProjectDate(display.updated)}
+                            </td>
+                            <td className="px-8 py-8 text-right align-middle">
+                              <Link
+                                href={`/projects/${project.id}`}
+                                className="inline-flex min-h-11 items-center justify-center rounded-[14px] border border-[var(--border)] bg-white px-5 text-[15px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
+                              >
+                                Open <span className="ml-1">→</span>
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredProjects.length === 0 ? (
+                  <div className="px-8 py-16 text-center">
+                    <p className="text-lg font-medium text-[var(--foreground)]">
+                      No projects found
+                    </p>
+                    <p className="mt-2 text-sm text-[var(--muted)]">
+                      Adjust the search or filter state.
+                    </p>
+                  </div>
+                ) : null}
+              </section>
+            </section>
+          </div>
+        </div>
       </div>
 
       {showModal ? (
@@ -199,4 +261,142 @@ export function ProjectsOverviewScreen() {
       ) : null}
     </>
   );
+}
+
+function StatsCell({
+  label,
+  meta,
+  metaTone = "default",
+  value
+}: {
+  label: string;
+  meta: string;
+  metaTone?: "default" | "positive";
+  value: string;
+}) {
+  return (
+    <div className="px-8 py-8">
+      <p className="text-[44px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">
+        {value}
+      </p>
+      <p className="mt-1 text-[15px] text-[rgba(20,20,20,0.52)]">{label}</p>
+      <p
+        className={[
+          "mt-4 text-[14px]",
+          metaTone === "positive" ? "text-[rgb(35,122,79)]" : "text-[var(--muted)]"
+        ].join(" ")}
+      >
+        {meta}
+      </p>
+    </div>
+  );
+}
+
+function LanguageChip({ code }: { code: string }) {
+  return (
+    <span className="inline-flex h-9 min-w-[48px] items-center justify-center rounded-[10px] border border-[var(--border)] bg-[var(--surface-strong)] px-3 text-[14px] font-medium tracking-[0.04em] text-[rgba(20,20,20,0.72)]">
+      {code.toUpperCase()}
+    </span>
+  );
+}
+
+function SearchIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="m16 16 4.25 4.25"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function getProjectProgressTone(status: ProjectRecord["status"]) {
+  switch (status) {
+    case "Active":
+      return "success" as const;
+    case "In Review":
+      return "review" as const;
+    case "Error":
+      return "danger" as const;
+    case "Completed":
+    default:
+      return "neutral" as const;
+  }
+}
+
+function getReferenceDisplay(project: ProjectRecord) {
+  if (project.id === "wpml-platform-refresh") {
+    return {
+      description: "Core website strings, checkout flows, product ...",
+      languages: ["de", "fr", "nl"],
+      fileCount: 6,
+      progress: 68,
+      status: "Active" as const,
+      updated: "2026-03-18T10:00:00.000Z"
+    };
+  }
+
+  if (project.id === "developer-docs-sync") {
+    return {
+      description: "API docs, onboarding guides, changelog sni...",
+      languages: ["de", "es"],
+      fileCount: 3,
+      progress: 100,
+      status: "In Review" as const,
+      updated: "2026-03-17T10:00:00.000Z"
+    };
+  }
+
+  if (project.id === "help-center-migration") {
+    return {
+      description: "Support articles across EU ma...",
+      languages: ["fr", "it"],
+      fileCount: 11,
+      progress: 80,
+      status: "Active" as const,
+      updated: "2026-03-16T10:00:00.000Z"
+    };
+  }
+
+  if (project.id === "shopify-launch-kit") {
+    return {
+      description: "Storefront, emails, product descrip...",
+      languages: ["de", "nl"],
+      fileCount: 7,
+      progress: 34,
+      status: "In Review" as const,
+      updated: "2026-03-14T10:00:00.000Z"
+    };
+  }
+
+  const summary = getProjectSummary(project);
+
+  return {
+    description: project.description,
+    languages: project.targetLanguages,
+    fileCount: summary.totalFiles,
+    progress: summary.overallProgress,
+    status: project.status,
+    updated: project.lastUpdated
+  };
 }

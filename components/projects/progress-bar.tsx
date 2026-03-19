@@ -1,12 +1,12 @@
 type ProgressBarProps = {
   value: number;
-  tone?: "neutral" | "accent" | "danger";
+  tone?: "neutral" | "success" | "review" | "danger" | "processing";
   size?: "sm" | "md";
 };
 
 export function ProgressBar({
   value,
-  tone = "accent",
+  tone = "success",
   size = "md"
 }: ProgressBarProps) {
   const clampedValue = Math.max(0, Math.min(100, value));
@@ -14,8 +14,8 @@ export function ProgressBar({
   return (
     <div
       className={[
-        "w-full overflow-hidden rounded-full bg-[rgba(32,40,28,0.08)]",
-        size === "sm" ? "h-1.5" : "h-2.5"
+        "w-full overflow-hidden rounded-full bg-[rgba(20,20,20,0.08)]",
+        size === "sm" ? "h-1.5" : "h-2"
       ].join(" ")}
     >
       <div
@@ -23,9 +23,13 @@ export function ProgressBar({
           "h-full rounded-full transition-[width]",
           tone === "danger"
             ? "bg-[var(--danger)]"
-            : tone === "neutral"
-              ? "bg-[rgba(32,40,28,0.38)]"
-              : "bg-[var(--accent)]"
+            : tone === "success"
+              ? "bg-[var(--success)]"
+              : tone === "review"
+                ? "bg-[var(--review)]"
+                : tone === "processing"
+                  ? "bg-[var(--processing)]"
+                  : "bg-[rgba(20,20,20,0.4)]"
         ].join(" ")}
         style={{ width: `${clampedValue}%` }}
       />

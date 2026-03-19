@@ -4,8 +4,7 @@ export const PROJECT_FILTERS: ProjectFilter[] = [
   "All",
   "Active",
   "Review",
-  "Error",
-  "Completed"
+  "Done"
 ];
 
 const seedProjects: ProjectRecord[] = [
@@ -100,9 +99,9 @@ const seedProjects: ProjectRecord[] = [
     description:
       "Storefront localization package for app listings, transactional emails, and merchant onboarding flows.",
     sourceLanguage: "en",
-    targetLanguages: ["fr", "it"],
-    status: "Completed",
-    lastUpdated: "2026-03-15T10:15:00.000Z",
+    targetLanguages: ["de", "nl"],
+    status: "In Review",
+    lastUpdated: "2026-03-14T10:15:00.000Z",
     glossaryEnabled: false,
     creditsUsed: 61320,
     qualityScore: 99,
@@ -132,8 +131,8 @@ const seedProjects: ProjectRecord[] = [
     description:
       "Support center migration from legacy content with mixed XML fragments and historical glossary drift.",
     sourceLanguage: "en",
-    targetLanguages: ["de"],
-    status: "Error",
+    targetLanguages: ["fr", "it"],
+    status: "Active",
     lastUpdated: "2026-03-16T18:05:00.000Z",
     glossaryEnabled: true,
     creditsUsed: 28740,
@@ -235,6 +234,10 @@ export function matchesProjectFilter(project: ProjectRecord, filter: ProjectFilt
 
   if (filter === "Review") {
     return project.status === "In Review";
+  }
+
+  if (filter === "Done") {
+    return project.status === "Completed";
   }
 
   return project.status === filter;
