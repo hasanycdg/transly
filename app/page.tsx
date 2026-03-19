@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { LanguageSelector } from "@/components/language-selector";
@@ -103,20 +104,51 @@ export default function HomePage() {
   return (
     <main className="min-h-screen px-6 py-10 md:px-10 md:py-14">
       <div className="mx-auto max-w-6xl">
-        <header className="max-w-3xl">
-          <div className="inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-sm text-[var(--muted)] shadow-[var(--shadow)]">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-[var(--accent)]" />
-            Structure-safe AI localization for XLIFF files
+        <header className="max-w-5xl">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-sm text-[var(--muted)] shadow-[var(--shadow)]">
+                <span className="flex h-2.5 w-2.5 rounded-full bg-[var(--accent)]" />
+                Structure-safe AI localization for XLIFF files
+              </div>
+              <h1 className="mt-8 max-w-3xl font-[var(--font-serif)] text-5xl leading-tight tracking-[-0.04em] text-[var(--foreground)] md:text-6xl">
+                Translayr turns raw XLIFF into reliable translated output without
+                breaking tags.
+              </h1>
+              <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--muted)] md:text-lg">
+                This MVP is intentionally narrow: upload one XLIFF file, protect inline
+                XML and placeholders, translate safely with AI, validate the result, and
+                download the rebuilt file immediately.
+              </p>
+            </div>
+
+            <div className="rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow)] lg:max-w-sm">
+              <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
+                New UI Available
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">
+                Multi-project workspace
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+                The new SaaS dashboard with Projects overview, project detail pages,
+                uploads, progress tracking, and file tables is now live.
+              </p>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row lg:flex-col">
+                <Link
+                  href="/projects"
+                  className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--foreground)] px-5 text-sm font-medium text-white transition hover:bg-black"
+                >
+                  Open Projects Workspace
+                </Link>
+                <Link
+                  href="/projects/wpml-platform-refresh"
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--border-strong)] bg-white px-5 text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                >
+                  View Example Project
+                </Link>
+              </div>
+            </div>
           </div>
-          <h1 className="mt-8 max-w-3xl font-[var(--font-serif)] text-5xl leading-tight tracking-[-0.04em] text-[var(--foreground)] md:text-6xl">
-            Translayr turns raw XLIFF into reliable translated output without
-            breaking tags.
-          </h1>
-          <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--muted)] md:text-lg">
-            This MVP is intentionally narrow: upload one XLIFF file, protect inline
-            XML and placeholders, translate safely with AI, validate the result, and
-            download the rebuilt file immediately.
-          </p>
         </header>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
