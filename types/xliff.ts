@@ -63,7 +63,81 @@ export interface ParsedXliffDocument {
   namespaceUri?: string | null;
 }
 
-export interface TranslationWriteback {
+export interface XliffTranslationInsertion {
   unitInternalId: string;
   translatedXml: string;
+  unitId?: string;
+  fileId?: string;
+  segmentId?: string;
+}
+
+export type TranslationWriteback = XliffTranslationInsertion;
+
+export type XliffRebuildWarningCode =
+  | "translation_not_found"
+  | "duplicate_translation_input"
+  | "source_node_unresolved"
+  | "target_node_unresolved"
+  | "target_created"
+  | "target_updated"
+  | "target_skipped"
+  | "ambiguous_unit_match";
+
+export interface XliffRebuildWarning {
+  code: XliffRebuildWarningCode;
+  message: string;
+  unitInternalId?: string;
+  unitId?: string;
+  fileId?: string;
+}
+
+export type XliffRebuildAction =
+  | "updated_existing_target"
+  | "created_missing_target"
+  | "skipped";
+
+export interface XliffRebuildUnitResult {
+  unitInternalId: string;
+  action: XliffRebuildAction;
+  unitId?: string;
+  fileId?: string;
+  sourceNodeRef: NodeRef;
+  targetNodeRef?: NodeRef;
+}
+
+export interface XliffRebuildParams {
+  originalXml: string;
+  parsedDocument: ParsedXliffDocument;
+  translations: XliffTranslationInsertion[];
+  targetLanguage: string;
+}
+
+export interface XliffRebuildResult {
+  xml: string;
+  warnings: XliffRebuildWarning[];
+  unitResults: XliffRebuildUnitResult[];
+  translatedUnitCount: number;
+}
+
+export type XliffValidationIssueCode =
+  | "malformed_xml"
+  | "missing_target_node"
+  | "unresolved_mask_token"
+  | "invalid_inline_xml"
+  | "missing_processed_translation";
+
+export interface XliffValidationIssue {
+  code: XliffValidationIssueCode;
+  message: string;
+  severity: "error" | "warning";
+  unitInternalId?: string;
+  unitId?: string;
+  fileId?: string;
+}
+
+export interface XliffValidationResult {
+  valid: boolean;
+  issues: XliffValidationIssue[];
+  errors: XliffValidationIssue[];
+  warnings: XliffValidationIssue[];
 }
