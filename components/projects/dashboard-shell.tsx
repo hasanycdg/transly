@@ -53,58 +53,52 @@ export function DashboardShell({ children }: DashboardShellProps) {
               <span className="flex-1">Projects</span>
               <ChevronIcon open={projectsOpen} />
             </button>
-          </div>
-
-          {projectsOpen ? (
-            <div className="px-2 pb-[6px] pl-[18px]">
-              <div className="space-y-[1px]">
-                <Link
-                  href="/projects"
-                  className={[
-                    "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
-                    pathname === "/projects"
-                      ? "font-medium text-[var(--foreground)]"
-                      : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                  ].join(" ")}
-                >
-                  All projects
-                </Link>
-
-                {projects.map((project) => {
-                  const active = pathname === `/projects/${project.id}`;
-
-                  return (
-                    <Link
-                      key={project.id}
-                      href={`/projects/${project.id}`}
+            {projectsOpen ? (
+              <div className="pb-[6px] pl-[18px] pt-[1px]">
+                <div className="space-y-[1px]">
+                  <Link
+                    href="/projects"
                     className={[
                       "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
-                      active
+                      pathname === "/projects"
                         ? "font-medium text-[var(--foreground)]"
                         : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                     ].join(" ")}
-                    title={project.name}
                   >
-                    {project.name}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+                    All projects
+                  </Link>
 
-          <div className="px-2 py-[10px]">
-            <div className="px-2 pb-1 pt-[10px] text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              Tools
-            </div>
-            <div className="space-y-[1px]">
+                  {projects.map((project) => {
+                    const active = pathname === `/projects/${project.id}`;
+
+                    return (
+                      <Link
+                        key={project.id}
+                        href={`/projects/${project.id}`}
+                        className={[
+                          "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
+                          active
+                            ? "font-medium text-[var(--foreground)]"
+                            : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                        ].join(" ")}
+                        title={project.name}
+                      >
+                        {project.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="space-y-[1px] pt-[8px]">
               {secondaryNavItems.map((item) => {
                 const Icon = item.icon;
 
                 return (
                   <div
                     key={item.label}
-                    className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-[13px] text-[var(--muted)]"
+                    className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-[13px] font-medium text-[var(--muted)] transition hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                   >
                     <Icon />
                     <span>{item.label}</span>
