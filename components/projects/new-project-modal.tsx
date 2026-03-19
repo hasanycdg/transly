@@ -24,10 +24,16 @@ export function NewProjectModal({
   const [description, setDescription] = useState("");
   const [sourceLanguage, setSourceLanguage] = useState("en");
   const [targetLanguages, setTargetLanguages] = useState<string[]>(["de"]);
+  const [targetPickerOpen, setTargetPickerOpen] = useState(false);
 
   if (!open) {
     return null;
   }
+
+  const availableTargetLanguages = LANGUAGE_OPTIONS.filter((option) => option.code !== sourceLanguage);
+  const selectedTargetLabels = availableTargetLanguages
+    .filter((option) => targetLanguages.includes(option.code))
+    .map((option) => option.label);
 
   function toggleTargetLanguage(code: string) {
     setTargetLanguages((current) =>
@@ -35,6 +41,21 @@ export function NewProjectModal({
         ? current.filter((item) => item !== code)
         : [...current, code]
     );
+  }
+
+  function handleSourceLanguageChange(nextSourceLanguage: string) {
+    setSourceLanguage(nextSourceLanguage);
+    setTargetLanguages((current) => {
+      const nextTargets = current.filter((item) => item !== nextSourceLanguage);
+
+      if (nextTargets.length > 0) {
+        return nextTargets;
+      }
+
+      const fallbackTarget = LANGUAGE_OPTIONS.find((option) => option.code !== nextSourceLanguage);
+
+      return fallbackTarget ? [fallbackTarget.code] : [];
+    });
   }
 
   async function handleCreate() {
@@ -111,7 +132,7 @@ export function NewProjectModal({
             <span className="text-[12px] font-medium text-[var(--foreground)]">Source language</span>
             <select
               value={sourceLanguage}
-              onChange={(event) => setSourceLanguage(event.target.value)}
+              onChange={(event) => handleSourceLanguageChange(event.target.value)}
               className="w-full rounded-[7px] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
             >
               {LANGUAGE_OPTIONS.map((option) => (
@@ -122,29 +143,58 @@ export function NewProjectModal({
             </select>
           </label>
 
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <span className="text-[12px] font-medium text-[var(--foreground)]">Target languages</span>
-            <div className="flex flex-wrap gap-[6px] rounded-[7px] border border-[var(--border)] bg-[var(--background)] p-2">
-              {LANGUAGE_OPTIONS.filter((option) => option.code !== sourceLanguage).map((option) => {
-                const selected = targetLanguages.includes(option.code);
+            <button
+              type="button"
+              onClick={() => setTargetPickerOpen((current) => !current)}
+              className="flex w-full items-center justify-between rounded-[7px] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[12.5px] text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
+            >
+              <span className={selectedTargetLabels.length > 0 ? "text-[var(--foreground)]" : "text-[var(--muted-soft)]"}>
+                {selectedTargetLabels.length > 0
+                  ? selectedTargetLabels.length <= 2
+                    ? selectedTargetLabels.join(", ")
+                    : `${selectedTargetLabels.slice(0, 2).join(", ")} +${selectedTargetLabels.length - 2}`
+                  : "Select target languages"}
+              </span>
+              <ChevronDownIcon open={targetPickerOpen} />
+            </button>
 
-                return (
-                  <button
-                    key={option.code}
-                    type="button"
-                    onClick={() => toggleTargetLanguage(option.code)}
-                    className={[
-                      "rounded-[5px] border px-2 py-[5px] text-[11.5px] font-medium transition",
-                      selected
-                        ? "border-[var(--foreground)] bg-white text-[var(--foreground)]"
-                        : "border-[var(--border)] bg-white text-[var(--muted)]"
-                    ].join(" ")}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
+            {targetPickerOpen ? (
+              <div className="absolute z-20 mt-1 w-full rounded-[8px] border border-[var(--border)] bg-white p-1.5">
+                <div className="max-h-[188px] overflow-y-auto">
+                  {availableTargetLanguages.map((option) => {
+                    const selected = targetLanguages.includes(option.code);
+
+                    return (
+                      <button
+                        key={option.code}
+                        type="button"
+                        onClick={() => toggleTargetLanguage(option.code)}
+                        className={[
+                          "flex w-full items-center justify-between rounded-[6px] px-2.5 py-2 text-left text-[12.5px] transition",
+                          selected
+                            ? "bg-[var(--background)] text-[var(--foreground)]"
+                            : "text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                        ].join(" ")}
+                      >
+                        <span>{option.label}</span>
+                        <span
+                          className={[
+                            "flex h-4 w-4 items-center justify-center rounded-full border text-[10px]",
+                            selected
+                              ? "border-[var(--foreground)] bg-[var(--foreground)] text-white"
+                              : "border-[var(--border)] bg-white text-transparent"
+                          ].join(" ")}
+                        >
+                          ✓
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -168,5 +218,26 @@ export function NewProjectModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function ChevronDownIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+      className={["transition-transform", open ? "rotate-180" : ""].join(" ")}
+    >
+      <path
+        d="m3.5 5.25 3.5 3.5 3.5-3.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
