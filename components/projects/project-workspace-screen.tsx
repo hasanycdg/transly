@@ -35,6 +35,7 @@ type UploadedSourceFile = {
   id: string;
   file: File;
   name: string;
+  content: string;
   words: number;
   lastUpdated: string;
 };
@@ -46,6 +47,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadedSourceFiles, setUploadedSourceFiles] = useState<UploadedSourceFile[]>([]);
   const [persistedFiles, setPersistedFiles] = useState<ProjectFileRecord[]>(project?.files ?? []);
+  const [reviewFileId, setReviewFileId] = useState<string | null>(null);
   const [runtimeFileStates, setRuntimeFileStates] = useState<Record<string, RuntimeFileState>>({});
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationProgress, setTranslationProgress] = useState(0);
@@ -75,6 +77,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
             id: getClientFileId(file),
             file,
             name: file.name,
+            content,
             words: countWords(content),
             lastUpdated: new Date(file.lastModified || Date.now()).toISOString()
           };
@@ -140,6 +143,33 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
     () => deriveProjectStatusFromFiles(displayFiles, project?.status ?? "Active"),
     [displayFiles, project?.status]
   );
+
+  const reviewFile = useMemo(
+    () => displayFiles.find((file) => file.id === reviewFileId) ?? null,
+    [displayFiles, reviewFileId]
+  );
+
+  const reviewOutput = useMemo(() => {
+    if (!reviewFile) {
+      return null;
+    }
+
+    return (
+      translationOutputs.find(
+        (output) =>
+          output.sourceFileName === reviewFile.name &&
+          output.targetLanguage.toLowerCase() === reviewFile.targetLanguage.toLowerCase()
+      ) ?? null
+    );
+  }, [reviewFile, translationOutputs]);
+
+  const reviewSourceFile = useMemo(() => {
+    if (!reviewFile) {
+      return null;
+    }
+
+    return uploadedSourceFiles.find((file) => file.name === reviewFile.name) ?? null;
+  }, [reviewFile, uploadedSourceFiles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -620,8 +650,90 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               {project.targetLanguages.map(getLanguageLabel).join(", ")}
             </div>
           </div>
-          <ProjectFilesTable files={displayFiles} title={null} />
+          <ProjectFilesTable files={displayFiles} title={null} onReviewFile={(file) => setReviewFileId(file.id)} />
         </section>
+
+        {reviewFile ? (
+          <section className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-white">
+            <div className="flex items-center justify-between gap-4 border-b border-[var(--border-light)] px-[18px] py-3">
+              <div>
+                <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+                  / Review
+                </span>
+                <h3 className="mt-1 text-[13px] font-medium text-[var(--foreground)]">
+                  {reviewFile.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewFileId(null)}
+                className="rounded-[7px] border border-[var(--border)] px-2.5 py-1.5 text-[12px] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid gap-6 px-[18px] py-4 xl:grid-cols-[220px_minmax(0,1fr)]">
+              <div className="space-y-3">
+                <ReviewMetaRow label="Language pair" value={`${reviewFile.sourceLanguage.toUpperCase()} → ${reviewFile.targetLanguage.toUpperCase()}`} />
+                <ReviewMetaRow label="Status" value={reviewFile.status} />
+                <ReviewMetaRow label="Progress" value={formatPercent(reviewFile.progress)} />
+                <ReviewMetaRow label="Words" value={formatCompactNumber(reviewFile.words)} />
+                <ReviewMetaRow label="Updated" value={formatProjectDate(reviewFile.lastUpdated)} />
+              </div>
+
+              <div className="min-w-0">
+                <div>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[13px] font-medium text-[var(--foreground)]">
+                        Review side by side
+                      </p>
+                      <p className="mt-1 text-[12px] text-[var(--muted-soft)]">
+                        Compare the original file with the translated output in parallel.
+                      </p>
+                    </div>
+                    {reviewOutput ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadOutput(reviewOutput)}
+                        className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
+                      >
+                        Download output
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <ReviewContentPanel
+                      label="Original"
+                      helperText={
+                        reviewSourceFile
+                          ? "Source file currently loaded in this session."
+                          : "Original content is only available after uploading this file in the current session."
+                      }
+                      content={reviewSourceFile?.content ?? null}
+                      emptyTitle="Original unavailable"
+                      emptyText="Upload or re-select this file in the current session to inspect the original source content here."
+                    />
+
+                    <ReviewContentPanel
+                      label="Translated"
+                      helperText={
+                        reviewOutput
+                          ? `Generated output for ${reviewFile.targetLanguage.toUpperCase()}.`
+                          : "Translated content is available after a successful translation run."
+                      }
+                      content={reviewOutput?.translatedContent ?? null}
+                      emptyTitle="Translation unavailable"
+                      emptyText="Run the translation for this file in the current session to inspect the translated output here."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-6 xl:grid-cols-2">
           <div className="rounded-[10px] border border-[var(--border)] bg-white">
@@ -819,6 +931,55 @@ function SummaryCell({
       </p>
       <p className="mt-1 text-[12px] text-[var(--muted-soft)]">{label}</p>
     </div>
+  );
+}
+
+function ReviewMetaRow({
+  label,
+  value
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 text-[12px]">
+      <span className="text-[var(--muted-soft)]">{label}</span>
+      <span className="text-right font-medium text-[var(--foreground)]">{value}</span>
+    </div>
+  );
+}
+
+function ReviewContentPanel({
+  label,
+  helperText,
+  content,
+  emptyTitle,
+  emptyText
+}: {
+  label: string;
+  helperText: string;
+  content: string | null;
+  emptyTitle: string;
+  emptyText: string;
+}) {
+  return (
+    <section className="overflow-hidden rounded-[8px] border border-[var(--border-light)] bg-[var(--background)]">
+      <div className="border-b border-[var(--border-light)] px-4 py-3">
+        <p className="text-[12px] font-medium text-[var(--foreground)]">{label}</p>
+        <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">{helperText}</p>
+      </div>
+
+      {content ? (
+        <pre className="max-h-[460px] overflow-auto p-4 text-[11.5px] leading-6 text-[var(--foreground)]">
+          <code>{content}</code>
+        </pre>
+      ) : (
+        <div className="px-4 py-4">
+          <p className="text-[13px] font-medium text-[var(--foreground)]">{emptyTitle}</p>
+          <p className="mt-1 text-[12px] text-[var(--muted-soft)]">{emptyText}</p>
+        </div>
+      )}
+    </section>
   );
 }
 

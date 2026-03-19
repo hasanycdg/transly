@@ -393,25 +393,50 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
   const billingCycle = billingCycleData as BillingCycleRow | null;
   const usageRows = ((dailyUsageData as DailyUsageRow[] | null) ?? []).slice().reverse();
   const breakdownRows = (breakdownData as UsageBreakdownRow[] | null) ?? [];
-
-  const creditsLimit = billingCycle?.credits_limit ?? workspace.credits_limit ?? DEFAULT_CREDITS_LIMIT;
-  const creditsUsed = billingCycle?.credits_used ?? workspace.credits_used ?? 0;
-  const cycleConsumedPercent = creditsLimit > 0 ? Math.round((creditsUsed / creditsLimit) * 100) : 0;
-  const totalApiRequests = usageRows.reduce((sum, row) => sum + row.api_requests, 0);
-  const totalUploads = usageRows.reduce((sum, row) => sum + row.upload_count, 0);
-  const totalExports = usageRows.reduce((sum, row) => sum + row.export_count, 0);
-  const totalReviews = usageRows.reduce((sum, row) => sum + row.review_sessions, 0);
-  const today = formatDateKey(now);
-  const todayRow = usageRows.find((row) => row.usage_date === today);
-  const yesterdayRow = usageRows.find((row) => row.usage_date !== today) ?? null;
+  const derivedUsage = deriveUsageFromProjects(projects, now);
   const activeProjects = projects.filter((project) => project.status !== "Completed").length;
   const reviewProjects = projects.filter((project) => project.status === "In Review").length;
-  const trend = usageRows.length > 0 ? usageRows.map(mapUsageTrendPoint) : buildEmptyUsageTrend(now);
+  const effectiveUsageRows = normalizeUsageRows(
+    mergeUsageRows(usageRows, derivedUsage.dailyRows, activeProjects),
+    now,
+    activeProjects
+  );
+
+  const creditsLimit = billingCycle?.credits_limit ?? workspace.credits_limit ?? DEFAULT_CREDITS_LIMIT;
+  const creditsUsed = Math.max(
+    billingCycle?.credits_used ?? 0,
+    workspace.credits_used ?? 0,
+    derivedUsage.creditsUsed,
+    effectiveUsageRows.reduce((sum, row) => sum + row.credits_used, 0)
+  );
+  const cycleConsumedPercent = creditsLimit > 0 ? Math.round((creditsUsed / creditsLimit) * 100) : 0;
+  const totalApiRequests = Math.max(
+    derivedUsage.totalApiRequests,
+    effectiveUsageRows.reduce((sum, row) => sum + row.api_requests, 0)
+  );
+  const totalUploads = Math.max(
+    derivedUsage.totalUploads,
+    effectiveUsageRows.reduce((sum, row) => sum + row.upload_count, 0)
+  );
+  const totalExports = Math.max(
+    derivedUsage.totalExports,
+    effectiveUsageRows.reduce((sum, row) => sum + row.export_count, 0)
+  );
+  const totalReviews = Math.max(
+    derivedUsage.totalReviews,
+    effectiveUsageRows.reduce((sum, row) => sum + row.review_sessions, 0)
+  );
+  const today = formatDateKey(now);
+  const todayRow = effectiveUsageRows.find((row) => row.usage_date === today);
+  const yesterdayRow = effectiveUsageRows.find((row) => row.usage_date !== today) ?? null;
+  const trend = effectiveUsageRows.length > 0 ? effectiveUsageRows.map(mapUsageTrendPoint) : buildEmptyUsageTrend(now);
   const breakdown = breakdownRows.length > 0 ? mapUsageBreakdownRows(breakdownRows) : buildFallbackUsageBreakdown(totalUploads, totalExports, totalReviews, creditsUsed);
   const projectedSpend = billingCycle ? billingCycle.projected_spend_cents : 0;
-  const updatedLabel = usageRows.length > 0
-    ? `Updated ${formatTimeLabel(new Date(`${usageRows.at(-1)?.usage_date}T18:00:00.000Z`))}`
-    : `Updated ${formatTimeLabel(now)}`;
+  const updatedLabel = derivedUsage.lastUpdatedAt
+    ? `Updated ${formatTimeLabel(derivedUsage.lastUpdatedAt)}`
+    : effectiveUsageRows.length > 0
+      ? `Updated ${formatTimeLabel(new Date(`${effectiveUsageRows.at(-1)?.usage_date}T18:00:00.000Z`))}`
+      : `Updated ${formatTimeLabel(now)}`;
   const planValue = `${formatCompactNumber(creditsUsed)} / ${formatCompactNumber(creditsLimit)} credits`;
   const planMeta = `${formatCompactNumber(Math.max(creditsLimit - creditsUsed, 0))} credits remaining before ${formatLongDate(
     billingCycle?.period_end ? new Date(`${billingCycle.period_end}T00:00:00.000Z`) : endOfCurrentMonth(now)
@@ -1235,6 +1260,155 @@ function mapUsageTrendPoint(row: DailyUsageRow): UsageTrendPoint {
     label: formatShortDate(new Date(`${row.usage_date}T00:00:00.000Z`)),
     value: row.credits_used
   };
+}
+
+function deriveUsageFromProjects(projects: ProjectRecord[], now: Date) {
+  const dailyRows = new Map<string, DailyUsageRow>();
+  const uploadKeys = new Set<string>();
+  let creditsUsed = 0;
+  let totalApiRequests = 0;
+  let totalUploads = 0;
+  let totalExports = 0;
+  let totalReviews = 0;
+  let lastUpdatedAt: Date | null = null;
+  const activeProjects = projects.filter((project) => project.status !== "Completed").length;
+
+  for (const project of projects) {
+    for (const file of project.files) {
+      const fileDate = new Date(file.lastUpdated);
+
+      if (Number.isNaN(fileDate.getTime())) {
+        continue;
+      }
+
+      const usageDate = formatDateKey(fileDate);
+      const row = getOrCreateDailyUsageRow(dailyRows, usageDate, activeProjects);
+      const uploadKey = `${project.id}::${file.name.toLowerCase()}::${file.sourceLanguage.toLowerCase()}`;
+      const countsAsTranslation = file.status !== "Queued";
+      const countsAsExport = file.status === "Done";
+      const countsAsReview = file.status === "Review";
+
+      if (!uploadKeys.has(uploadKey)) {
+        uploadKeys.add(uploadKey);
+        row.upload_count += 1;
+        totalUploads += 1;
+      }
+
+      if (countsAsTranslation) {
+        row.credits_used += file.words;
+        row.api_requests += 1;
+        creditsUsed += file.words;
+        totalApiRequests += 1;
+      }
+
+      if (countsAsExport) {
+        row.export_count += 1;
+        totalExports += 1;
+      }
+
+      if (countsAsReview) {
+        row.review_sessions += 1;
+        totalReviews += 1;
+      }
+
+      row.active_projects = activeProjects;
+
+      if (!lastUpdatedAt || fileDate > lastUpdatedAt) {
+        lastUpdatedAt = fileDate;
+      }
+    }
+  }
+
+  return {
+    dailyRows: Array.from(dailyRows.values()).sort((left, right) => left.usage_date.localeCompare(right.usage_date)),
+    creditsUsed,
+    totalApiRequests,
+    totalUploads,
+    totalExports,
+    totalReviews,
+    lastUpdatedAt: lastUpdatedAt ?? now
+  };
+}
+
+function mergeUsageRows(
+  recordedRows: DailyUsageRow[],
+  derivedRows: DailyUsageRow[],
+  activeProjects: number
+) {
+  const merged = new Map<string, DailyUsageRow>();
+
+  for (const row of [...recordedRows, ...derivedRows]) {
+    const existing = merged.get(row.usage_date);
+
+    if (!existing) {
+      merged.set(row.usage_date, {
+        ...row,
+        active_projects: Math.max(row.active_projects, activeProjects)
+      });
+      continue;
+    }
+
+    merged.set(row.usage_date, {
+      usage_date: row.usage_date,
+      credits_used: Math.max(existing.credits_used, row.credits_used),
+      api_requests: Math.max(existing.api_requests, row.api_requests),
+      upload_count: Math.max(existing.upload_count, row.upload_count),
+      export_count: Math.max(existing.export_count, row.export_count),
+      review_sessions: Math.max(existing.review_sessions, row.review_sessions),
+      active_projects: Math.max(existing.active_projects, row.active_projects, activeProjects)
+    });
+  }
+
+  return Array.from(merged.values()).sort((left, right) => left.usage_date.localeCompare(right.usage_date));
+}
+
+function normalizeUsageRows(rows: DailyUsageRow[], now: Date, activeProjects: number) {
+  const byDate = new Map(rows.map((row) => [row.usage_date, row]));
+
+  return Array.from({ length: 10 }, (_, index) => {
+    const date = new Date(now);
+    date.setUTCDate(now.getUTCDate() - (9 - index));
+    const usageDate = formatDateKey(date);
+    const row = byDate.get(usageDate);
+
+    return (
+      row ?? {
+        usage_date: usageDate,
+        credits_used: 0,
+        api_requests: 0,
+        upload_count: 0,
+        export_count: 0,
+        review_sessions: 0,
+        active_projects: activeProjects
+      }
+    );
+  });
+}
+
+function getOrCreateDailyUsageRow(
+  rows: Map<string, DailyUsageRow>,
+  usageDate: string,
+  activeProjects: number
+) {
+  const existing = rows.get(usageDate);
+
+  if (existing) {
+    return existing;
+  }
+
+  const nextRow: DailyUsageRow = {
+    usage_date: usageDate,
+    credits_used: 0,
+    api_requests: 0,
+    upload_count: 0,
+    export_count: 0,
+    review_sessions: 0,
+    active_projects: activeProjects
+  };
+
+  rows.set(usageDate, nextRow);
+
+  return nextRow;
 }
 
 function mapUsageBreakdownRows(rows: UsageBreakdownRow[]): UsageBreakdownItem[] {

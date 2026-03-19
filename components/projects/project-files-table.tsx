@@ -7,11 +7,13 @@ import { StatusBadge } from "@/components/projects/status-badge";
 
 type ProjectFilesTableProps = {
   files: ProjectFileRecord[];
+  onReviewFile?: (file: ProjectFileRecord) => void;
   title?: string | null;
 };
 
 export function ProjectFilesTable({
   files,
+  onReviewFile,
   title = "Project Files"
 }: ProjectFilesTableProps) {
   return (
@@ -68,7 +70,11 @@ export function ProjectFilesTable({
             </div>
 
             <div className="flex flex-wrap gap-[6px]">
-              <ActionButton label="Review" disabled={file.status !== "Review"} />
+              <ActionButton
+                label="Review"
+                disabled={!canReviewFile(file)}
+                onClick={() => onReviewFile?.(file)}
+              />
               <ActionButton label="Download" disabled={file.status !== "Done"} />
               <ActionButton label="Retry" disabled={file.status !== "Error"} />
               <ActionButton label="Delete" />
@@ -86,18 +92,25 @@ export function ProjectFilesTable({
 
 function ActionButton({
   disabled = false,
-  label
+  label,
+  onClick
 }: {
   disabled?: boolean;
   label: string;
+  onClick?: () => void;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
+      onClick={onClick}
       className="rounded-[6px] border border-[var(--border)] px-[9px] py-[5px] text-[11.5px] font-medium text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:border-[var(--border-light)] disabled:text-[var(--muted-soft)]"
     >
       {label}
     </button>
   );
+}
+
+function canReviewFile(file: ProjectFileRecord) {
+  return file.status === "Review" || file.status === "Done";
 }
