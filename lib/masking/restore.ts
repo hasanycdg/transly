@@ -1,60 +1,40 @@
-import { GENERATED_TOKEN_PATTERN } from "@/lib/masking/tokens";
+import { restoreProtectedTokens, unmaskString, validateTokenMap } from "@/lib/masking";
 import { TranslationPipelineError } from "@/types/translation";
 import type { ProtectedToken } from "@/types/translation";
 
-export function restoreProtectedTokens(
-  translatedText: string,
-  tokens: ProtectedToken[],
-  unitInternalId?: string
-): string {
-  validateProtectedTokens(translatedText, tokens, unitInternalId);
-
-  let restored = translatedText;
-
-  for (const token of tokens) {
-    restored = restored.split(token.token).join(token.original);
-  }
-
-  return restored;
-}
+export { restoreProtectedTokens, unmaskString };
 
 export function validateProtectedTokens(
   translatedText: string,
   tokens: ProtectedToken[],
   unitInternalId?: string
 ): void {
-  const foundTokens: string[] = translatedText.match(GENERATED_TOKEN_PATTERN) ?? [];
-  const expectedTokens = tokens.map((token) => token.token);
-
-  const missingTokens = expectedTokens.filter((token) => !foundTokens.includes(token));
-  const unexpectedTokens = foundTokens.filter((token) => !expectedTokens.includes(token));
-  const duplicatedTokens = foundTokens.filter(
-    (token, index) => foundTokens.indexOf(token) !== index
-  );
+  const map = tokens.reduce<Record<string, string>>((accumulator, token) => {
+    accumulator[token.token] = token.original;
+    return accumulator;
+  }, {});
+  const validation = validateTokenMap(translatedText, map);
 
   if (
-    missingTokens.length === 0 &&
-    unexpectedTokens.length === 0 &&
-    duplicatedTokens.length === 0 &&
-    foundTokens.length === expectedTokens.length
+    validation.missingTokens.length === 0 &&
+    validation.unexpectedTokens.length === 0 &&
+    validation.duplicatedTokens.length === 0 &&
+    validation.reorderedTokens.length === 0
   ) {
     return;
   }
 
-  const hasTagIssue = tokens.some((token) => token.kind === "xml_tag");
-  const code = hasTagIssue ? "tag_mismatch" : "placeholder_mismatch";
-
   throw new TranslationPipelineError(
-    code,
-    "The AI response changed or lost protected placeholders. The translated file was not generated.",
+    Object.keys(map).some((token) => token.startsWith("__TAG_"))
+      ? "tag_mismatch"
+      : "placeholder_mismatch",
+    validation.reorderedTokens.length > 0
+      ? "The AI response reordered protected tokens. The translated file was not generated."
+      : "The AI response changed or lost protected tokens. The translated file was not generated.",
     422,
     {
       unitInternalId,
-      expectedTokens,
-      foundTokens,
-      missingTokens,
-      unexpectedTokens,
-      duplicatedTokens
+      ...validation
     }
   );
 }

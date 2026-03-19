@@ -9,11 +9,37 @@ export interface ProtectedToken {
   index: number;
 }
 
+export type ProtectedTokenMap = Record<string, string>;
+
 export interface MaskedSegment {
   originalText: string;
   maskedText: string;
   tokens: ProtectedToken[];
+  map: ProtectedTokenMap;
   tokenCount: number;
+}
+
+export type UnmaskWarningCode = "reordered_tokens";
+
+export interface UnmaskWarning {
+  code: UnmaskWarningCode;
+  message: string;
+  tokens: string[];
+}
+
+export interface TokenValidationResult {
+  expectedTokens: string[];
+  foundTokens: string[];
+  missingTokens: string[];
+  unexpectedTokens: string[];
+  duplicatedTokens: string[];
+  reorderedTokens: string[];
+}
+
+export interface UnmaskResult {
+  text: string;
+  warnings: UnmaskWarning[];
+  validation: TokenValidationResult;
 }
 
 export interface TranslationBatchItem {
