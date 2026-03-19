@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getProjectStatusTone } from "@/lib/projects/display";
 import { formatCompactNumber, formatPercent, formatProjectDate, getLanguageLabel } from "@/lib/projects/formatters";
 import { getProjectSummary } from "@/lib/projects/mock-data";
+import { estimateTranslationFileWordCount } from "@/lib/translation/word-count";
 import type { ProjectFileRecord, ProjectFileSyncInput, ProjectRecord } from "@/types/projects";
 import type { TranslationApiErrorShape, TranslationApiSuccess } from "@/types/translation";
 
@@ -78,7 +79,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
             file,
             name: file.name,
             content,
-            words: countWords(content),
+            words: estimateTranslationFileWordCount(file.name, content),
             lastUpdated: new Date(file.lastModified || Date.now()).toISOString()
           };
         })
@@ -804,19 +805,6 @@ function getClientFileId(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}`;
 }
 
-function countWords(content: string) {
-  const plainText = content
-    .replace(/<[^>]+>/g, " ")
-    .replace(/[\r\n\t]+/g, " ")
-    .trim();
-
-  if (!plainText) {
-    return 0;
-  }
-
-  return plainText.split(/\s+/).length;
-}
-
 function mergeProjectFiles(existingFiles: ProjectFileRecord[], runtimeFiles: ProjectFileRecord[]) {
   const merged = new Map<string, ProjectFileRecord>();
 
@@ -871,6 +859,7 @@ function buildProjectFileSyncPayload(
       return {
         clientId: sourceFile.id,
         name: sourceFile.name,
+        content: sourceFile.content,
         sourceLanguage: project.sourceLanguage,
         targetLanguage,
         words: runtimeState?.words ?? sourceFile.words,

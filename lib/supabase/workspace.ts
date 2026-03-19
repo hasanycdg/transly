@@ -4,6 +4,8 @@ import { unstable_noStore as noStore } from "next/cache";
 
 import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
+import { countMeaningfulTextContent } from "@/lib/translation/word-count";
+import { countXliffTranslationWords } from "@/lib/xliff/metrics";
 import type {
   FileStatus,
   NewProjectInput,
@@ -281,7 +283,7 @@ export async function syncProjectFiles(
       target_language: file.targetLanguage,
       status: mapFileStatusToDatabase(file.status),
       progress_percent: file.progress,
-      word_count: file.words,
+      word_count: resolveProjectFileWordCount(file),
       source_storage_path: sourceStoragePath,
       xliff_version: file.xliffVersion ?? null,
       error_message: file.errorMessage ?? null,
@@ -1192,6 +1194,22 @@ function deriveProjectStatusFromRows(files: ProjectFileRow[]): ProjectRow["statu
   }
 
   return "active";
+}
+
+function resolveProjectFileWordCount(file: ProjectFileSyncInput) {
+  if (!file.content) {
+    return file.words;
+  }
+
+  if (/\.(xliff|xlf)$/i.test(file.name)) {
+    try {
+      return countXliffTranslationWords(file.content);
+    } catch {
+      return countMeaningfulTextContent(file.content);
+    }
+  }
+
+  return countMeaningfulTextContent(file.content);
 }
 
 function mapProjectExportRecord(projectExport: ProjectExportRow): ProjectExportRecord {

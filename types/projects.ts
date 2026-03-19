@@ -20,6 +20,7 @@ export interface ProjectFileRecord {
 export interface ProjectFileSyncInput {
   clientId: string;
   name: string;
+  content?: string;
   sourceLanguage: string;
   targetLanguage: string;
   words: number;

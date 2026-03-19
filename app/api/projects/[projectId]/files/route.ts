@@ -66,6 +66,7 @@ function normalizeFileInput(file: Partial<ProjectFileSyncInput>): ProjectFileSyn
       ? Math.max(0, Math.min(100, Math.round(file.progress)))
       : 0;
   const status = normalizeStatus(file.status);
+  const content = typeof file.content === "string" ? file.content : undefined;
 
   if (!clientId || !name || !sourceLanguage || !targetLanguage || !status) {
     return null;
@@ -74,6 +75,7 @@ function normalizeFileInput(file: Partial<ProjectFileSyncInput>): ProjectFileSyn
   return {
     clientId,
     name,
+    content,
     sourceLanguage,
     targetLanguage,
     words,
