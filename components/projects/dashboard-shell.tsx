@@ -14,8 +14,8 @@ type DashboardShellProps = {
 
 const secondaryNavItems = [
   { label: "Usage", href: "/usage", icon: UsageIcon },
-  { label: "Glossary", icon: GlossaryIcon },
-  { label: "Settings", icon: SettingsIcon }
+  { label: "Glossary", href: "/glossary", icon: GlossaryIcon },
+  { label: "Settings", href: "/settings", icon: SettingsIcon }
 ];
 
 export function DashboardShell({ children }: DashboardShellProps) {
