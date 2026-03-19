@@ -10,11 +10,10 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   return (
     <span
       className={[
-        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium",
+        "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
         styles.className
       ].join(" ")}
     >
-      <span className={["h-1.5 w-1.5 rounded-full", styles.dotClassName].join(" ")} />
       {status}
     </span>
   );
@@ -25,36 +24,26 @@ function getBadgeStyles(status: ProjectStatus | FileStatus) {
     case "Active":
     case "Processing":
       return {
-        className:
-          "border-[rgba(36,91,144,0.12)] bg-[rgba(36,91,144,0.08)] text-[rgb(36,91,144)]",
-        dotClassName: "bg-[rgb(36,91,144)]"
+        className: "bg-[rgba(84,131,185,0.14)] text-[rgb(72,112,158)]"
       };
     case "In Review":
     case "Review":
       return {
-        className:
-          "border-[rgba(135,101,28,0.12)] bg-[rgba(135,101,28,0.08)] text-[rgb(135,101,28)]",
-        dotClassName: "bg-[rgb(135,101,28)]"
+        className: "bg-[rgba(238,204,113,0.28)] text-[rgb(153,120,28)]"
       };
     case "Completed":
     case "Done":
       return {
-        className:
-          "border-[rgba(34,98,73,0.12)] bg-[rgba(34,98,73,0.08)] text-[rgb(34,98,73)]",
-        dotClassName: "bg-[rgb(34,98,73)]"
+        className: "bg-[rgba(164,226,174,0.26)] text-[rgb(61,133,74)]"
       };
     case "Error":
       return {
-        className:
-          "border-[rgba(157,62,47,0.12)] bg-[rgba(157,62,47,0.08)] text-[rgb(157,62,47)]",
-        dotClassName: "bg-[rgb(157,62,47)]"
+        className: "bg-[rgba(245,183,177,0.34)] text-[rgb(183,72,62)]"
       };
     case "Queued":
     default:
       return {
-        className:
-          "border-[rgba(78,82,74,0.12)] bg-[rgba(78,82,74,0.08)] text-[rgb(78,82,74)]",
-        dotClassName: "bg-[rgb(78,82,74)]"
+        className: "bg-[rgba(222,224,229,0.55)] text-[rgb(95,99,109)]"
       };
   }
 }
