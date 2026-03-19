@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getProjectStatusTone } from "@/lib/projects/display";
 import { formatCompactNumber, formatPercent, formatProjectDate, getLanguageLabel } from "@/lib/projects/formatters";
 import { getProjectSummary } from "@/lib/projects/mock-data";
-import type { ProjectRecord } from "@/types/projects";
+import type { ProjectFileRecord, ProjectFileSyncInput, ProjectRecord } from "@/types/projects";
 import type { TranslationApiErrorShape, TranslationApiSuccess } from "@/types/translation";
 
 import { ProgressBar } from "@/components/projects/progress-bar";
@@ -31,9 +31,22 @@ type ProjectTranslationFailure = {
   message: string;
 };
 
+type UploadedSourceFile = {
+  id: string;
+  file: File;
+  name: string;
+  words: number;
+  lastUpdated: string;
+};
+
+type RuntimeFileState = Pick<ProjectFileRecord, "status" | "progress" | "lastUpdated" | "words">;
+
 export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps) {
   const [hasMounted, setHasMounted] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedSourceFiles, setUploadedSourceFiles] = useState<UploadedSourceFile[]>([]);
+  const [persistedFiles, setPersistedFiles] = useState<ProjectFileRecord[]>(project?.files ?? []);
+  const [runtimeFileStates, setRuntimeFileStates] = useState<Record<string, RuntimeFileState>>({});
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationProgress, setTranslationProgress] = useState(0);
   const [currentTaskLabel, setCurrentTaskLabel] = useState<string | null>(null);
@@ -41,11 +54,122 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
   const [translationOutputs, setTranslationOutputs] = useState<ProjectTranslationOutput[]>([]);
   const [translationFailures, setTranslationFailures] = useState<ProjectTranslationFailure[]>([]);
   const uploadInputId = `project-upload-${project?.id ?? "unknown"}`;
-  const summary = project ? getProjectSummary(project) : null;
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  useEffect(() => {
+    setPersistedFiles(project?.files ?? []);
+  }, [project]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function buildSourceFileSnapshots() {
+      const snapshots = await Promise.all(
+        selectedFiles.map(async (file) => {
+          const content = await file.text();
+
+          return {
+            id: getClientFileId(file),
+            file,
+            name: file.name,
+            words: countWords(content),
+            lastUpdated: new Date(file.lastModified || Date.now()).toISOString()
+          };
+        })
+      );
+
+      if (!cancelled) {
+        setUploadedSourceFiles(snapshots);
+      }
+    }
+
+    void buildSourceFileSnapshots();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFiles]);
+
+  const runtimeFiles = useMemo(() => {
+    if (!project) {
+      return [];
+    }
+
+    return uploadedSourceFiles.flatMap((sourceFile) =>
+      project.targetLanguages.map((targetLanguage) => {
+        const runtimeId = buildRuntimeFileId(sourceFile.id, targetLanguage);
+        const runtimeState = runtimeFileStates[runtimeId];
+
+        return {
+          id: runtimeId,
+          name: sourceFile.name,
+          sourceLanguage: project.sourceLanguage,
+          targetLanguage,
+          status: runtimeState?.status ?? "Queued",
+          progress: runtimeState?.progress ?? 0,
+          lastUpdated: runtimeState?.lastUpdated ?? sourceFile.lastUpdated,
+          words: runtimeState?.words ?? sourceFile.words
+        } satisfies ProjectFileRecord;
+      })
+    );
+  }, [project, runtimeFileStates, uploadedSourceFiles]);
+
+  const displayFiles = useMemo(() => {
+    if (!project) {
+      return [];
+    }
+
+    return mergeProjectFiles(persistedFiles, runtimeFiles);
+  }, [persistedFiles, project, runtimeFiles]);
+
+  const summary = useMemo(() => {
+    if (!project) {
+      return null;
+    }
+
+    return getProjectSummary({
+      ...project,
+      files: displayFiles
+    });
+  }, [displayFiles, project]);
+
+  const displayProjectStatus = useMemo(
+    () => deriveProjectStatusFromFiles(displayFiles, project?.status ?? "Active"),
+    [displayFiles, project?.status]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncUploadedFiles() {
+      if (!project || uploadedSourceFiles.length === 0 || project.targetLanguages.length === 0) {
+        return;
+      }
+
+      try {
+        const files = await syncProjectFilesRequest(
+          project.id,
+          buildProjectFileSyncPayload(project, uploadedSourceFiles, {}),
+          "POST"
+        );
+
+        if (!cancelled) {
+          setPersistedFiles(files);
+        }
+      } catch {
+        // Keep the local runtime summary responsive even if metadata sync fails.
+      }
+    }
+
+    void syncUploadedFiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project, uploadedSourceFiles]);
 
   if (!project || !summary) {
     return (
@@ -101,10 +225,18 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
       return;
     }
 
-    const jobs = selectedFiles.flatMap((file) =>
+    if (uploadedSourceFiles.length !== selectedFiles.length) {
+      setTranslationError("Files are still being prepared. Try again in a second.");
+      return;
+    }
+
+    const jobs = uploadedSourceFiles.flatMap((sourceFile) =>
       currentProject.targetLanguages.map((targetLanguage) => ({
-        file,
-        targetLanguage
+        id: buildRuntimeFileId(sourceFile.id, targetLanguage),
+        file: sourceFile.file,
+        sourceFileName: sourceFile.name,
+        targetLanguage,
+        words: sourceFile.words
       }))
     );
 
@@ -121,12 +253,36 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
     setTranslationError(null);
     setTranslationOutputs([]);
     setTranslationFailures([]);
+    setRuntimeFileStates((current) => {
+      const next = { ...current };
+
+      for (const job of jobs) {
+        next[job.id] = {
+          status: "Queued",
+          progress: 0,
+          lastUpdated: new Date().toISOString(),
+          words: job.words
+        };
+      }
+
+      return next;
+    });
 
     const nextOutputs: ProjectTranslationOutput[] = [];
     const nextFailures: ProjectTranslationFailure[] = [];
+    const finalRuntimeStates: Record<string, RuntimeFileState> = {};
 
     for (const [index, job] of jobs.entries()) {
-      setCurrentTaskLabel(`${job.file.name} → ${job.targetLanguage.toUpperCase()}`);
+      setCurrentTaskLabel(`${job.sourceFileName} → ${job.targetLanguage.toUpperCase()}`);
+      setRuntimeFileStates((current) => ({
+        ...current,
+        [job.id]: {
+          status: "Processing",
+          progress: 48,
+          lastUpdated: new Date().toISOString(),
+          words: job.words
+        }
+      }));
 
       try {
         const formData = new FormData();
@@ -143,29 +299,79 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
 
         if (!response.ok || "error" in payload) {
           nextFailures.push({
-            id: `${job.file.name}-${job.targetLanguage}-${index}`,
-            sourceFileName: job.file.name,
+            id: `${job.sourceFileName}-${job.targetLanguage}-${index}`,
+            sourceFileName: job.sourceFileName,
             targetLanguage: job.targetLanguage,
             message: "error" in payload ? payload.error.message : "Translation failed."
           });
+          setRuntimeFileStates((current) => ({
+            ...current,
+            [job.id]: {
+              status: "Error",
+              progress: 100,
+              lastUpdated: new Date().toISOString(),
+              words: job.words
+            }
+          }));
         } else {
           nextOutputs.push({
             ...payload,
-            id: `${job.file.name}-${job.targetLanguage}-${index}`,
-            sourceFileName: job.file.name,
+            id: `${job.sourceFileName}-${job.targetLanguage}-${index}`,
+            sourceFileName: job.sourceFileName,
             targetLanguage: job.targetLanguage
           });
+          finalRuntimeStates[job.id] = {
+            status: "Done",
+            progress: 100,
+            lastUpdated: new Date().toISOString(),
+            words: job.words
+          };
+          setRuntimeFileStates((current) => ({
+            ...current,
+            [job.id]: {
+              status: "Done",
+              progress: 100,
+              lastUpdated: new Date().toISOString(),
+              words: job.words
+            }
+          }));
         }
       } catch (error) {
         nextFailures.push({
-          id: `${job.file.name}-${job.targetLanguage}-${index}`,
-          sourceFileName: job.file.name,
+          id: `${job.sourceFileName}-${job.targetLanguage}-${index}`,
+          sourceFileName: job.sourceFileName,
           targetLanguage: job.targetLanguage,
-          message: error instanceof Error ? error.message : "Translation failed."
-        });
+            message: error instanceof Error ? error.message : "Translation failed."
+          });
+        finalRuntimeStates[job.id] = {
+          status: "Error",
+          progress: 100,
+          lastUpdated: new Date().toISOString(),
+          words: job.words
+        };
+        setRuntimeFileStates((current) => ({
+          ...current,
+          [job.id]: {
+            status: "Error",
+            progress: 100,
+            lastUpdated: new Date().toISOString(),
+            words: job.words
+          }
+        }));
       } finally {
         setTranslationProgress(Math.round(((index + 1) / jobs.length) * 100));
       }
+    }
+
+    try {
+      const files = await syncProjectFilesRequest(
+        currentProject.id,
+        buildProjectFileSyncPayload(currentProject, uploadedSourceFiles, finalRuntimeStates),
+        "PATCH"
+      );
+      setPersistedFiles(files);
+    } catch {
+      // Keep the successful translation outputs available even when file metadata sync fails.
     }
 
     setTranslationOutputs(nextOutputs);
@@ -212,7 +418,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               <h1 className="text-[18px] font-semibold tracking-[-0.4px] text-[var(--foreground)]">
                 {project.name}
               </h1>
-              <StatusBadge status={project.status} />
+              <StatusBadge status={displayProjectStatus} />
             </div>
 
             <p className="mt-1 truncate text-[12px] text-[var(--muted-soft)]">
@@ -272,7 +478,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
             <ProgressBar
               value={summary.overallProgress}
               size="sm"
-              tone={getProjectStatusTone(project.status)}
+              tone={getProjectStatusTone(displayProjectStatus)}
             />
           </div>
         </section>
@@ -414,7 +620,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               {project.targetLanguages.map(getLanguageLabel).join(", ")}
             </div>
           </div>
-          <ProjectFilesTable files={project.files} title={null} />
+          <ProjectFilesTable files={displayFiles} title={null} />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2">
@@ -476,6 +682,115 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
 
 function isSupportedTranslationFile(fileName: string) {
   return /\.(xliff|xlf)$/i.test(fileName);
+}
+
+function buildRuntimeFileId(sourceFileId: string, targetLanguage: string) {
+  return `runtime:${sourceFileId}:${targetLanguage}`;
+}
+
+function getClientFileId(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
+function countWords(content: string) {
+  const plainText = content
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[\r\n\t]+/g, " ")
+    .trim();
+
+  if (!plainText) {
+    return 0;
+  }
+
+  return plainText.split(/\s+/).length;
+}
+
+function mergeProjectFiles(existingFiles: ProjectFileRecord[], runtimeFiles: ProjectFileRecord[]) {
+  const merged = new Map<string, ProjectFileRecord>();
+
+  for (const file of existingFiles) {
+    merged.set(getProjectFileMergeKey(file), file);
+  }
+
+  for (const file of runtimeFiles) {
+    merged.set(getProjectFileMergeKey(file), file);
+  }
+
+  return Array.from(merged.values()).sort(
+    (left, right) => new Date(right.lastUpdated).getTime() - new Date(left.lastUpdated).getTime()
+  );
+}
+
+async function syncProjectFilesRequest(
+  projectId: string,
+  files: ProjectFileSyncInput[],
+  method: "POST" | "PATCH"
+) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/files`, {
+    method,
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ files })
+  });
+
+  const payload = (await response.json()) as {
+    error?: string;
+    files?: ProjectFileRecord[];
+  };
+
+  if (!response.ok || !payload.files) {
+    throw new Error(payload.error ?? "Failed to sync project files.");
+  }
+
+  return payload.files;
+}
+
+function buildProjectFileSyncPayload(
+  project: Pick<ProjectRecord, "sourceLanguage" | "targetLanguages">,
+  sourceFiles: UploadedSourceFile[],
+  runtimeStates: Record<string, RuntimeFileState>
+): ProjectFileSyncInput[] {
+  return sourceFiles.flatMap((sourceFile) =>
+    project.targetLanguages.map((targetLanguage) => {
+      const runtimeId = buildRuntimeFileId(sourceFile.id, targetLanguage);
+      const runtimeState = runtimeStates[runtimeId];
+
+      return {
+        clientId: sourceFile.id,
+        name: sourceFile.name,
+        sourceLanguage: project.sourceLanguage,
+        targetLanguage,
+        words: runtimeState?.words ?? sourceFile.words,
+        status: runtimeState?.status ?? "Queued",
+        progress: runtimeState?.progress ?? 0
+      };
+    })
+  );
+}
+
+function getProjectFileMergeKey(file: Pick<ProjectFileRecord, "name" | "targetLanguage">) {
+  return `${file.name.toLowerCase()}::${file.targetLanguage.toLowerCase()}`;
+}
+
+function deriveProjectStatusFromFiles(files: ProjectFileRecord[], fallbackStatus: ProjectRecord["status"]) {
+  if (files.some((file) => file.status === "Error")) {
+    return "Error";
+  }
+
+  if (files.length > 0 && files.every((file) => file.status === "Done")) {
+    return "Completed";
+  }
+
+  if (files.some((file) => file.status === "Review")) {
+    return "In Review";
+  }
+
+  if (files.length > 0) {
+    return "Active";
+  }
+
+  return fallbackStatus;
 }
 
 function downloadTextFile(fileName: string, content: string, mimeType: string) {

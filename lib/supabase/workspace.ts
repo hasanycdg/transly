@@ -5,10 +5,12 @@ import { unstable_noStore as noStore } from "next/cache";
 import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import type {
+  FileStatus,
   NewProjectInput,
   ProjectActivityRecord,
   ProjectExportRecord,
   ProjectFileRecord,
+  ProjectFileSyncInput,
   ProjectRecord,
   ProjectStatus
 } from "@/types/projects";
@@ -82,11 +84,15 @@ type ProjectFileRow = {
   id: string;
   project_id: string;
   name: string;
+  file_format?: "xliff" | "xlf" | "po" | "strings" | "resx";
   source_language: string;
   target_language: string;
   status: "queued" | "processing" | "review" | "done" | "error";
   progress_percent: number;
   word_count: number;
+  source_storage_path?: string | null;
+  xliff_version?: string | null;
+  error_message?: string | null;
   updated_at: string;
 };
 
@@ -209,6 +215,138 @@ export async function getProjectRecordBySlug(projectSlug: string): Promise<Proje
   const projects = await getProjectRecords();
 
   return projects.find((project) => project.id === projectSlug) ?? null;
+}
+
+export async function syncProjectFiles(
+  projectSlug: string,
+  files: ProjectFileSyncInput[]
+): Promise<ProjectFileRecord[]> {
+  const { supabase, workspace } = await getWorkspaceContext();
+  const project = await getProjectRowBySlug(supabase, workspace.id, projectSlug);
+
+  if (!project) {
+    throw new Error("Project not found.");
+  }
+
+  if (files.length === 0) {
+    return [];
+  }
+
+  const now = new Date().toISOString();
+  const targetLanguages = Array.from(new Set(files.map((file) => file.targetLanguage)));
+  const fileNames = Array.from(new Set(files.map((file) => file.name)));
+  const sourcePaths = Array.from(new Set(files.map((file) => buildLocalSourcePath(file.clientId))));
+
+  const { data: existingData, error: existingError } = await supabase
+    .from("project_files")
+    .select(
+      "id, project_id, name, file_format, source_language, target_language, status, progress_percent, word_count, source_storage_path, xliff_version, error_message, updated_at"
+    )
+    .eq("project_id", project.id)
+    .in("target_language", targetLanguages)
+    .in("name", fileNames);
+
+  if (existingError) {
+    throw new Error(`Failed to load project files: ${existingError.message}`);
+  }
+
+  const existingFiles = (existingData as ProjectFileRow[] | null) ?? [];
+  const existingBySourceKey = new Map<string, ProjectFileRow>();
+  const existingByFallbackKey = new Map<string, ProjectFileRow>();
+
+  for (const file of existingFiles) {
+    const sourcePath = file.source_storage_path ?? null;
+
+    if (sourcePath && sourcePaths.includes(sourcePath)) {
+      existingBySourceKey.set(getProjectFileSourceKey(file.name, file.target_language, sourcePath), file);
+    }
+
+    existingByFallbackKey.set(getProjectFileFallbackKey(file.name, file.target_language), file);
+  }
+
+  const inserts: Array<Record<string, unknown>> = [];
+  const updates: Array<{ id: string; values: Record<string, unknown> }> = [];
+
+  for (const file of files) {
+    const sourceStoragePath = buildLocalSourcePath(file.clientId);
+    const existing =
+      existingBySourceKey.get(getProjectFileSourceKey(file.name, file.targetLanguage, sourceStoragePath)) ??
+      existingByFallbackKey.get(getProjectFileFallbackKey(file.name, file.targetLanguage));
+
+    const values = {
+      project_id: project.id,
+      name: file.name,
+      file_format: getFileFormat(file.name),
+      source_language: file.sourceLanguage,
+      target_language: file.targetLanguage,
+      status: mapFileStatusToDatabase(file.status),
+      progress_percent: file.progress,
+      word_count: file.words,
+      source_storage_path: sourceStoragePath,
+      xliff_version: file.xliffVersion ?? null,
+      error_message: file.errorMessage ?? null,
+      updated_at: now
+    } satisfies Record<string, unknown>;
+
+    if (existing) {
+      updates.push({
+        id: existing.id,
+        values
+      });
+    } else {
+      inserts.push({
+        ...values,
+        uploaded_at: now
+      });
+    }
+  }
+
+  if (inserts.length > 0) {
+    const { error: insertError } = await supabase.from("project_files").insert(inserts);
+
+    if (insertError) {
+      throw new Error(`Failed to insert project files: ${insertError.message}`);
+    }
+  }
+
+  for (const update of updates) {
+    const { error: updateError } = await supabase
+      .from("project_files")
+      .update(update.values)
+      .eq("id", update.id);
+
+    if (updateError) {
+      throw new Error(`Failed to update project file: ${updateError.message}`);
+    }
+  }
+
+  const { data: refreshedData, error: refreshedError } = await supabase
+    .from("project_files")
+    .select(
+      "id, project_id, name, file_format, source_language, target_language, status, progress_percent, word_count, source_storage_path, xliff_version, error_message, updated_at"
+    )
+    .eq("project_id", project.id)
+    .order("updated_at", { ascending: false });
+
+  if (refreshedError) {
+    throw new Error(`Failed to reload project files: ${refreshedError.message}`);
+  }
+
+  const refreshedFiles = (refreshedData as ProjectFileRow[] | null) ?? [];
+  const projectStatus = deriveProjectStatusFromRows(refreshedFiles);
+  const { error: projectUpdateError } = await supabase
+    .from("projects")
+    .update({
+      status: projectStatus,
+      updated_at: now
+    })
+    .eq("id", project.id);
+
+  if (projectUpdateError) {
+    throw new Error(`Failed to update project status: ${projectUpdateError.message}`);
+  }
+
+  return refreshedFiles.map(mapProjectFileRecord);
 }
 
 export async function getUsageScreenData(): Promise<UsageScreenData> {
@@ -680,7 +818,7 @@ async function getProjectRecords(): Promise<ProjectRecord[]> {
       .order("sort_order", { ascending: true }),
     supabase
       .from("project_files")
-      .select("id, project_id, name, source_language, target_language, status, progress_percent, word_count, updated_at")
+      .select("id, project_id, name, file_format, source_language, target_language, status, progress_percent, word_count, source_storage_path, xliff_version, error_message, updated_at")
       .in("project_id", projectIds)
       .order("updated_at", { ascending: false }),
     supabase
@@ -865,6 +1003,25 @@ function selectWorkspaceSettings(
     .maybeSingle();
 }
 
+async function getProjectRowBySlug(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string,
+  projectSlug: string
+) {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, workspace_id, slug, name, description, source_language, status, glossary_enabled, credits_used, quality_score, origin, updated_at")
+    .eq("workspace_id", workspaceId)
+    .eq("slug", projectSlug)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load project: ${error.message}`);
+  }
+
+  return data as ProjectRow | null;
+}
+
 function isUniqueViolation(error: { code?: string | null }) {
   return error.code === "23505";
 }
@@ -946,6 +1103,70 @@ function mapProjectFileRecord(file: ProjectFileRow): ProjectFileRecord {
     lastUpdated: file.updated_at,
     words: file.word_count
   };
+}
+
+function getFileFormat(fileName: string): NonNullable<ProjectFileRow["file_format"]> {
+  if (/\.xlf$/i.test(fileName)) {
+    return "xlf";
+  }
+
+  if (/\.po$/i.test(fileName)) {
+    return "po";
+  }
+
+  if (/\.strings$/i.test(fileName)) {
+    return "strings";
+  }
+
+  if (/\.resx$/i.test(fileName)) {
+    return "resx";
+  }
+
+  return "xliff";
+}
+
+function buildLocalSourcePath(clientId: string) {
+  return `local:${clientId}`;
+}
+
+function getProjectFileSourceKey(name: string, targetLanguage: string, sourceStoragePath: string) {
+  return `${name.toLowerCase()}::${targetLanguage.toLowerCase()}::${sourceStoragePath}`;
+}
+
+function getProjectFileFallbackKey(name: string, targetLanguage: string) {
+  return `${name.toLowerCase()}::${targetLanguage.toLowerCase()}`;
+}
+
+function mapFileStatusToDatabase(status: FileStatus): ProjectFileRow["status"] {
+  switch (status) {
+    case "Processing":
+      return "processing";
+    case "Review":
+      return "review";
+    case "Done":
+      return "done";
+    case "Error":
+      return "error";
+    case "Queued":
+    default:
+      return "queued";
+  }
+}
+
+function deriveProjectStatusFromRows(files: ProjectFileRow[]): ProjectRow["status"] {
+  if (files.some((file) => file.status === "error")) {
+    return "error";
+  }
+
+  if (files.length > 0 && files.every((file) => file.status === "done")) {
+    return "completed";
+  }
+
+  if (files.some((file) => file.status === "review")) {
+    return "in_review";
+  }
+
+  return "active";
 }
 
 function mapProjectExportRecord(projectExport: ProjectExportRow): ProjectExportRecord {

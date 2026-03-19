@@ -17,6 +17,18 @@ export interface ProjectFileRecord {
   words: number;
 }
 
+export interface ProjectFileSyncInput {
+  clientId: string;
+  name: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  words: number;
+  status: FileStatus;
+  progress: number;
+  errorMessage?: string | null;
+  xliffVersion?: string | null;
+}
+
 export interface ProjectActivityRecord {
   id: string;
   title: string;
