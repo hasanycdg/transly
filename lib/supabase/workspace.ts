@@ -95,6 +95,8 @@ type ProjectFileRow = {
   source_storage_path?: string | null;
   xliff_version?: string | null;
   error_message?: string | null;
+  uploaded_at?: string;
+  created_at?: string;
   updated_at: string;
 };
 
@@ -144,6 +146,34 @@ type UsageBreakdownRow = {
   metric_value: number;
   share_percent: number | null;
   sort_order: number;
+};
+
+type ArchivedDailyUsageRow = {
+  usage_date: string;
+  credits_used: number;
+  api_requests: number;
+  upload_count: number;
+  export_count: number;
+  review_sessions: number;
+  active_projects: number;
+};
+
+type WorkspaceDailyUsageSnapshotRow = ArchivedDailyUsageRow & {
+  billing_cycle_id: string | null;
+};
+
+type DeletedProjectUsageArchive = {
+  dailyRows: ArchivedDailyUsageRow[];
+};
+
+type UsageArchiveRollbackSnapshot = {
+  previousDailyRows: WorkspaceDailyUsageSnapshotRow[];
+  insertedDates: string[];
+  workspaceCreditsUsed: number;
+  billingCycle: {
+    id: string;
+    creditsUsed: number;
+  } | null;
 };
 
 type GlossaryCollectionRow = {
@@ -351,6 +381,47 @@ export async function syncProjectFiles(
   return refreshedFiles.map(mapProjectFileRecord);
 }
 
+export async function deleteProject(projectSlug: string): Promise<void> {
+  const { supabase, workspace } = await getWorkspaceContext();
+  const project = await getProjectRowBySlug(supabase, workspace.id, projectSlug);
+
+  if (!project) {
+    throw new Error("Project not found.");
+  }
+
+  const { data: filesData, error: filesError } = await supabase
+    .from("project_files")
+    .select(
+      "id, project_id, name, file_format, source_language, target_language, status, progress_percent, word_count, source_storage_path, xliff_version, error_message, uploaded_at, created_at, updated_at"
+    )
+    .eq("project_id", project.id)
+    .order("updated_at", { ascending: false });
+
+  if (filesError) {
+    throw new Error(`Failed to load project files for deletion: ${filesError.message}`);
+  }
+
+  const projectFiles = (filesData as ProjectFileRow[] | null) ?? [];
+  const usageArchive = buildDeletedProjectUsageArchive(project, projectFiles);
+  const rollbackSnapshot = await archiveDeletedProjectUsage(supabase, workspace.id, usageArchive, workspace.credits_used ?? 0);
+
+  const { error: deleteError } = await supabase.from("projects").delete().eq("id", project.id);
+
+  if (deleteError) {
+    try {
+      await rollbackArchivedProjectUsage(supabase, workspace.id, rollbackSnapshot);
+    } catch (rollbackError) {
+      throw new Error(
+        `Failed to delete project: ${deleteError.message}. Rollback failed: ${
+          rollbackError instanceof Error ? rollbackError.message : "Unknown rollback error."
+        }`
+      );
+    }
+
+    throw new Error(`Failed to delete project: ${deleteError.message}`);
+  }
+}
+
 export async function getUsageScreenData(): Promise<UsageScreenData> {
   noStore();
 
@@ -370,8 +441,7 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
         .from("workspace_daily_usage")
         .select("usage_date, credits_used, api_requests, upload_count, export_count, review_sessions, active_projects")
         .eq("workspace_id", workspace.id)
-        .order("usage_date", { ascending: false })
-        .limit(10),
+        .order("usage_date", { ascending: false }),
       supabase
         .from("workspace_usage_breakdown")
         .select("metric_key, metric_label, metric_value, share_percent, sort_order")
@@ -398,35 +468,32 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
   const derivedUsage = deriveUsageFromProjects(projects, now);
   const activeProjects = projects.filter((project) => project.status !== "Completed").length;
   const reviewProjects = projects.filter((project) => project.status === "In Review").length;
-  const effectiveUsageRows = normalizeUsageRows(
-    mergeUsageRows(usageRows, derivedUsage.dailyRows, activeProjects),
-    now,
-    activeProjects
-  );
+  const mergedUsageRows = mergeUsageRows(usageRows, derivedUsage.dailyRows, activeProjects);
+  const effectiveUsageRows = normalizeUsageRows(mergedUsageRows, now, activeProjects);
 
   const creditsLimit = billingCycle?.credits_limit ?? workspace.credits_limit ?? DEFAULT_CREDITS_LIMIT;
   const creditsUsed = Math.max(
     billingCycle?.credits_used ?? 0,
     workspace.credits_used ?? 0,
     derivedUsage.creditsUsed,
-    effectiveUsageRows.reduce((sum, row) => sum + row.credits_used, 0)
+    mergedUsageRows.reduce((sum, row) => sum + row.credits_used, 0)
   );
   const cycleConsumedPercent = creditsLimit > 0 ? Math.round((creditsUsed / creditsLimit) * 100) : 0;
   const totalApiRequests = Math.max(
     derivedUsage.totalApiRequests,
-    effectiveUsageRows.reduce((sum, row) => sum + row.api_requests, 0)
+    mergedUsageRows.reduce((sum, row) => sum + row.api_requests, 0)
   );
   const totalUploads = Math.max(
     derivedUsage.totalUploads,
-    effectiveUsageRows.reduce((sum, row) => sum + row.upload_count, 0)
+    mergedUsageRows.reduce((sum, row) => sum + row.upload_count, 0)
   );
   const totalExports = Math.max(
     derivedUsage.totalExports,
-    effectiveUsageRows.reduce((sum, row) => sum + row.export_count, 0)
+    mergedUsageRows.reduce((sum, row) => sum + row.export_count, 0)
   );
   const totalReviews = Math.max(
     derivedUsage.totalReviews,
-    effectiveUsageRows.reduce((sum, row) => sum + row.review_sessions, 0)
+    mergedUsageRows.reduce((sum, row) => sum + row.review_sessions, 0)
   );
   const today = formatDateKey(now);
   const todayRow = effectiveUsageRows.find((row) => row.usage_date === today);
@@ -1280,6 +1347,275 @@ function mapUsageTrendPoint(row: DailyUsageRow): UsageTrendPoint {
   };
 }
 
+function buildDeletedProjectUsageArchive(
+  project: ProjectRow,
+  projectFiles: ProjectFileRow[]
+): DeletedProjectUsageArchive {
+  const dailyRows = new Map<string, ArchivedDailyUsageRow>();
+  const uploadKeys = new Set<string>();
+  const activeProjects = project.status === "completed" ? 0 : 1;
+
+  for (const file of projectFiles) {
+    const fileDate = getProjectFileUsageDate(file);
+
+    if (!fileDate) {
+      continue;
+    }
+
+    const usageDate = formatDateKey(fileDate);
+    const row = getOrCreateArchivedDailyUsageRow(dailyRows, usageDate, activeProjects);
+    const uploadKey = `${project.id}::${file.name.toLowerCase()}::${file.source_language.toLowerCase()}`;
+    const countsAsTranslation = file.status !== "queued";
+
+    if (!uploadKeys.has(uploadKey)) {
+      uploadKeys.add(uploadKey);
+      row.upload_count += 1;
+    }
+
+    if (countsAsTranslation) {
+      row.credits_used += file.word_count;
+      row.api_requests += 1;
+    }
+
+    if (file.status === "done") {
+      row.export_count += 1;
+    }
+
+    if (file.status === "review") {
+      row.review_sessions += 1;
+    }
+  }
+
+  return {
+    dailyRows: Array.from(dailyRows.values()).sort((left, right) => left.usage_date.localeCompare(right.usage_date))
+  };
+}
+
+async function archiveDeletedProjectUsage(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string,
+  usageArchive: DeletedProjectUsageArchive,
+  workspaceCreditsUsed: number
+): Promise<UsageArchiveRollbackSnapshot> {
+  const impactedDates = usageArchive.dailyRows.map((row) => row.usage_date);
+  const [{ data: activeCycleData, error: activeCycleError }, { data: existingUsageData, error: existingUsageError }] =
+    await Promise.all([
+      supabase
+        .from("workspace_billing_cycles")
+        .select("id, period_start, period_end, credits_used")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "active")
+        .order("period_start", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      impactedDates.length > 0
+        ? supabase
+            .from("workspace_daily_usage")
+            .select(
+              "usage_date, billing_cycle_id, credits_used, api_requests, upload_count, export_count, review_sessions, active_projects"
+            )
+            .eq("workspace_id", workspaceId)
+            .in("usage_date", impactedDates)
+        : Promise.resolve({ data: [], error: null })
+    ]);
+
+  if (activeCycleError) {
+    throw new Error(`Failed to load active billing cycle: ${activeCycleError.message}`);
+  }
+
+  if (existingUsageError) {
+    throw new Error(`Failed to load existing usage rows: ${existingUsageError.message}`);
+  }
+
+  const activeCycle = activeCycleData as Pick<BillingCycleRow, "id" | "period_start" | "period_end" | "credits_used"> | null;
+  const existingRows = (existingUsageData as WorkspaceDailyUsageSnapshotRow[] | null) ?? [];
+  const existingByDate = new Map(existingRows.map((row) => [row.usage_date, row]));
+
+  if (usageArchive.dailyRows.length > 0) {
+    const upsertRows = usageArchive.dailyRows.map((row) => {
+      const existing = existingByDate.get(row.usage_date);
+
+      return {
+        workspace_id: workspaceId,
+        billing_cycle_id: existing?.billing_cycle_id ?? activeCycle?.id ?? null,
+        usage_date: row.usage_date,
+        credits_used: (existing?.credits_used ?? 0) + row.credits_used,
+        api_requests: (existing?.api_requests ?? 0) + row.api_requests,
+        upload_count: (existing?.upload_count ?? 0) + row.upload_count,
+        export_count: (existing?.export_count ?? 0) + row.export_count,
+        review_sessions: (existing?.review_sessions ?? 0) + row.review_sessions,
+        active_projects: Math.max(existing?.active_projects ?? 0, row.active_projects)
+      };
+    });
+
+    const { error: upsertError } = await supabase
+      .from("workspace_daily_usage")
+      .upsert(upsertRows, { onConflict: "workspace_id,usage_date" });
+
+    if (upsertError) {
+      throw new Error(`Failed to archive project usage: ${upsertError.message}`);
+    }
+  }
+
+  const nextWorkspaceCreditsUsed = Math.max(
+    workspaceCreditsUsed,
+    await getWorkspaceCurrentCreditsUsed(supabase, workspaceId)
+  );
+
+  if (nextWorkspaceCreditsUsed > workspaceCreditsUsed) {
+    const { error: workspaceUpdateError } = await supabase
+      .from("workspaces")
+      .update({ credits_used: nextWorkspaceCreditsUsed })
+      .eq("id", workspaceId);
+
+    if (workspaceUpdateError) {
+      throw new Error(`Failed to update workspace credits after archiving usage: ${workspaceUpdateError.message}`);
+    }
+  }
+
+  if (activeCycle) {
+    const cycleCreditsUsed = Math.max(activeCycle.credits_used, nextWorkspaceCreditsUsed);
+
+    if (cycleCreditsUsed > activeCycle.credits_used) {
+      const { error: billingUpdateError } = await supabase
+        .from("workspace_billing_cycles")
+        .update({ credits_used: cycleCreditsUsed })
+        .eq("id", activeCycle.id);
+
+      if (billingUpdateError) {
+        throw new Error(`Failed to update billing cycle usage: ${billingUpdateError.message}`);
+      }
+    }
+  }
+
+  return {
+    previousDailyRows: existingRows,
+    insertedDates: impactedDates.filter((usageDate) => !existingByDate.has(usageDate)),
+    workspaceCreditsUsed,
+    billingCycle: activeCycle
+      ? {
+          id: activeCycle.id,
+          creditsUsed: activeCycle.credits_used
+        }
+      : null
+  };
+}
+
+async function rollbackArchivedProjectUsage(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string,
+  rollbackSnapshot: UsageArchiveRollbackSnapshot
+) {
+  if (rollbackSnapshot.insertedDates.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("workspace_daily_usage")
+      .delete()
+      .eq("workspace_id", workspaceId)
+      .in("usage_date", rollbackSnapshot.insertedDates);
+
+    if (deleteError) {
+      throw new Error(`Failed to remove archived usage rows during rollback: ${deleteError.message}`);
+    }
+  }
+
+  if (rollbackSnapshot.previousDailyRows.length > 0) {
+    const restoreRows = rollbackSnapshot.previousDailyRows.map((row) => ({
+      workspace_id: workspaceId,
+      billing_cycle_id: row.billing_cycle_id,
+      usage_date: row.usage_date,
+      credits_used: row.credits_used,
+      api_requests: row.api_requests,
+      upload_count: row.upload_count,
+      export_count: row.export_count,
+      review_sessions: row.review_sessions,
+      active_projects: row.active_projects
+    }));
+
+    const { error: restoreError } = await supabase
+      .from("workspace_daily_usage")
+      .upsert(restoreRows, { onConflict: "workspace_id,usage_date" });
+
+    if (restoreError) {
+      throw new Error(`Failed to restore usage rows during rollback: ${restoreError.message}`);
+    }
+  }
+
+  const { error: workspaceError } = await supabase
+    .from("workspaces")
+    .update({ credits_used: rollbackSnapshot.workspaceCreditsUsed })
+    .eq("id", workspaceId);
+
+  if (workspaceError) {
+    throw new Error(`Failed to restore workspace credits during rollback: ${workspaceError.message}`);
+  }
+
+  if (rollbackSnapshot.billingCycle) {
+    const { error: billingError } = await supabase
+      .from("workspace_billing_cycles")
+      .update({ credits_used: rollbackSnapshot.billingCycle.creditsUsed })
+      .eq("id", rollbackSnapshot.billingCycle.id);
+
+    if (billingError) {
+      throw new Error(`Failed to restore billing cycle credits during rollback: ${billingError.message}`);
+    }
+  }
+}
+
+async function getWorkspaceCurrentCreditsUsed(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string,
+): Promise<number> {
+  const { data: projectsData, error: projectsError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("workspace_id", workspaceId);
+
+  if (projectsError) {
+    throw new Error(`Failed to load workspace projects while summarizing credits: ${projectsError.message}`);
+  }
+
+  const projectIds = (((projectsData as { id: string }[] | null) ?? [])).map((project) => project.id);
+
+  if (projectIds.length === 0) {
+    return 0;
+  }
+
+  const { data: filesData, error: filesError } = await supabase
+    .from("project_files")
+    .select("word_count, status")
+    .in("project_id", projectIds);
+
+  if (filesError) {
+    throw new Error(`Failed to load project files while summarizing credits: ${filesError.message}`);
+  }
+
+  return (((filesData as Pick<ProjectFileRow, "word_count" | "status">[] | null) ?? [])).reduce((sum, file) => {
+    if (file.status === "queued") {
+      return sum;
+    }
+
+    return sum + file.word_count;
+  }, 0);
+}
+
+function getProjectFileUsageDate(file: ProjectFileRow) {
+  const candidates = [file.updated_at, file.uploaded_at, file.created_at];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    const nextDate = new Date(candidate);
+
+    if (!Number.isNaN(nextDate.getTime())) {
+      return nextDate;
+    }
+  }
+
+  return null;
+}
+
 function deriveUsageFromProjects(projects: ProjectRecord[], now: Date) {
   const dailyRows = new Map<string, DailyUsageRow>();
   const uploadKeys = new Set<string>();
@@ -1368,11 +1704,11 @@ function mergeUsageRows(
 
     merged.set(row.usage_date, {
       usage_date: row.usage_date,
-      credits_used: Math.max(existing.credits_used, row.credits_used),
-      api_requests: Math.max(existing.api_requests, row.api_requests),
-      upload_count: Math.max(existing.upload_count, row.upload_count),
-      export_count: Math.max(existing.export_count, row.export_count),
-      review_sessions: Math.max(existing.review_sessions, row.review_sessions),
+      credits_used: existing.credits_used + row.credits_used,
+      api_requests: existing.api_requests + row.api_requests,
+      upload_count: existing.upload_count + row.upload_count,
+      export_count: existing.export_count + row.export_count,
+      review_sessions: existing.review_sessions + row.review_sessions,
       active_projects: Math.max(existing.active_projects, row.active_projects, activeProjects)
     });
   }
@@ -1415,6 +1751,32 @@ function getOrCreateDailyUsageRow(
   }
 
   const nextRow: DailyUsageRow = {
+    usage_date: usageDate,
+    credits_used: 0,
+    api_requests: 0,
+    upload_count: 0,
+    export_count: 0,
+    review_sessions: 0,
+    active_projects: activeProjects
+  };
+
+  rows.set(usageDate, nextRow);
+
+  return nextRow;
+}
+
+function getOrCreateArchivedDailyUsageRow(
+  rows: Map<string, ArchivedDailyUsageRow>,
+  usageDate: string,
+  activeProjects: number
+) {
+  const existing = rows.get(usageDate);
+
+  if (existing) {
+    return existing;
+  }
+
+  const nextRow: ArchivedDailyUsageRow = {
     usage_date: usageDate,
     credits_used: 0,
     api_requests: 0,

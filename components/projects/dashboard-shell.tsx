@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import type { DashboardShellData } from "@/types/workspace";
@@ -20,8 +20,52 @@ const secondaryNavItems = [
 
 export function DashboardShell({ children, shellData }: DashboardShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [hasMounted, setHasMounted] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(true);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const projects = shellData.projects;
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  async function handleDeleteProject(projectId: string, projectName: string) {
+    if (deletingProjectId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${projectName}"? The project will be removed from the database, but archived usage statistics will stay available.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingProjectId(projectId);
+
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE"
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Project deletion failed.");
+      }
+
+      if (pathname === `/projects/${projectId}`) {
+        router.replace("/projects");
+      }
+
+      router.refresh();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Project deletion failed.");
+    } finally {
+      setDeletingProjectId(null);
+    }
+  }
 
   return (
     <div className="h-screen overflow-hidden bg-[var(--background)]">
@@ -67,21 +111,59 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
 
                   {projects.map((project) => {
                     const active = pathname === `/projects/${project.id}`;
+                    const isDeleting = deletingProjectId === project.id;
+                    const linkClassName = [
+                      "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
+                      active
+                        ? "font-medium text-[var(--foreground)]"
+                        : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                    ].join(" ");
+
+                    if (!hasMounted) {
+                      return (
+                        <Link
+                          key={project.id}
+                          href={`/projects/${project.id}`}
+                          className={linkClassName}
+                          title={project.name}
+                        >
+                          {project.name}
+                        </Link>
+                      );
+                    }
 
                     return (
-                      <Link
-                        key={project.id}
-                        href={`/projects/${project.id}`}
-                        className={[
-                          "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
-                          active
-                            ? "font-medium text-[var(--foreground)]"
-                            : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                        ].join(" ")}
-                        title={project.name}
-                      >
-                        {project.name}
-                      </Link>
+                      <div key={project.id} className="group/project relative flex items-center">
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className={[
+                            linkClassName,
+                            "min-w-0 flex-1 pr-7"
+                          ].join(" ")}
+                          title={project.name}
+                        >
+                          {project.name}
+                        </Link>
+                        <button
+                          type="button"
+                          aria-label={`Delete ${project.name}`}
+                          disabled={Boolean(deletingProjectId)}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void handleDeleteProject(project.id, project.name);
+                          }}
+                          className={[
+                            "absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-[4px] text-[12px] leading-none transition",
+                            isDeleting
+                              ? "opacity-100 text-[var(--muted-soft)]"
+                              : "opacity-0 text-[rgba(17,17,16,0.34)] group-hover/project:opacity-100 hover:bg-[var(--background)] hover:text-[var(--foreground)] focus:opacity-100"
+                          ].join(" ")}
+                          title={`Delete ${project.name}`}
+                        >
+                          {isDeleting ? "…" : "×"}
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
