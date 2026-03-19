@@ -1,35 +1,12 @@
-"use client";
+import type { UsageScreenData } from "@/types/workspace";
 
-const usageTrend = [
-  { label: "Mar 1", value: 32 },
-  { label: "Mar 3", value: 41 },
-  { label: "Mar 5", value: 38 },
-  { label: "Mar 7", value: 52 },
-  { label: "Mar 9", value: 48 },
-  { label: "Mar 11", value: 61 },
-  { label: "Mar 13", value: 58 },
-  { label: "Mar 15", value: 67 },
-  { label: "Mar 17", value: 72 },
-  { label: "Mar 19", value: 76 }
-];
+type UsageScreenProps = {
+  data: UsageScreenData;
+};
 
-const featureUsage = [
-  { label: "XLIFF translations", value: "48.2k", percent: 82 },
-  { label: "Placeholder validation", value: "12.4k", percent: 61 },
-  { label: "Exports generated", value: "6.1k", percent: 44 },
-  { label: "Review sessions", value: "3.8k", percent: 31 }
-];
+export function UsageScreen({ data }: UsageScreenProps) {
+  const chartPoints = buildChartPoints(data.trend, 520, 160);
 
-const recentUsage = [
-  { label: "Credits used today", value: "4,820", detail: "Across 19 uploads" },
-  { label: "API requests", value: "1,284", detail: "7.2% above yesterday" },
-  { label: "Active projects", value: "12", detail: "4 in review" },
-  { label: "Current cycle", value: "Mar 1 - Mar 31", detail: "68% consumed" }
-];
-
-const chartPoints = buildChartPoints(usageTrend, 520, 160);
-
-export function UsageScreen() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)] px-7 py-4">
@@ -54,10 +31,9 @@ export function UsageScreen() {
 
       <div className="flex flex-col gap-6 px-7 py-6">
         <section className="grid grid-cols-1 overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 xl:grid-cols-4">
-          <MetricCell value="68%" label="Cycle consumed" meta="12% ahead of plan" tone="positive" />
-          <MetricCell value="48.2k" label="Credits used" meta="Current billing cycle" />
-          <MetricCell value="1,284" label="API requests" meta="19 upload sessions" />
-          <MetricCell value="€420" label="Projected spend" meta="Based on current run-rate" />
+          {data.metrics.map((metric) => (
+            <MetricCell key={metric.label} value={metric.value} label={metric.label} meta={metric.meta} tone={metric.tone} />
+          ))}
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.8fr)]">
@@ -71,7 +47,7 @@ export function UsageScreen() {
                   Credits consumed over time
                 </h2>
               </div>
-              <span className="text-[11px] text-[var(--muted-soft)]">Updated 18:36</span>
+              <span className="text-[11px] text-[var(--muted-soft)]">{data.updatedLabel}</span>
             </div>
 
             <div className="px-[18px] py-4">
@@ -146,7 +122,7 @@ export function UsageScreen() {
                 </p>
               </div>
               <div className="space-y-4 px-[18px] py-4">
-                {recentUsage.map((item) => (
+                {data.snapshots.map((item) => (
                   <div key={item.label} className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-[12px] text-[var(--muted-soft)]">{item.label}</p>
@@ -167,13 +143,13 @@ export function UsageScreen() {
               <div className="px-[18px] py-4">
                 <div className="mb-2 flex items-center justify-between text-[12px] text-[var(--muted)]">
                   <span>Enterprise usage allocation</span>
-                  <span className="font-medium text-[var(--foreground)]">68 / 100 GB</span>
+                  <span className="font-medium text-[var(--foreground)]">{data.planValue}</span>
                 </div>
                 <div className="h-[3px] overflow-hidden rounded-full bg-[var(--border)]">
-                  <div className="h-full w-[68%] rounded-full bg-[var(--success)]" />
+                  <div className="h-full rounded-full bg-[var(--success)]" style={{ width: `${data.planPercent}%` }} />
                 </div>
                 <p className="mt-3 text-[11.5px] text-[var(--muted-soft)]">
-                  32 GB remaining before the next billing reset on March 31.
+                  {data.planMeta}
                 </p>
               </div>
             </div>
@@ -188,7 +164,7 @@ export function UsageScreen() {
           </div>
           <div className="px-[18px] py-4">
             <div className="grid gap-4 xl:grid-cols-2">
-              {featureUsage.map((item) => (
+              {data.breakdown.map((item) => (
                 <div key={item.label} className="rounded-[8px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
                   <div className="mb-[6px] flex items-center justify-between gap-3">
                     <span className="text-[12px] font-medium text-[var(--foreground)]">{item.label}</span>

@@ -1,46 +1,10 @@
-"use client";
+import type { GlossaryScreenData } from "@/types/workspace";
 
-const glossaryMetrics = [
-  { label: "Total terms", value: "186", meta: "Across all projects" },
-  { label: "Protected phrases", value: "42", meta: "Never translate" },
-  { label: "Locales covered", value: "6", meta: "DE, FR, NL, ES +2" },
-  { label: "Pending reviews", value: "12", meta: "Needs approval" }
-];
+type GlossaryScreenProps = {
+  data: GlossaryScreenData;
+};
 
-const glossaryTerms = [
-  {
-    source: "Checkout",
-    translations: "DE Kasse · FR Paiement · NL Afrekenen",
-    status: "Approved",
-    project: "WPML Platform Refresh"
-  },
-  {
-    source: "Billing address",
-    translations: "DE Rechnungsadresse · FR Adresse de facturation",
-    status: "Approved",
-    project: "Shopify Launch Kit"
-  },
-  {
-    source: "Developer key",
-    translations: "DE Entwicklerschlüssel · ES Clave de desarrollador",
-    status: "Review",
-    project: "Developer Docs Sync"
-  },
-  {
-    source: "Priority support",
-    translations: "FR Support prioritaire · IT Supporto prioritario",
-    status: "Draft",
-    project: "Help Center Migration"
-  }
-];
-
-const glossaryCollections = [
-  { name: "Brand voice", count: "38 terms", detail: "Product names, UI nouns, campaign phrases" },
-  { name: "Commerce", count: "64 terms", detail: "Checkout, billing, product and tax labels" },
-  { name: "Developer docs", count: "51 terms", detail: "Code-sensitive terminology and CLI phrases" }
-];
-
-export function GlossaryScreen() {
+export function GlossaryScreen({ data }: GlossaryScreenProps) {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)] px-7 py-4">
@@ -65,7 +29,7 @@ export function GlossaryScreen() {
 
       <div className="flex flex-col gap-6 px-7 py-6">
         <section className="grid grid-cols-1 overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 xl:grid-cols-4">
-          {glossaryMetrics.map((metric) => (
+          {data.metrics.map((metric) => (
             <MetricCell key={metric.label} {...metric} />
           ))}
         </section>
@@ -97,7 +61,7 @@ export function GlossaryScreen() {
               ))}
             </div>
 
-            {glossaryTerms.map((term) => (
+            {data.terms.length > 0 ? data.terms.map((term) => (
               <div
                 key={term.source}
                 className="grid grid-cols-[160px_minmax(0,1fr)_90px_160px] items-center border-b border-[var(--border-light)] px-[18px] py-[13px] last:border-b-0"
@@ -120,7 +84,11 @@ export function GlossaryScreen() {
                 </div>
                 <div className="text-[11.5px] text-[var(--muted-soft)]">{term.project}</div>
               </div>
-            ))}
+            )) : (
+              <div className="px-6 py-10 text-center text-[12px] text-[var(--muted-soft)]">
+                No glossary terms have been added yet.
+              </div>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -131,7 +99,7 @@ export function GlossaryScreen() {
                 </p>
               </div>
               <div className="space-y-4 px-[18px] py-4">
-                {glossaryCollections.map((collection) => (
+                {data.collections.length > 0 ? data.collections.map((collection) => (
                   <div key={collection.name} className="rounded-[8px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-[12px] font-medium text-[var(--foreground)]">
@@ -143,7 +111,9 @@ export function GlossaryScreen() {
                       {collection.detail}
                     </p>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-[11.5px] text-[var(--muted-soft)]">No glossary collections yet.</p>
+                )}
               </div>
             </div>
 

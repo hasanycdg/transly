@@ -1,38 +1,10 @@
-"use client";
+import type { SettingsScreenData } from "@/types/workspace";
 
-const settingsGroups = [
-  {
-    title: "Translation defaults",
-    items: [
-      { label: "Default target locale", value: "German (DE)" },
-      { label: "Model profile", value: "Structure-safe" },
-      { label: "Batch size", value: "25 strings" }
-    ]
-  },
-  {
-    title: "Validation",
-    items: [
-      { label: "Placeholder mismatch check", value: "Enabled" },
-      { label: "Inline tag parity", value: "Strict mode" },
-      { label: "Malformed XML fallback", value: "Block export" }
-    ]
-  }
-];
+type SettingsScreenProps = {
+  data: SettingsScreenData;
+};
 
-const workspacePreferences = [
-  { label: "Email notifications", enabled: true },
-  { label: "Review reminders", enabled: true },
-  { label: "Auto-export after completion", enabled: false },
-  { label: "Glossary prompt injection", enabled: true }
-];
-
-const apiSettings = [
-  { label: "OpenAI provider", value: "Connected" },
-  { label: "API key status", value: "Configured on server" },
-  { label: "Environment", value: "Production-like local setup" }
-];
-
-export function SettingsScreen() {
+export function SettingsScreen({ data }: SettingsScreenProps) {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)] px-7 py-4">
@@ -58,7 +30,7 @@ export function SettingsScreen() {
       <div className="flex flex-col gap-6 px-7 py-6">
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
           <div className="space-y-6">
-            {settingsGroups.map((group) => (
+            {data.groups.map((group) => (
               <div key={group.title} className="rounded-[10px] border border-[var(--border)] bg-white">
                 <div className="border-b border-[var(--border-light)] px-[18px] py-3">
                   <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
@@ -83,7 +55,7 @@ export function SettingsScreen() {
                 </p>
               </div>
               <div className="space-y-3 px-[18px] py-4">
-                {workspacePreferences.map((preference) => (
+                {data.preferences.map((preference) => (
                   <div key={preference.label} className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-[12px] text-[var(--foreground)]">{preference.label}</p>
@@ -118,7 +90,7 @@ export function SettingsScreen() {
                 </p>
               </div>
               <div className="space-y-4 px-[18px] py-4">
-                {apiSettings.map((setting) => (
+                {data.apiSettings.map((setting) => (
                   <div key={setting.label} className="flex items-center justify-between gap-4 text-[12px]">
                     <span className="text-[var(--muted-soft)]">{setting.label}</span>
                     <span className="font-medium text-[var(--foreground)]">{setting.value}</span>
@@ -134,9 +106,9 @@ export function SettingsScreen() {
                 </p>
               </div>
               <div className="space-y-3 px-[18px] py-4 text-[11.5px] text-[var(--muted)]">
-                <p>API credentials stay server-side and are never exposed to the browser.</p>
-                <p>Exports are blocked when placeholder or inline-tag validation fails.</p>
-                <p>Uploaded files remain in-memory for the MVP and are not stored persistently.</p>
+                {data.securityNotes.map((note) => (
+                  <p key={note}>{note}</p>
+                ))}
               </div>
             </div>
 
@@ -150,16 +122,16 @@ export function SettingsScreen() {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-[12px] text-[var(--foreground)]">Workspace plan</p>
-                    <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">Pro plan with 5 seats</p>
+                    <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">{data.workspacePlanMeta}</p>
                   </div>
                   <span className="rounded-[5px] border border-[var(--processing-border)] bg-[var(--processing-bg)] px-2 py-[3px] text-[11.5px] font-medium text-[var(--processing)]">
-                    Active
+                    {data.workspacePlan}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-[12px] text-[var(--foreground)]">Review access</p>
-                    <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">3 editors · 2 reviewers</p>
+                    <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">{data.teamSummary}</p>
                   </div>
                   <button className="rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]">
                     Manage

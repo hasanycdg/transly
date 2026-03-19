@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { getProjectStatusTone } from "@/lib/projects/display";
 import { formatCompactNumber, formatPercent, formatProjectDate, getLanguageLabel } from "@/lib/projects/formatters";
-import { getProjectById, getProjectSummary } from "@/lib/projects/mock-data";
-import { loadStoredProjects } from "@/lib/projects/storage";
+import { getProjectSummary } from "@/lib/projects/mock-data";
+import type { ProjectRecord } from "@/types/projects";
 
 import { ProgressBar } from "@/components/projects/progress-bar";
 import { ProjectFilesTable } from "@/components/projects/project-files-table";
@@ -14,17 +14,13 @@ import { ProjectUploadZone } from "@/components/projects/project-upload-zone";
 import { StatusBadge } from "@/components/projects/status-badge";
 
 type ProjectWorkspaceScreenProps = {
-  projectId: string;
+  project: ProjectRecord | null;
 };
 
-export function ProjectWorkspaceScreen({ projectId }: ProjectWorkspaceScreenProps) {
+export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const uploadInputId = `project-upload-${projectId}`;
-  const project = useMemo(
-    () => getProjectById(projectId, loadStoredProjects()),
-    [projectId]
-  );
-  const summary = useMemo(() => (project ? getProjectSummary(project) : null), [project]);
+  const uploadInputId = `project-upload-${project?.id ?? "unknown"}`;
+  const summary = project ? getProjectSummary(project) : null;
 
   if (!project || !summary) {
     return (

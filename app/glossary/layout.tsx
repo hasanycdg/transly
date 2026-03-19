@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 
 import { DashboardShell } from "@/components/projects/dashboard-shell";
+import { getDashboardShellData } from "@/lib/supabase/workspace";
 
-export default function GlossaryLayout({
+export default async function GlossaryLayout({
   children
 }: {
   children: ReactNode;
 }) {
-  return <DashboardShell>{children}</DashboardShell>;
+  const shellData = await getDashboardShellData();
+
+  return <DashboardShell shellData={shellData}>{children}</DashboardShell>;
 }

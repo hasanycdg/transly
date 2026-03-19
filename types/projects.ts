@@ -2,7 +2,7 @@ export type ProjectStatus = "Active" | "In Review" | "Completed" | "Error";
 
 export type FileStatus = "Queued" | "Processing" | "Review" | "Done" | "Error";
 
-export type ProjectOrigin = "seed" | "custom";
+export type ProjectOrigin = "seed" | "custom" | "imported";
 
 export type ProjectFilter = "All" | "Active" | "Review" | "Done";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { startTransition, useMemo, useState } from "react";
 
 import {
   getOverviewProjectDisplay,
@@ -10,8 +10,7 @@ import {
   matchesOverviewProjectFilter
 } from "@/lib/projects/display";
 import { formatProjectDate } from "@/lib/projects/formatters";
-import { createProjectRecord, getSeedProjects, mergeProjects, PROJECT_FILTERS } from "@/lib/projects/mock-data";
-import { loadStoredProjects, saveStoredProjects } from "@/lib/projects/storage";
+import { PROJECT_FILTERS } from "@/lib/projects/mock-data";
 import type { NewProjectInput, ProjectFilter, ProjectRecord } from "@/types/projects";
 
 import { NewProjectModal } from "@/components/projects/new-project-modal";
@@ -19,15 +18,20 @@ import { ProgressBar } from "@/components/projects/progress-bar";
 import { ProjectUploadZone } from "@/components/projects/project-upload-zone";
 import { StatusBadge } from "@/components/projects/status-badge";
 
-export function ProjectsOverviewScreen() {
+type ProjectsOverviewScreenProps = {
+  initialProjects: ProjectRecord[];
+};
+
+export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScreenProps) {
   const router = useRouter();
-  const [projects, setProjects] = useState<ProjectRecord[]>(() =>
-    mergeProjects(getSeedProjects(), loadStoredProjects())
-  );
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ProjectFilter>("All");
   const [showModal, setShowModal] = useState(false);
   const [overviewFiles, setOverviewFiles] = useState<File[]>([]);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+
+  const projects = initialProjects;
 
   const filteredProjects = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -45,15 +49,34 @@ export function ProjectsOverviewScreen() {
 
   const stats = useMemo(() => getOverviewStatsDisplay(projects), [projects]);
 
-  function handleCreateProject(input: NewProjectInput) {
-    const newProject = createProjectRecord(input);
-    const storedProjects = [
-      ...loadStoredProjects().filter((project) => project.id !== newProject.id),
-      newProject
-    ];
+  async function handleCreateProject(input: NewProjectInput) {
+    setCreateError(null);
+    setIsCreatingProject(true);
 
-    saveStoredProjects(storedProjects);
-    setProjects(mergeProjects(getSeedProjects(), storedProjects));
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+
+      const payload = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Project could not be created.");
+      }
+
+      setShowModal(false);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Project could not be created.");
+    } finally {
+      setIsCreatingProject(false);
+    }
   }
 
   return (
@@ -246,6 +269,8 @@ export function ProjectsOverviewScreen() {
           open={showModal}
           onClose={() => setShowModal(false)}
           onCreate={handleCreateProject}
+          errorMessage={createError}
+          submitting={isCreatingProject}
         />
       ) : null}
     </>

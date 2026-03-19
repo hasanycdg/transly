@@ -8,10 +8,18 @@ import type { NewProjectInput } from "@/types/projects";
 type NewProjectModalProps = {
   open: boolean;
   onClose: () => void;
-  onCreate: (input: NewProjectInput) => void;
+  onCreate: (input: NewProjectInput) => Promise<void> | void;
+  submitting?: boolean;
+  errorMessage?: string | null;
 };
 
-export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProps) {
+export function NewProjectModal({
+  open,
+  onClose,
+  onCreate,
+  submitting = false,
+  errorMessage = null
+}: NewProjectModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sourceLanguage, setSourceLanguage] = useState("en");
@@ -29,22 +37,21 @@ export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProp
     );
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     const trimmedName = name.trim();
     const trimmedDescription = description.trim();
 
-    if (!trimmedName || targetLanguages.length === 0) {
+    if (!trimmedName || targetLanguages.length === 0 || submitting) {
       return;
     }
 
-    onCreate({
+    await onCreate({
       name: trimmedName,
       description:
         trimmedDescription || "New localization workspace ready for file uploads and review.",
       sourceLanguage,
       targetLanguages
     });
-    onClose();
   }
 
   return (
@@ -65,11 +72,18 @@ export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProp
           <button
             type="button"
             onClick={onClose}
+            disabled={submitting}
             className="rounded-[7px] border border-[var(--border)] px-2 py-1 text-[12px] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
             Close
           </button>
         </div>
+
+        {errorMessage ? (
+          <div className="mt-4 rounded-[8px] border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-[12px] text-[var(--error)]">
+            {errorMessage}
+          </div>
+        ) : null}
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <label className="space-y-1 md:col-span-2">
@@ -138,6 +152,7 @@ export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProp
           <button
             type="button"
             onClick={onClose}
+            disabled={submitting}
             className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
             Cancel
@@ -145,10 +160,10 @@ export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProp
           <button
             type="button"
             onClick={handleCreate}
-            disabled={!name.trim() || targetLanguages.length === 0}
+            disabled={!name.trim() || targetLanguages.length === 0 || submitting}
             className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium text-white transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Create Project
+            {submitting ? "Creating..." : "Create Project"}
           </button>
         </div>
       </div>

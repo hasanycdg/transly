@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 
-import { getSeedProjects, mergeProjects } from "@/lib/projects/mock-data";
-import { loadStoredProjects } from "@/lib/projects/storage";
+import type { DashboardShellData } from "@/types/workspace";
 
 type DashboardShellProps = {
   children: ReactNode;
+  shellData: DashboardShellData;
 };
 
 const secondaryNavItems = [
@@ -18,13 +18,10 @@ const secondaryNavItems = [
   { label: "Settings", href: "/settings", icon: SettingsIcon }
 ];
 
-export function DashboardShell({ children }: DashboardShellProps) {
+export function DashboardShell({ children, shellData }: DashboardShellProps) {
   const pathname = usePathname();
   const [projectsOpen, setProjectsOpen] = useState(true);
-  const projects = useMemo(
-    () => mergeProjects(getSeedProjects(), loadStoredProjects()),
-    []
-  );
+  const projects = shellData.projects;
 
   return (
     <div className="h-screen overflow-hidden bg-[var(--background)]">
@@ -120,13 +117,13 @@ export function DashboardShell({ children }: DashboardShellProps) {
 
           <div className="mt-auto flex items-center gap-[9px] border-t border-[var(--border-light)] px-[14px] py-3">
             <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--foreground)] text-[10px] font-semibold text-white">
-              N
+              {shellData.workspaceAvatarLabel}
             </div>
             <div className="min-w-0">
               <p className="truncate text-[12.5px] font-medium text-[var(--foreground)]">
-                Workspace
+                {shellData.workspaceName}
               </p>
-              <p className="text-[11px] text-[var(--muted-soft)]">Pro plan</p>
+              <p className="text-[11px] text-[var(--muted-soft)]">{shellData.workspacePlanName} plan</p>
             </div>
           </div>
         </aside>
