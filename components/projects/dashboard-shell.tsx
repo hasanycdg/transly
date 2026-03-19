@@ -27,9 +27,9 @@ export function DashboardShell({ children }: DashboardShellProps) {
   );
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      <div className="flex min-h-screen">
-        <aside className="hidden h-screen w-[212px] shrink-0 flex-col overflow-y-auto border-r border-[var(--border)] bg-white lg:flex">
+    <div className="h-screen overflow-hidden bg-[var(--background)]">
+      <div className="flex h-screen">
+        <aside className="hidden h-screen w-[212px] shrink-0 flex-col overflow-hidden border-r border-[var(--border)] bg-white lg:flex">
           <div className="flex items-center gap-[9px] border-b border-[var(--border-light)] px-4 pb-4 pt-5">
             <div className="flex h-6 w-6 items-center justify-center rounded-[5px] bg-[var(--foreground)] text-white">
               <LogoIcon />
@@ -131,7 +131,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 overflow-y-auto bg-[var(--background)]">
+        <main className="min-w-0 flex-1 overflow-y-auto overscroll-contain bg-[var(--background)]">
           {children}
         </main>
       </div>
