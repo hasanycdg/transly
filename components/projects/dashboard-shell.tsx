@@ -56,7 +56,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           </div>
 
           {projectsOpen ? (
-            <div className="px-2 pb-[6px]">
+            <div className="px-2 pb-[6px] pl-[18px]">
               <div className="space-y-[1px]">
                 <Link
                   href="/projects"
