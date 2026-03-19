@@ -8,8 +8,7 @@ import {
   getElementInnerXml,
   getFirstChildByLocalName,
   getLocalName,
-  getTextContentNormalized,
-  isElement
+  getTextContentNormalized
 } from "@/lib/xliff/selectors";
 import { TranslationPipelineError } from "@/types/translation";
 import type {
