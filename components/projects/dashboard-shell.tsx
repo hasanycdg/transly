@@ -13,7 +13,7 @@ type DashboardShellProps = {
 };
 
 const secondaryNavItems = [
-  { label: "Usage", icon: UsageIcon },
+  { label: "Usage", href: "/usage", icon: UsageIcon },
   { label: "Glossary", icon: GlossaryIcon },
   { label: "Settings", icon: SettingsIcon }
 ];
@@ -94,13 +94,22 @@ export function DashboardShell({ children }: DashboardShellProps) {
             <div className="space-y-[1px] pt-[8px]">
               {secondaryNavItems.map((item) => {
                 const Icon = item.icon;
+                const active = item.href ? pathname.startsWith(item.href) : false;
 
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium text-[rgba(17,17,16,0.72)] transition hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                  >
+                const className = [
+                  "flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
+                  active
+                    ? "bg-[var(--background)] text-[var(--foreground)]"
+                    : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                ].join(" ");
+
+                return item.href ? (
+                  <Link key={item.label} href={item.href} className={className}>
+                    <Icon />
+                    <span>{item.label}</span>
+                  </Link>
+                ) : (
+                  <button key={item.label} type="button" className={className}>
                     <Icon />
                     <span>{item.label}</span>
                   </button>
