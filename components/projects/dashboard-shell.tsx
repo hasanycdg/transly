@@ -96,13 +96,14 @@ export function DashboardShell({ children }: DashboardShellProps) {
                 const Icon = item.icon;
 
                 return (
-                  <div
+                  <button
                     key={item.label}
-                    className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-[13px] font-medium text-[var(--muted)] transition hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium text-[rgba(17,17,16,0.72)] transition hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                   >
                     <Icon />
                     <span>{item.label}</span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
