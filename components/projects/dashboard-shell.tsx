@@ -64,7 +64,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
                     "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
                     pathname === "/projects"
                       ? "font-medium text-[var(--foreground)]"
-                      : "text-[var(--muted-soft)] hover:text-[var(--muted)]"
+                      : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                   ].join(" ")}
                 >
                   All projects
@@ -77,15 +77,15 @@ export function DashboardShell({ children }: DashboardShellProps) {
                     <Link
                       key={project.id}
                       href={`/projects/${project.id}`}
-                      className={[
-                        "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
-                        active
-                          ? "font-medium text-[var(--foreground)]"
-                          : "text-[var(--muted-soft)] hover:text-[var(--muted)]"
-                      ].join(" ")}
-                      title={project.name}
-                    >
-                      {project.name}
+                    className={[
+                      "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
+                      active
+                        ? "font-medium text-[var(--foreground)]"
+                        : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                    ].join(" ")}
+                    title={project.name}
+                  >
+                    {project.name}
                     </Link>
                   );
                 })}
