@@ -14,8 +14,8 @@ export function ProgressBar({
   return (
     <div
       className={[
-        "w-full overflow-hidden rounded-full bg-[rgba(20,20,20,0.08)]",
-        size === "sm" ? "h-1.5" : "h-2"
+        "w-full overflow-hidden rounded-full bg-[var(--border)]",
+        size === "sm" ? "h-[3px]" : "h-1"
       ].join(" ")}
     >
       <div
@@ -29,7 +29,7 @@ export function ProgressBar({
                 ? "bg-[var(--review)]"
                 : tone === "processing"
                   ? "bg-[var(--processing)]"
-                  : "bg-[rgba(20,20,20,0.4)]"
+                  : "bg-[var(--muted-soft)]"
         ].join(" ")}
         style={{ width: `${clampedValue}%` }}
       />

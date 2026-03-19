@@ -1,28 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f4f0;
-  --background-strong: #efeeea;
-  --surface: rgba(255, 255, 255, 0.88);
-  --surface-strong: rgba(255, 255, 255, 0.98);
-  --border: rgba(20, 20, 20, 0.1);
-  --border-strong: rgba(20, 20, 20, 0.16);
-  --foreground: #141414;
-  --muted: #8b8b8b;
-  --accent: #171717;
+  --background: #f7f7f5;
+  --background-strong: #fafaf8;
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --border: #e4e4e0;
+  --border-light: #efefec;
+  --border-strong: #bbbbb6;
+  --foreground: #111110;
+  --muted: #555550;
+  --muted-soft: #999990;
+  --accent: #111110;
   --accent-soft: rgba(23, 23, 23, 0.06);
-  --success: #2f8c59;
-  --review: #df9832;
-  --processing: #3860c1;
-  --danger: #9d3e2f;
-  --danger-soft: rgba(157, 62, 47, 0.12);
-  --warning: #7a5b10;
-  --warning-soft: rgba(122, 91, 16, 0.12);
+  --success: #1a7f4b;
+  --success-bg: #f0faf4;
+  --success-border: #c3e8d5;
+  --review: #92510a;
+  --review-bg: #fef8ee;
+  --review-border: #f5d9a8;
+  --processing: #1a4faf;
+  --processing-bg: #eef3fe;
+  --processing-border: #c5d4f8;
+  --danger: #9b1d1d;
+  --danger-bg: #fef1f1;
+  --danger-border: #f5c3c3;
   --shadow: 0 0 0 rgba(0, 0, 0, 0);
 }
 
 * {
   box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 html {
@@ -35,6 +47,10 @@ body {
   color: var(--foreground);
   background: transparent;
   font-family: var(--font-sans), sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -44,8 +60,14 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted-soft);
 }
 
 ::selection {

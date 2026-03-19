@@ -48,58 +48,57 @@ export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProp
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(18,21,18,0.22)] px-4 py-10 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-[32px] border border-[rgba(36,39,32,0.1)] bg-white p-8 shadow-[0_32px_80px_rgba(18,21,18,0.12)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(17,17,16,0.16)] px-4 py-10">
+      <div className="w-full max-w-[640px] rounded-[10px] border border-[var(--border)] bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
-              New Project
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+              / New Project
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-              Create a translation workspace
+            <h2 className="mt-1 text-[18px] font-semibold tracking-[-0.3px] text-[var(--foreground)]">
+              Create translation workspace
             </h2>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]">
-              Start a new project, pick your source language, and define the markets
-              you want to localize before files enter the pipeline.
+            <p className="mt-1 text-[12px] text-[var(--muted-soft)]">
+              Pick source and target languages, then start uploading localization files.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(36,39,32,0.1)] text-[var(--muted)] transition hover:text-[var(--foreground)]"
+            className="rounded-[7px] border border-[var(--border)] px-2 py-1 text-[12px] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
-            ×
+            Close
           </button>
         </div>
 
-        <div className="mt-8 grid gap-5 md:grid-cols-2">
-          <label className="space-y-2 md:col-span-2">
-            <span className="text-sm font-medium text-[var(--foreground)]">Project name</span>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <label className="space-y-1 md:col-span-2">
+            <span className="text-[12px] font-medium text-[var(--foreground)]">Project name</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="WPML Agency Rollout"
-              className="w-full rounded-2xl border border-[rgba(36,39,32,0.1)] bg-[rgba(247,247,244,0.8)] px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]"
+              className="w-full rounded-[7px] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
             />
           </label>
 
-          <label className="space-y-2 md:col-span-2">
-            <span className="text-sm font-medium text-[var(--foreground)]">Description</span>
+          <label className="space-y-1 md:col-span-2">
+            <span className="text-[12px] font-medium text-[var(--foreground)]">Description</span>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Localized product pages, legal strings, and user flows for launch markets."
-              rows={4}
-              className="w-full rounded-2xl border border-[rgba(36,39,32,0.1)] bg-[rgba(247,247,244,0.8)] px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]"
+              rows={3}
+              className="w-full rounded-[7px] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
             />
           </label>
 
-          <label className="space-y-2">
-            <span className="text-sm font-medium text-[var(--foreground)]">Source language</span>
+          <label className="space-y-1">
+            <span className="text-[12px] font-medium text-[var(--foreground)]">Source language</span>
             <select
               value={sourceLanguage}
               onChange={(event) => setSourceLanguage(event.target.value)}
-              className="w-full rounded-2xl border border-[rgba(36,39,32,0.1)] bg-[rgba(247,247,244,0.8)] px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]"
+              className="w-full rounded-[7px] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
             >
               {LANGUAGE_OPTIONS.map((option) => (
                 <option key={option.code} value={option.code}>
@@ -109,9 +108,9 @@ export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProp
             </select>
           </label>
 
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-[var(--foreground)]">Target languages</span>
-            <div className="flex flex-wrap gap-2 rounded-2xl border border-[rgba(36,39,32,0.1)] bg-[rgba(247,247,244,0.8)] p-3">
+          <div className="space-y-1">
+            <span className="text-[12px] font-medium text-[var(--foreground)]">Target languages</span>
+            <div className="flex flex-wrap gap-[6px] rounded-[7px] border border-[var(--border)] bg-[var(--background)] p-2">
               {LANGUAGE_OPTIONS.filter((option) => option.code !== sourceLanguage).map((option) => {
                 const selected = targetLanguages.includes(option.code);
 
@@ -121,10 +120,10 @@ export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProp
                     type="button"
                     onClick={() => toggleTargetLanguage(option.code)}
                     className={[
-                      "rounded-full border px-3 py-2 text-xs font-medium transition",
+                      "rounded-[5px] border px-2 py-[5px] text-[11.5px] font-medium transition",
                       selected
-                        ? "border-[var(--accent)] bg-[rgba(29,92,77,0.1)] text-[var(--accent)]"
-                        : "border-[rgba(36,39,32,0.1)] bg-white text-[var(--foreground)]"
+                        ? "border-[var(--foreground)] bg-white text-[var(--foreground)]"
+                        : "border-[var(--border)] bg-white text-[var(--muted)]"
                     ].join(" ")}
                   >
                     {option.label}
@@ -135,11 +134,11 @@ export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProp
           </div>
         </div>
 
-        <div className="mt-8 flex items-center justify-end gap-3">
+        <div className="mt-5 flex items-center justify-end gap-[6px]">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex min-h-11 items-center justify-center rounded-full border border-[rgba(36,39,32,0.12)] px-5 text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--accent)]"
+            className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
             Cancel
           </button>
@@ -147,7 +146,7 @@ export function NewProjectModal({ open, onClose, onCreate }: NewProjectModalProp
             type="button"
             onClick={handleCreate}
             disabled={!name.trim() || targetLanguages.length === 0}
-            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--foreground)] px-5 text-sm font-medium text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-[rgba(31,26,20,0.35)]"
+            className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium text-white transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Create Project
           </button>

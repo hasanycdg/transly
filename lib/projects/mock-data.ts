@@ -99,9 +99,9 @@ const seedProjects: ProjectRecord[] = [
     description:
       "Storefront localization package for app listings, transactional emails, and merchant onboarding flows.",
     sourceLanguage: "en",
-    targetLanguages: ["de", "nl"],
-    status: "In Review",
-    lastUpdated: "2026-03-14T10:15:00.000Z",
+    targetLanguages: ["fr", "it"],
+    status: "Completed",
+    lastUpdated: "2026-03-15T10:15:00.000Z",
     glossaryEnabled: false,
     creditsUsed: 61320,
     qualityScore: 99,
@@ -131,8 +131,8 @@ const seedProjects: ProjectRecord[] = [
     description:
       "Support center migration from legacy content with mixed XML fragments and historical glossary drift.",
     sourceLanguage: "en",
-    targetLanguages: ["fr", "it"],
-    status: "Active",
+    targetLanguages: ["de"],
+    status: "Error",
     lastUpdated: "2026-03-16T18:05:00.000Z",
     glossaryEnabled: true,
     creditsUsed: 28740,
