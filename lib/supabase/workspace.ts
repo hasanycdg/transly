@@ -3,6 +3,7 @@ import "server-only";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { mergeGlossaryTranslations, parseGlossaryCsv } from "@/lib/glossary/csv";
+import { LANGUAGE_OPTIONS } from "@/lib/languages";
 import { formatCompactNumber } from "@/lib/projects/formatters";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
@@ -30,7 +31,10 @@ import type {
 } from "@/types/projects";
 import type {
   DashboardShellData,
+  SettingsFilenameFormat,
+  SettingsQualityPreset,
   SettingsScreenData,
+  SettingsToneStyle,
   UsageBreakdownItem,
   UsageMetricItem,
   UsageScreenData,
@@ -65,6 +69,34 @@ type WorkspaceSettingsRow = {
   review_reminders: boolean;
   auto_export_after_completion: boolean;
   glossary_prompt_injection: boolean;
+  metadata: Record<string, unknown> | null;
+};
+
+type WorkspaceSettingsMetadata = {
+  profileName?: string;
+  profileEmail?: string;
+  preferredSourceLanguage?: string;
+  toneStyle?: SettingsToneStyle;
+  strictGlossaryMode?: boolean;
+  aiBehavior?: SettingsQualityPreset;
+  defaultFilenameFormat?: SettingsFilenameFormat;
+};
+
+export type TranslationRuntimeSettings = {
+  workspaceSlug: string;
+  defaultSourceLanguage?: string;
+  defaultTargetLanguage?: string;
+  sourceLanguageMode: "auto" | "manual";
+  toneStyle: SettingsToneStyle;
+  strictTagProtection: boolean;
+  failOnTagMismatch: boolean;
+  useGlossaryAutomatically: boolean;
+  strictGlossaryMode: boolean;
+  aiBehavior: SettingsQualityPreset;
+  defaultFilenameFormat: SettingsFilenameFormat;
+  autoDownloadAfterTranslation: boolean;
+  translationBatchSize: number;
+  translationModel: string;
 };
 
 type ProjectRow = {
@@ -235,6 +267,7 @@ const DEFAULT_WORKSPACE_SLUG = "workspace";
 const DEFAULT_WORKSPACE_PLAN = "Pro";
 const DEFAULT_WORKSPACE_AVATAR_LABEL = "W";
 const DEFAULT_CREDITS_LIMIT = 100_000;
+const SUPPORTED_LANGUAGE_CODES = new Set(LANGUAGE_OPTIONS.map((option) => option.code));
 
 export async function getDashboardShellData(): Promise<DashboardShellData> {
   noStore();
@@ -777,33 +810,146 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData> {
   noStore();
 
   const { workspace, settings } = await getWorkspaceContext();
-  const preferences = {
-    autoDownloadAfterTranslation: settings.auto_export_after_completion,
-    defaultFilenameFormat: "Original + target locale" as const
-  };
+  const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
 
   return {
     profile: {
-      name: workspace.name,
-      email: `${workspace.slug}@translayr.app`
+      name: metadata.profileName ?? workspace.name,
+      email: metadata.profileEmail ?? `${workspace.slug}@translayr.app`
     },
     translation: {
       sourceLanguageMode: settings.default_source_language ? "manual" : "auto",
-      sourceLanguage: settings.default_source_language ?? "en",
+      sourceLanguage: settings.default_source_language ?? metadata.preferredSourceLanguage ?? "en",
       targetLanguage: settings.default_target_language ?? "de",
-      toneStyle: "Neutral",
-      strictTagProtection: settings.inline_tag_validation_mode !== "off",
+      toneStyle: metadata.toneStyle ?? "Neutral",
+      strictTagProtection: settings.inline_tag_validation_mode !== "off" && settings.inline_tag_validation_mode !== "warn",
       failOnTagMismatch: settings.block_export_on_validation_failure,
       useGlossaryAutomatically: settings.glossary_prompt_injection,
-      strictGlossaryMode: false,
-      aiBehavior: "Balanced"
+      strictGlossaryMode: metadata.strictGlossaryMode ?? false,
+      aiBehavior: metadata.aiBehavior ?? getAiBehaviorFromSettings(settings)
     },
-    preferences,
+    preferences: {
+      autoDownloadAfterTranslation: settings.auto_export_after_completion,
+      defaultFilenameFormat: metadata.defaultFilenameFormat ?? "Original + target locale"
+    },
     dangerZone: {
       title: "Delete account",
       description: "Permanently remove your Translayr account, workspace access, and personal settings.",
       actionLabel: "Delete account"
     }
+  };
+}
+
+export async function updateSettings(input: SettingsScreenData): Promise<SettingsScreenData> {
+  const { supabase, workspace, settings } = await getWorkspaceContext();
+  const currentMetadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const rawMetadata =
+    settings.metadata && typeof settings.metadata === "object" ? settings.metadata : {};
+
+  const profileName = input.profile.name.trim();
+  const profileEmail = input.profile.email.trim().toLowerCase();
+
+  if (!profileName) {
+    throw new Error("Name is required.");
+  }
+
+  if (!isValidEmail(profileEmail)) {
+    throw new Error("Enter a valid email address.");
+  }
+
+  const sourceLanguageMode = input.translation.sourceLanguageMode === "manual" ? "manual" : "auto";
+  const sourceLanguage = validateLanguageCode(input.translation.sourceLanguage, "source language");
+  const targetLanguage = validateLanguageCode(input.translation.targetLanguage, "target language");
+
+  if (sourceLanguageMode === "manual" && sourceLanguage === targetLanguage) {
+    throw new Error("Source and target language should not be identical for the default translation setup.");
+  }
+
+  const toneStyle = normalizeToneStyle(input.translation.toneStyle);
+  const aiBehavior = normalizeAiBehavior(input.translation.aiBehavior);
+  const defaultFilenameFormat = normalizeFilenameFormat(input.preferences.defaultFilenameFormat);
+  const translationBatchSize = getBatchSizeForAiBehavior(aiBehavior);
+  const inlineTagValidationMode = input.translation.strictTagProtection ? "strict" : "warn";
+
+  const nextMetadata: WorkspaceSettingsMetadata = {
+    ...rawMetadata,
+    ...currentMetadata,
+    profileName,
+    profileEmail,
+    preferredSourceLanguage: sourceLanguage,
+    toneStyle,
+    strictGlossaryMode: Boolean(input.translation.strictGlossaryMode),
+    aiBehavior,
+    defaultFilenameFormat
+  };
+
+  const { error } = await supabase
+    .from("workspace_settings")
+    .update({
+      default_source_language: sourceLanguageMode === "manual" ? sourceLanguage : null,
+      default_target_language: targetLanguage,
+      inline_tag_validation_mode: inlineTagValidationMode,
+      block_export_on_validation_failure: Boolean(input.translation.failOnTagMismatch),
+      auto_export_after_completion: Boolean(input.preferences.autoDownloadAfterTranslation),
+      glossary_prompt_injection: Boolean(input.translation.useGlossaryAutomatically),
+      translation_batch_size: translationBatchSize,
+      metadata: nextMetadata
+    })
+    .eq("workspace_id", workspace.id);
+
+  if (error) {
+    throw new Error(`Failed to save settings: ${error.message}`);
+  }
+
+  return {
+    profile: {
+      name: profileName,
+      email: profileEmail
+    },
+    translation: {
+      sourceLanguageMode,
+      sourceLanguage,
+      targetLanguage,
+      toneStyle,
+      strictTagProtection: Boolean(input.translation.strictTagProtection),
+      failOnTagMismatch: Boolean(input.translation.failOnTagMismatch),
+      useGlossaryAutomatically: Boolean(input.translation.useGlossaryAutomatically),
+      strictGlossaryMode: Boolean(input.translation.strictGlossaryMode),
+      aiBehavior
+    },
+    preferences: {
+      autoDownloadAfterTranslation: Boolean(input.preferences.autoDownloadAfterTranslation),
+      defaultFilenameFormat
+    },
+    dangerZone: {
+      title: input.dangerZone.title,
+      description: input.dangerZone.description,
+      actionLabel: input.dangerZone.actionLabel
+    }
+  };
+}
+
+export async function getTranslationRuntimeSettings(): Promise<TranslationRuntimeSettings> {
+  noStore();
+
+  const { workspace, settings } = await getWorkspaceContext();
+  const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
+
+  return {
+    workspaceSlug: workspace.slug,
+    defaultSourceLanguage: settings.default_source_language ?? undefined,
+    defaultTargetLanguage: settings.default_target_language ?? undefined,
+    sourceLanguageMode: settings.default_source_language ? "manual" : "auto",
+    toneStyle: metadata.toneStyle ?? "Neutral",
+    strictTagProtection: settings.inline_tag_validation_mode === "strict",
+    failOnTagMismatch: settings.block_export_on_validation_failure,
+    useGlossaryAutomatically: settings.glossary_prompt_injection,
+    strictGlossaryMode: metadata.strictGlossaryMode ?? false,
+    aiBehavior: metadata.aiBehavior ?? getAiBehaviorFromSettings(settings),
+    defaultFilenameFormat: metadata.defaultFilenameFormat ?? "Original + target locale",
+    autoDownloadAfterTranslation: settings.auto_export_after_completion,
+    translationBatchSize: Math.max(1, settings.translation_batch_size),
+    translationModel: settings.translation_model
   };
 }
 
@@ -1468,7 +1614,7 @@ async function ensureWorkspaceSettings(
     .insert({
       workspace_id: workspaceId
     })
-    .select("workspace_id, default_source_language, default_target_language, translation_provider, translation_model, translation_batch_size, placeholder_validation_mode, inline_tag_validation_mode, block_export_on_validation_failure, email_notifications, review_reminders, auto_export_after_completion, glossary_prompt_injection")
+    .select("workspace_id, default_source_language, default_target_language, translation_provider, translation_model, translation_batch_size, placeholder_validation_mode, inline_tag_validation_mode, block_export_on_validation_failure, email_notifications, review_reminders, auto_export_after_completion, glossary_prompt_injection, metadata")
     .single();
 
   if (insertError) {
@@ -1510,7 +1656,7 @@ function selectWorkspaceSettings(
 ) {
   return supabase
     .from("workspace_settings")
-    .select("workspace_id, default_source_language, default_target_language, translation_provider, translation_model, translation_batch_size, placeholder_validation_mode, inline_tag_validation_mode, block_export_on_validation_failure, email_notifications, review_reminders, auto_export_after_completion, glossary_prompt_injection")
+    .select("workspace_id, default_source_language, default_target_language, translation_provider, translation_model, translation_batch_size, placeholder_validation_mode, inline_tag_validation_mode, block_export_on_validation_failure, email_notifications, review_reminders, auto_export_after_completion, glossary_prompt_injection, metadata")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
 }
@@ -2516,6 +2662,158 @@ function formatLocaleSummary(locales: string[]) {
   }
 
   return `${locales.slice(0, 4).join(", ")} +${locales.length - 4}`;
+}
+
+export async function getExactGlossaryTranslations(
+  sourceLanguage: string,
+  targetLanguage: string,
+  sourceTexts: string[]
+): Promise<Map<string, string>> {
+  noStore();
+
+  if (sourceTexts.length === 0) {
+    return new Map();
+  }
+
+  const { supabase, workspace } = await getWorkspaceContext();
+  const normalizedSourceLanguage = sourceLanguage.trim().toLowerCase();
+  const normalizedTargetLanguage = targetLanguage.trim().toLowerCase();
+  const normalizedSourceTexts = Array.from(
+    new Set(
+      sourceTexts
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+    )
+  );
+
+  if (normalizedSourceTexts.length === 0) {
+    return new Map();
+  }
+
+  const { data: glossaryRows, error } = await supabase
+    .from("glossary_terms")
+    .select("source_term, status, glossary_term_translations(locale_code, translated_term)")
+    .eq("workspace_id", workspace.id)
+    .eq("source_language", normalizedSourceLanguage)
+    .in("source_term", normalizedSourceTexts)
+    .in("status", ["approved", "review"]);
+
+  if (error) {
+    throw new Error(`Failed to load glossary translations: ${error.message}`);
+  }
+
+  const result = new Map<string, string>();
+
+  for (const row of (glossaryRows as Array<{
+    source_term: string;
+    status: string;
+    glossary_term_translations: Array<{ locale_code: string; translated_term: string }> | null;
+  }> | null) ?? []) {
+    const exactMatch = row.glossary_term_translations?.find(
+      (translation) => translation.locale_code.toLowerCase() === normalizedTargetLanguage
+    );
+
+    if (exactMatch?.translated_term?.trim()) {
+      result.set(row.source_term.trim(), exactMatch.translated_term.trim());
+    }
+  }
+
+  return result;
+}
+
+function parseWorkspaceSettingsMetadata(value: Record<string, unknown> | null | undefined): WorkspaceSettingsMetadata {
+  const metadata = value && typeof value === "object" ? value : {};
+
+  return {
+    profileName: typeof metadata.profileName === "string" ? metadata.profileName : undefined,
+    profileEmail: typeof metadata.profileEmail === "string" ? metadata.profileEmail : undefined,
+    preferredSourceLanguage:
+      typeof metadata.preferredSourceLanguage === "string" &&
+      SUPPORTED_LANGUAGE_CODES.has(metadata.preferredSourceLanguage)
+        ? metadata.preferredSourceLanguage
+        : undefined,
+    toneStyle: isToneStyle(metadata.toneStyle) ? metadata.toneStyle : undefined,
+    strictGlossaryMode:
+      typeof metadata.strictGlossaryMode === "boolean" ? metadata.strictGlossaryMode : undefined,
+    aiBehavior: isAiBehavior(metadata.aiBehavior) ? metadata.aiBehavior : undefined,
+    defaultFilenameFormat: isFilenameFormat(metadata.defaultFilenameFormat)
+      ? metadata.defaultFilenameFormat
+      : undefined
+  };
+}
+
+function validateLanguageCode(value: string, label: string) {
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (!SUPPORTED_LANGUAGE_CODES.has(normalizedValue)) {
+    throw new Error(`Select a supported ${label}.`);
+  }
+
+  return normalizedValue;
+}
+
+function normalizeToneStyle(value: string): SettingsToneStyle {
+  if (isToneStyle(value)) {
+    return value;
+  }
+
+  throw new Error("Select a supported tone setting.");
+}
+
+function normalizeAiBehavior(value: string): SettingsQualityPreset {
+  if (isAiBehavior(value)) {
+    return value;
+  }
+
+  throw new Error("Select a supported AI behavior.");
+}
+
+function normalizeFilenameFormat(value: string): SettingsFilenameFormat {
+  if (isFilenameFormat(value)) {
+    return value;
+  }
+
+  throw new Error("Select a supported filename format.");
+}
+
+function getAiBehaviorFromSettings(settings: Pick<WorkspaceSettingsRow, "translation_batch_size">): SettingsQualityPreset {
+  if (settings.translation_batch_size >= 35) {
+    return "Fast";
+  }
+
+  if (settings.translation_batch_size <= 12) {
+    return "High Quality";
+  }
+
+  return "Balanced";
+}
+
+function getBatchSizeForAiBehavior(aiBehavior: SettingsQualityPreset) {
+  if (aiBehavior === "Fast") {
+    return 40;
+  }
+
+  if (aiBehavior === "High Quality") {
+    return 10;
+  }
+
+  return 25;
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isToneStyle(value: unknown): value is SettingsToneStyle {
+  return value === "Neutral" || value === "Formal" || value === "Informal" || value === "Marketing" || value === "Technical";
+}
+
+function isAiBehavior(value: unknown): value is SettingsQualityPreset {
+  return value === "Fast" || value === "Balanced" || value === "High Quality";
+}
+
+function isFilenameFormat(value: unknown): value is SettingsFilenameFormat {
+  return value === "Original + target locale" || value === "Original + source + target" || value === "Project slug + locale";
 }
 
 function slugify(value: string) {

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { containsMeaningfulText, maskProtectedTokens } from "@/lib/masking/tokens";
+import { unmaskString } from "@/lib/masking/restore";
 import { restoreProtectedTokens } from "@/lib/masking/restore";
+import { getExactGlossaryTranslations, getTranslationRuntimeSettings } from "@/lib/supabase/workspace";
 import { parseXliffDocument } from "@/lib/xliff/parser";
 import { serializeTranslatedXliff } from "@/lib/xliff/serializer";
 import { OpenAITranslationProvider } from "@/services/translation/openai-provider";
@@ -13,10 +15,15 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    const runtimeSettings = await getTranslationRuntimeSettings();
     const formData = await request.formData();
     const fileEntry = formData.get("file");
-    const targetLanguage = normalizeLanguageValue(formData.get("targetLanguage"));
-    const sourceLanguageFallback = normalizeLanguageValue(formData.get("sourceLanguage"));
+    const projectSlug = normalizeLanguageValue(formData.get("projectSlug"));
+    const targetLanguage =
+      normalizeLanguageValue(formData.get("targetLanguage")) ?? runtimeSettings.defaultTargetLanguage;
+    const sourceLanguageFallback =
+      normalizeLanguageValue(formData.get("sourceLanguage")) ??
+      (runtimeSettings.sourceLanguageMode === "manual" ? runtimeSettings.defaultSourceLanguage : undefined);
 
     if (!(fileEntry instanceof File)) {
       throw new TranslationPipelineError(
@@ -64,9 +71,27 @@ export async function POST(request: Request) {
 
     const maskedSegments = new Map<string, MaskedSegment>();
     const writebacks: TranslationWriteback[] = [];
+    const glossaryMatches = runtimeSettings.useGlossaryAutomatically
+      ? await getExactGlossaryTranslations(
+          detectedSourceLanguage,
+          targetLanguage,
+          parsedDocument.units.map((unit) => unit.sourceText)
+        )
+      : new Map<string, string>();
     const translationItems = parsedDocument.units.flatMap((unit) => {
       const masked = maskProtectedTokens(unit.sourceXml);
       maskedSegments.set(unit.internalId, masked);
+
+      const exactGlossaryTranslation = glossaryMatches.get(unit.sourceText.trim());
+
+      if (exactGlossaryTranslation && runtimeSettings.strictGlossaryMode) {
+        writebacks.push({
+          unitInternalId: unit.internalId,
+          translatedXml: escapeXmlText(exactGlossaryTranslation)
+        });
+
+        return [];
+      }
 
       if (!containsMeaningfulText(masked.maskedText)) {
         writebacks.push({
@@ -87,10 +112,15 @@ export async function POST(request: Request) {
       ];
     });
 
-    const provider = new OpenAITranslationProvider();
+    const provider = new OpenAITranslationProvider({
+      model: runtimeSettings.translationModel
+    });
     const translatedItems = await provider.translateBatch(translationItems, {
       sourceLanguage: detectedSourceLanguage,
-      targetLanguage
+      targetLanguage,
+      model: runtimeSettings.translationModel,
+      maxBatchItems: runtimeSettings.translationBatchSize,
+      toneStyle: runtimeSettings.toneStyle
     });
 
     for (const translatedItem of translatedItems) {
@@ -107,14 +137,36 @@ export async function POST(request: Request) {
         );
       }
 
-      writebacks.push({
-        unitInternalId: translatedItem.unitInternalId,
-        translatedXml: restoreProtectedTokens(
-          translatedItem.translatedText,
-          maskedSegment.tokens,
-          translatedItem.unitInternalId
-        )
-      });
+      try {
+        writebacks.push({
+          unitInternalId: translatedItem.unitInternalId,
+          translatedXml: restoreWithRuntimeRules(
+            translatedItem.translatedText,
+            maskedSegment,
+            runtimeSettings.strictTagProtection,
+            translatedItem.unitInternalId
+          )
+        });
+      } catch (error) {
+        if (
+          isTranslationPipelineError(error) &&
+          !runtimeSettings.failOnTagMismatch &&
+          (error.code === "tag_mismatch" || error.code === "placeholder_mismatch")
+        ) {
+          warnings.push({
+            code: "tag_mismatch_fallback",
+            message: "A translation changed protected tags or placeholders. The affected unit kept its original source content.",
+            unitInternalId: translatedItem.unitInternalId
+          });
+          writebacks.push({
+            unitInternalId: translatedItem.unitInternalId,
+            translatedXml: maskedSegment.originalText
+          });
+          continue;
+        }
+
+        throw error;
+      }
     }
 
     const translatedContent = serializeTranslatedXliff({
@@ -125,13 +177,20 @@ export async function POST(request: Request) {
     });
 
     const responsePayload: TranslationApiSuccess = {
-      fileName: buildOutputFileName(fileEntry.name, targetLanguage),
+      fileName: buildOutputFileName(
+        fileEntry.name,
+        detectedSourceLanguage,
+        targetLanguage,
+        runtimeSettings.defaultFilenameFormat,
+        projectSlug ?? runtimeSettings.workspaceSlug
+      ),
       translatedContent,
       warnings,
       detectedSourceLanguage,
       detectedTargetLanguage: targetLanguage,
       xliffVersion: parsedDocument.version,
-      translatedUnitCount: writebacks.length
+      translatedUnitCount: writebacks.length,
+      autoDownloadAfterTranslation: runtimeSettings.autoDownloadAfterTranslation
     };
 
     return NextResponse.json(responsePayload);
@@ -175,12 +234,55 @@ function isSupportedXliffFile(fileName: string): boolean {
   return /\.(xliff|xlf)$/i.test(fileName);
 }
 
-function buildOutputFileName(fileName: string, targetLanguage: string): string {
+function buildOutputFileName(
+  fileName: string,
+  sourceLanguage: string,
+  targetLanguage: string,
+  filenameFormat: string,
+  workspaceSlug: string
+) {
   const match = fileName.match(/^(.*?)(\.(?:xliff|xlf))$/i);
+  const baseName = match ? match[1] : fileName;
+  const extension = match ? match[2] : ".xliff";
 
-  if (!match) {
-    return `${fileName}.${targetLanguage}.xliff`;
+  if (filenameFormat === "Original + source + target") {
+    return `${baseName}.${sourceLanguage}-${targetLanguage}${extension}`;
   }
 
-  return `${match[1]}.${targetLanguage}${match[2]}`;
+  if (filenameFormat === "Project slug + locale") {
+    return `${workspaceSlug}.${targetLanguage}${extension}`;
+  }
+
+  return `${baseName}.${targetLanguage}${extension}`;
+}
+
+function restoreWithRuntimeRules(
+  translatedText: string,
+  maskedSegment: MaskedSegment,
+  strictTagProtection: boolean,
+  unitInternalId: string
+) {
+  if (strictTagProtection) {
+    return restoreProtectedTokens(translatedText, maskedSegment.tokens, unitInternalId);
+  }
+
+  try {
+    return unmaskString(translatedText, maskedSegment.map, { strict: false }).text;
+  } catch (error) {
+    if (error instanceof TranslationPipelineError) {
+      error.details = {
+        ...error.details,
+        unitInternalId
+      };
+    }
+
+    throw error;
+  }
+}
+
+function escapeXmlText(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

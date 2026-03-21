@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getProjectStatusTone } from "@/lib/projects/display";
 import { formatCompactNumber, formatPercent, formatProjectDate, getLanguageLabel } from "@/lib/projects/formatters";
@@ -56,6 +56,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
   const [translationError, setTranslationError] = useState<string | null>(null);
   const [translationOutputs, setTranslationOutputs] = useState<ProjectTranslationOutput[]>([]);
   const [translationFailures, setTranslationFailures] = useState<ProjectTranslationFailure[]>([]);
+  const autoDownloadedOutputIdsRef = useRef<Set<string>>(new Set());
   const uploadInputId = `project-upload-${project?.id ?? "unknown"}`;
 
   useEffect(() => {
@@ -65,6 +66,17 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
   useEffect(() => {
     setPersistedFiles(project?.files ?? []);
   }, [project]);
+
+  useEffect(() => {
+    for (const output of translationOutputs) {
+      if (!output.autoDownloadAfterTranslation || autoDownloadedOutputIdsRef.current.has(output.id)) {
+        continue;
+      }
+
+      autoDownloadedOutputIdsRef.current.add(output.id);
+      downloadTextFile(output.fileName, output.translatedContent, "application/xml;charset=utf-8");
+    }
+  }, [translationOutputs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -284,6 +296,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
     setTranslationError(null);
     setTranslationOutputs([]);
     setTranslationFailures([]);
+    autoDownloadedOutputIdsRef.current.clear();
     setRuntimeFileStates((current) => {
       const next = { ...current };
 
@@ -320,6 +333,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
         formData.append("file", job.file);
         formData.append("targetLanguage", job.targetLanguage);
         formData.append("sourceLanguage", currentProject.sourceLanguage);
+        formData.append("projectSlug", currentProject.id);
 
         const response = await fetch("/api/translate", {
           method: "POST",

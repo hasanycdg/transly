@@ -58,6 +58,8 @@ export interface TranslationContext {
   sourceLanguage: string;
   targetLanguage: string;
   model?: string;
+  maxBatchItems?: number;
+  toneStyle?: string;
 }
 
 export interface TranslationApiSuccess {
@@ -68,6 +70,7 @@ export interface TranslationApiSuccess {
   detectedTargetLanguage: string;
   xliffVersion: XliffVersion;
   translatedUnitCount: number;
+  autoDownloadAfterTranslation: boolean;
 }
 
 export interface TranslationApiErrorShape {

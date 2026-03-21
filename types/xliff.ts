@@ -6,7 +6,8 @@ export type XliffWarningCode =
   | "missing_source_language"
   | "unsupported_unit_structure"
   | "skipped_empty_source"
-  | "used_source_language_fallback";
+  | "used_source_language_fallback"
+  | "tag_mismatch_fallback";
 
 export interface XliffWarning {
   code: XliffWarningCode;

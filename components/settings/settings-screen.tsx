@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 
@@ -96,14 +97,63 @@ const INPUT_CLASS_NAME =
   "h-11 w-full rounded-[12px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]";
 
 export function SettingsScreen({ data }: SettingsScreenProps) {
+  const router = useRouter();
   const [draft, setDraft] = useState(data);
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("translation");
   const [isPending, startTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const activeSectionMeta = SECTION_ITEMS.find((section) => section.id === activeSection) ?? SECTION_ITEMS[0];
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(data);
 
   useEffect(() => {
     setDraft(data);
   }, [data]);
+
+  useEffect(() => {
+    if (!saveMessage) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSaveMessage(null);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [saveMessage]);
+
+  async function handleSave() {
+    if (!hasChanges || isSaving) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setErrorMessage(null);
+      const response = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(draft)
+      });
+
+      const payload = (await response.json().catch(() => null)) as SettingsScreenData | { error?: string } | null;
+
+      if (!response.ok || !isSettingsPayload(payload)) {
+        throw new Error(payload && "error" in payload ? payload.error ?? "Settings could not be saved." : "Settings could not be saved.");
+      }
+
+      setDraft(payload);
+      setSaveMessage("Settings saved.");
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Settings could not be saved.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   function updateProfile<Key extends keyof SettingsProfileData>(key: Key, value: SettingsProfileData[Key]) {
     setDraft((current) => ({
@@ -158,14 +208,50 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
             </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-3 py-2 text-[11.5px] text-[var(--muted)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--foreground)]" />
-            {activeSectionMeta.label}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-3 py-2 text-[11.5px] text-[var(--muted)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--foreground)]" />
+              {activeSectionMeta.label}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(data);
+                setErrorMessage(null);
+                setSaveMessage(null);
+              }}
+              disabled={!hasChanges || isSaving}
+              className="rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleSave();
+              }}
+              disabled={!hasChanges || isSaving}
+              className="rounded-[12px] bg-[var(--foreground)] px-4 py-2.5 text-[12px] font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {isSaving ? "Saving..." : "Save changes"}
+            </button>
           </div>
         </div>
       </header>
 
       <div className="px-7 py-6">
+        {saveMessage ? (
+          <div className="mb-4 rounded-[16px] border border-[var(--success-border)] bg-[var(--success-bg)] px-4 py-3 text-[12.5px] text-[var(--success)]">
+            {saveMessage}
+          </div>
+        ) : null}
+
+        {errorMessage ? (
+          <div className="mb-4 rounded-[16px] border border-[var(--danger-border)] bg-[var(--danger-bg)] px-4 py-3 text-[12.5px] text-[var(--danger)]">
+            {errorMessage}
+          </div>
+        ) : null}
+
         <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
           <aside className="self-start xl:sticky xl:top-[102px]">
             <div className="rounded-[18px] border border-[var(--border)] bg-white p-3">
@@ -255,11 +341,8 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                         <input
                           type="email"
                           value={draft.profile.email}
-                          readOnly
-                          className={[
-                            INPUT_CLASS_NAME,
-                            "cursor-not-allowed bg-[var(--background)] text-[var(--muted)]"
-                          ].join(" ")}
+                          onChange={(event) => updateProfile("email", event.target.value)}
+                          className={INPUT_CLASS_NAME}
                         />
                       </FieldBlock>
                     </div>
@@ -813,5 +896,16 @@ function ChevronDownIcon({ className = "h-4 w-4" }: IconProps) {
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
       <path d="m4.5 6.5 3.5 3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+function isSettingsPayload(value: SettingsScreenData | { error?: string } | null): value is SettingsScreenData {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "profile" in value &&
+      "translation" in value &&
+      "preferences" in value &&
+      "dangerZone" in value
   );
 }

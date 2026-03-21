@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { LANGUAGE_OPTIONS } from "@/lib/languages";
 import type { NewProjectInput } from "@/types/projects";
+import type { SettingsScreenData } from "@/types/workspace";
 
 type NewProjectModalProps = {
   open: boolean;
@@ -25,6 +26,46 @@ export function NewProjectModal({
   const [sourceLanguage, setSourceLanguage] = useState("en");
   const [targetLanguages, setTargetLanguages] = useState<string[]>(["de"]);
   const [targetPickerOpen, setTargetPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function loadDefaults() {
+      try {
+        const response = await fetch("/api/settings", {
+          method: "GET"
+        });
+
+        const payload = (await response.json().catch(() => null)) as SettingsScreenData | null;
+
+        if (!response.ok || !payload || cancelled) {
+          return;
+        }
+
+        const nextSourceLanguage = payload.translation.sourceLanguage;
+        const preferredTargetLanguage = payload.translation.targetLanguage;
+        const nextTargetLanguage =
+          preferredTargetLanguage !== nextSourceLanguage
+            ? preferredTargetLanguage
+            : LANGUAGE_OPTIONS.find((option) => option.code !== nextSourceLanguage)?.code ?? "de";
+
+        setSourceLanguage(nextSourceLanguage);
+        setTargetLanguages(nextTargetLanguage ? [nextTargetLanguage] : []);
+      } catch {
+        // Keep built-in defaults when settings cannot be loaded.
+      }
+    }
+
+    void loadDefaults();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   if (!open) {
     return null;

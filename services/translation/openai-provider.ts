@@ -48,8 +48,11 @@ export class OpenAITranslationProvider implements TranslationProvider {
       return [];
     }
 
-    const chunks = chunkTranslationItems(items);
+    const chunks = chunkTranslationItems(items, {
+      maxItems: context.maxBatchItems
+    });
     const results = new Map<string, string>();
+    const behaviorInstruction = buildBehaviorInstruction(context);
 
     for (const chunk of chunks) {
       const completion = await this.client.chat.completions.create({
@@ -61,13 +64,14 @@ export class OpenAITranslationProvider implements TranslationProvider {
         messages: [
           {
             role: "system",
-            content: SYSTEM_PROMPT
+            content: behaviorInstruction ? `${SYSTEM_PROMPT}\n${behaviorInstruction}` : SYSTEM_PROMPT
           },
           {
             role: "user",
             content: JSON.stringify({
               sourceLanguage: context.sourceLanguage,
               targetLanguage: context.targetLanguage,
+              toneStyle: context.toneStyle ?? null,
               items: chunk.map((item) => ({
                 id: item.unitInternalId,
                 text: item.text
@@ -202,4 +206,12 @@ function parseTranslationPayload(
 
 function stripMarkdownFence(content: string): string {
   return content.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+}
+
+function buildBehaviorInstruction(context: TranslationContext) {
+  if (!context.toneStyle) {
+    return "";
+  }
+
+  return `Favor a ${context.toneStyle.toLowerCase()} tone whenever the source text allows it, while keeping translations concise and structurally safe.`;
 }
