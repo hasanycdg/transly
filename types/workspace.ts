@@ -47,6 +47,44 @@ export interface UsageScreenData {
   planPercent: number;
 }
 
+export interface BillingPlanOption {
+  id: string;
+  name: string;
+  price: string;
+  priceMeta: string;
+  credits: string;
+  description: string;
+  features: string[];
+  current: boolean;
+}
+
+export interface BillingInvoiceItem {
+  id: string;
+  periodLabel: string;
+  issuedOnLabel: string;
+  amountLabel: string;
+  statusLabel: string;
+  creditsLabel: string;
+}
+
+export interface BillingScreenData {
+  metrics: UsageMetricItem[];
+  currentPlanName: string;
+  planDescription: string;
+  cycleLabel: string;
+  renewalLabel: string;
+  usageValue: string;
+  usageMeta: string;
+  usagePercent: number;
+  projectedSpendValue: string;
+  creditsRemainingValue: string;
+  billingEmail: string;
+  paymentMethodLabel: string;
+  paymentMethodMeta: string;
+  plans: BillingPlanOption[];
+  invoices: BillingInvoiceItem[];
+}
+
 export type SettingsSectionId = "profile" | "translation" | "preferences" | "danger";
 
 export type SettingsToneStyle = "Neutral" | "Formal" | "Informal" | "Marketing" | "Technical";

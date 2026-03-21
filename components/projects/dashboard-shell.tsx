@@ -14,6 +14,7 @@ type DashboardShellProps = {
 
 const secondaryNavItems = [
   { label: "Usage", href: "/usage", icon: UsageIcon },
+  { label: "Billing", href: "/billing", icon: BillingIcon },
   { label: "Glossary", href: "/glossary", icon: GlossaryIcon },
   { label: "Settings", href: "/settings", icon: SettingsIcon }
 ];
@@ -263,6 +264,15 @@ function GlossaryIcon() {
         strokeWidth="1.3"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+function BillingIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M1.5 5.25h12M4 9.25h3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   );
 }

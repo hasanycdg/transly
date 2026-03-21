@@ -30,6 +30,9 @@ import type {
   ProjectStatus
 } from "@/types/projects";
 import type {
+  BillingInvoiceItem,
+  BillingPlanOption,
+  BillingScreenData,
   DashboardShellData,
   SettingsFilenameFormat,
   SettingsQualityPreset,
@@ -262,12 +265,55 @@ type GlossaryWriteContext = {
   termsByKey: Map<string, GlossaryTermLookupRow>;
 };
 
+type BillingPlanDefinition = {
+  id: string;
+  name: string;
+  basePriceCents: number;
+  creditsLimit: number;
+  description: string;
+  features: string[];
+};
+
 const DEFAULT_WORKSPACE_NAME = "Workspace";
 const DEFAULT_WORKSPACE_SLUG = "workspace";
 const DEFAULT_WORKSPACE_PLAN = "Pro";
 const DEFAULT_WORKSPACE_AVATAR_LABEL = "W";
 const DEFAULT_CREDITS_LIMIT = 100_000;
 const SUPPORTED_LANGUAGE_CODES = new Set(LANGUAGE_OPTIONS.map((option) => option.code));
+const BILLING_PLANS: BillingPlanDefinition[] = [
+  {
+    id: "starter",
+    name: "Starter",
+    basePriceCents: 1900,
+    creditsLimit: 25_000,
+    description: "For smaller localization workloads and lightweight weekly release cycles.",
+    features: ["25k monthly credits", "Core XLIFF translation", "Glossary support"]
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    basePriceCents: 4900,
+    creditsLimit: 100_000,
+    description: "For product teams shipping continuously across multiple locales.",
+    features: ["100k monthly credits", "Review workflow", "Priority glossary injection"]
+  },
+  {
+    id: "scale",
+    name: "Scale",
+    basePriceCents: 12900,
+    creditsLimit: 300_000,
+    description: "For larger teams coordinating launches, QA, and exports at higher volume.",
+    features: ["300k monthly credits", "Faster batch throughput", "Shared team operations"]
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    basePriceCents: 24900,
+    creditsLimit: 1_000_000,
+    description: "For high-volume localization programs that need headroom and tighter control.",
+    features: ["1M monthly credits", "Custom policy defaults", "Dedicated support channel"]
+  }
+];
 
 export async function getDashboardShellData(): Promise<DashboardShellData> {
   noStore();
@@ -637,6 +683,154 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
     planMeta,
     planPercent: cycleConsumedPercent
   };
+}
+
+export async function getBillingScreenData(): Promise<BillingScreenData> {
+  noStore();
+
+  const now = new Date();
+  const { supabase, workspace, settings } = await getWorkspaceContext();
+  const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const currentPlan = getBillingPlanDefinition(workspace.plan_name);
+  const [{ data: billingCyclesData, error: billingError }, projects] = await Promise.all([
+    supabase
+      .from("workspace_billing_cycles")
+      .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
+      .eq("workspace_id", workspace.id)
+      .order("period_start", { ascending: false })
+      .limit(6),
+    getProjectRecords()
+  ]);
+
+  if (billingError) {
+    throw new Error(`Failed to load billing cycles: ${billingError.message}`);
+  }
+
+  const billingCycles = (billingCyclesData as BillingCycleRow[] | null) ?? [];
+  const activeCycle = billingCycles.find((cycle) => cycle.status === "active") ?? billingCycles[0] ?? null;
+  const derivedUsage = deriveUsageFromProjects(projects, now);
+  const creditsLimit = activeCycle?.credits_limit ?? workspace.credits_limit ?? currentPlan.creditsLimit;
+  const creditsUsed = Math.max(activeCycle?.credits_used ?? 0, workspace.credits_used ?? 0, derivedUsage.creditsUsed);
+  const creditsRemaining = Math.max(creditsLimit - creditsUsed, 0);
+  const usagePercent = creditsLimit > 0 ? Math.min(100, Math.round((creditsUsed / creditsLimit) * 100)) : 0;
+  const projectedSpendCents = Math.max(activeCycle?.projected_spend_cents ?? 0, currentPlan.basePriceCents);
+  const cycleStart = activeCycle?.period_start
+    ? new Date(`${activeCycle.period_start}T00:00:00.000Z`)
+    : startOfCurrentMonth(now);
+  const cycleEnd = activeCycle?.period_end
+    ? new Date(`${activeCycle.period_end}T00:00:00.000Z`)
+    : endOfCurrentMonth(now);
+  const activeProjects = projects.filter((project) => project.status !== "Completed").length;
+  const reviewProjects = projects.filter((project) => project.status === "In Review").length;
+  const billingEmail = metadata.profileEmail ?? `${workspace.slug}@translayr.app`;
+
+  const metrics: UsageMetricItem[] = [
+    {
+      value: currentPlan.name,
+      label: "Current plan",
+      meta: `${formatCompactNumber(currentPlan.creditsLimit)} included credits`,
+      tone: "positive"
+    },
+    {
+      value: formatCompactNumber(creditsRemaining),
+      label: "Credits remaining",
+      meta: `${usagePercent}% of this cycle already consumed`
+    },
+    {
+      value: String(activeProjects),
+      label: "Active projects",
+      meta: `${reviewProjects} currently in review`
+    },
+    {
+      value: formatCurrency(projectedSpendCents / 100),
+      label: "Projected invoice",
+      meta: activeCycle ? "Current cycle projection" : "Base subscription estimate"
+    }
+  ];
+
+  const plans: BillingPlanOption[] = BILLING_PLANS.map((plan) => ({
+    id: plan.id,
+    name: plan.name,
+    price: formatCurrency(plan.basePriceCents / 100),
+    priceMeta: "per month",
+    credits: `${formatCompactNumber(plan.creditsLimit)} credits`,
+    description: plan.description,
+    features: plan.features,
+    current: plan.name.toLowerCase() === currentPlan.name.toLowerCase()
+  }));
+
+  const invoices = (billingCycles.length > 0 ? billingCycles : [buildFallbackBillingCycle(now, currentPlan, creditsUsed)])
+    .map((cycle) => mapBillingInvoiceItem(cycle, currentPlan))
+    .slice(0, 6);
+
+  return {
+    metrics,
+    currentPlanName: currentPlan.name,
+    planDescription: currentPlan.description,
+    cycleLabel: `${formatShortDate(cycleStart)} - ${formatShortDate(cycleEnd)}`,
+    renewalLabel: `Renews on ${formatLongDate(cycleEnd)}`,
+    usageValue: `${formatCompactNumber(creditsUsed)} / ${formatCompactNumber(creditsLimit)} credits`,
+    usageMeta: `${formatCompactNumber(creditsRemaining)} credits remaining in the current cycle.`,
+    usagePercent,
+    projectedSpendValue: formatCurrency(projectedSpendCents / 100),
+    creditsRemainingValue: formatCompactNumber(creditsRemaining),
+    billingEmail,
+    paymentMethodLabel: "Visa ending in 4242",
+    paymentMethodMeta: `Invoices are sent to ${billingEmail}.`,
+    plans,
+    invoices
+  };
+}
+
+export async function updateBillingPlan(planId: string): Promise<BillingScreenData> {
+  const plan = BILLING_PLANS.find((entry) => entry.id === planId.trim().toLowerCase());
+
+  if (!plan) {
+    throw new Error("Select a supported billing plan.");
+  }
+
+  const { supabase, workspace } = await getWorkspaceContext();
+  const { data: activeCycleData, error: activeCycleError } = await supabase
+    .from("workspace_billing_cycles")
+    .select("id, projected_spend_cents")
+    .eq("workspace_id", workspace.id)
+    .eq("status", "active")
+    .order("period_start", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeCycleError) {
+    throw new Error(`Failed to load active billing cycle: ${activeCycleError.message}`);
+  }
+
+  const { error: workspaceError } = await supabase
+    .from("workspaces")
+    .update({
+      plan_name: plan.name,
+      credits_limit: plan.creditsLimit
+    })
+    .eq("id", workspace.id);
+
+  if (workspaceError) {
+    throw new Error(`Failed to update subscription plan: ${workspaceError.message}`);
+  }
+
+  if (activeCycleData) {
+    const activeCycle = activeCycleData as Pick<BillingCycleRow, "id" | "projected_spend_cents">;
+    const { error: cycleError } = await supabase
+      .from("workspace_billing_cycles")
+      .update({
+        credits_limit: plan.creditsLimit,
+        projected_spend_cents: Math.max(activeCycle.projected_spend_cents, plan.basePriceCents)
+      })
+      .eq("id", activeCycle.id);
+
+    if (cycleError) {
+      throw new Error(`Failed to update billing cycle limit: ${cycleError.message}`);
+    }
+  }
+
+  return getBillingScreenData();
 }
 
 export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
@@ -2842,6 +3036,50 @@ function buildAvatarLabel(value: string) {
     .join("");
 
   return initials || DEFAULT_WORKSPACE_AVATAR_LABEL;
+}
+
+function getBillingPlanDefinition(planName: string): BillingPlanDefinition {
+  const normalizedPlanName = planName.trim().toLowerCase();
+
+  return (
+    BILLING_PLANS.find((plan) => plan.name.toLowerCase() === normalizedPlanName || plan.id === normalizedPlanName) ??
+    BILLING_PLANS.find((plan) => plan.name === DEFAULT_WORKSPACE_PLAN) ??
+    BILLING_PLANS[1]
+  );
+}
+
+function buildFallbackBillingCycle(
+  now: Date,
+  plan: BillingPlanDefinition,
+  creditsUsed: number
+): BillingCycleRow {
+  return {
+    id: "fallback-cycle",
+    period_start: formatDateKey(startOfCurrentMonth(now)),
+    period_end: formatDateKey(endOfCurrentMonth(now)),
+    credits_limit: plan.creditsLimit,
+    credits_used: creditsUsed,
+    projected_spend_cents: plan.basePriceCents,
+    status: "active"
+  };
+}
+
+function mapBillingInvoiceItem(
+  cycle: BillingCycleRow,
+  currentPlan: BillingPlanDefinition
+): BillingInvoiceItem {
+  const periodStart = new Date(`${cycle.period_start}T00:00:00.000Z`);
+  const periodEnd = new Date(`${cycle.period_end}T00:00:00.000Z`);
+  const amountCents = Math.max(cycle.projected_spend_cents, currentPlan.basePriceCents);
+
+  return {
+    id: cycle.id,
+    periodLabel: `${formatShortDate(periodStart)} - ${formatShortDate(periodEnd)}`,
+    issuedOnLabel: formatLongDate(periodEnd),
+    amountLabel: formatCurrency(amountCents / 100),
+    statusLabel: cycle.status === "active" ? "Open" : cycle.status === "closed" ? "Paid" : "Projected",
+    creditsLabel: `${formatCompactNumber(cycle.credits_used)} / ${formatCompactNumber(cycle.credits_limit)}`
+  };
 }
 
 function slugify(value: string) {
