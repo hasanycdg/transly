@@ -47,29 +47,50 @@ export interface UsageScreenData {
   planPercent: number;
 }
 
-export interface SettingsValueItem {
-  label: string;
-  value: string;
+export type SettingsSectionId = "profile" | "translation" | "preferences" | "danger";
+
+export type SettingsToneStyle = "Neutral" | "Formal" | "Informal" | "Marketing" | "Technical";
+
+export type SettingsQualityPreset = "Fast" | "Balanced" | "High Quality";
+
+export type SettingsFilenameFormat =
+  | "Original + target locale"
+  | "Original + source + target"
+  | "Project slug + locale";
+
+export interface SettingsProfileData {
+  name: string;
+  email: string;
 }
 
-export interface SettingsGroupData {
+export interface SettingsTranslationData {
+  sourceLanguageMode: "auto" | "manual";
+  sourceLanguage: string;
+  targetLanguage: string;
+  toneStyle: SettingsToneStyle;
+  strictTagProtection: boolean;
+  failOnTagMismatch: boolean;
+  useGlossaryAutomatically: boolean;
+  strictGlossaryMode: boolean;
+  aiBehavior: SettingsQualityPreset;
+}
+
+export interface SettingsPreferencesData {
+  autoDownloadAfterTranslation: boolean;
+  defaultFilenameFormat: SettingsFilenameFormat;
+}
+
+export interface SettingsDangerZoneData {
   title: string;
-  items: SettingsValueItem[];
-}
-
-export interface SettingsPreferenceItem {
-  label: string;
-  enabled: boolean;
+  description: string;
+  actionLabel: string;
 }
 
 export interface SettingsScreenData {
-  groups: SettingsGroupData[];
-  preferences: SettingsPreferenceItem[];
-  apiSettings: SettingsValueItem[];
-  securityNotes: string[];
-  workspacePlan: string;
-  workspacePlanMeta: string;
-  teamSummary: string;
+  profile: SettingsProfileData;
+  translation: SettingsTranslationData;
+  preferences: SettingsPreferencesData;
+  dangerZone: SettingsDangerZoneData;
 }
 
 export interface ProjectsOverviewData {

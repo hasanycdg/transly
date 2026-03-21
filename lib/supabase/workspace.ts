@@ -3,7 +3,7 @@ import "server-only";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { mergeGlossaryTranslations, parseGlossaryCsv } from "@/lib/glossary/csv";
-import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
+import { formatCompactNumber } from "@/lib/projects/formatters";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
 import { countXliffTranslationWords } from "@/lib/xliff/metrics";
@@ -30,8 +30,6 @@ import type {
 } from "@/types/projects";
 import type {
   DashboardShellData,
-  SettingsGroupData,
-  SettingsPreferenceItem,
   SettingsScreenData,
   UsageBreakdownItem,
   UsageMetricItem,
@@ -121,11 +119,6 @@ type ProjectActivityRow = {
   title: string;
   detail: string;
   occurred_at: string;
-};
-
-type WorkspaceMemberRow = {
-  role: "owner" | "admin" | "editor" | "reviewer" | "viewer";
-  status: "invited" | "active" | "disabled";
 };
 
 type BillingCycleRow = {
@@ -783,98 +776,34 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
 export async function getSettingsScreenData(): Promise<SettingsScreenData> {
   noStore();
 
-  const { supabase, workspace, settings } = await getWorkspaceContext();
-  const { data, error } = await supabase
-    .from("workspace_members")
-    .select("role, status")
-    .eq("workspace_id", workspace.id);
-
-  if (error) {
-    throw new Error(`Failed to load workspace members: ${error.message}`);
-  }
-
-  const members = (data as WorkspaceMemberRow[] | null) ?? [];
-  const activeMembers = members.filter((member) => member.status === "active");
-  const editorCount = activeMembers.filter((member) =>
-    member.role === "owner" || member.role === "admin" || member.role === "editor"
-  ).length;
-  const reviewerCount = activeMembers.filter((member) => member.role === "reviewer").length;
-
-  const groups: SettingsGroupData[] = [
-    {
-      title: "Translation defaults",
-      items: [
-        {
-          label: "Default source locale",
-          value: settings.default_source_language ? getLanguageLabel(settings.default_source_language) : "Auto-detect"
-        },
-        {
-          label: "Default target locale",
-          value: settings.default_target_language ? getLanguageLabel(settings.default_target_language) : "Not set"
-        },
-        {
-          label: "Model profile",
-          value: `${settings.translation_provider} / ${settings.translation_model}`
-        },
-        {
-          label: "Batch size",
-          value: `${settings.translation_batch_size} strings`
-        }
-      ]
-    },
-    {
-      title: "Validation",
-      items: [
-        {
-          label: "Placeholder mismatch check",
-          value: capitalize(settings.placeholder_validation_mode)
-        },
-        {
-          label: "Inline tag parity",
-          value: capitalize(settings.inline_tag_validation_mode)
-        },
-        {
-          label: "Malformed XML fallback",
-          value: settings.block_export_on_validation_failure ? "Block export" : "Allow export"
-        }
-      ]
-    }
-  ];
-
-  const preferences: SettingsPreferenceItem[] = [
-    { label: "Email notifications", enabled: settings.email_notifications },
-    { label: "Review reminders", enabled: settings.review_reminders },
-    { label: "Auto-export after completion", enabled: settings.auto_export_after_completion },
-    { label: "Glossary prompt injection", enabled: settings.glossary_prompt_injection }
-  ];
-
-  const apiSettings = [
-    {
-      label: "Supabase project",
-      value: getProjectRefFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)
-    },
-    {
-      label: "Translation provider",
-      value: capitalize(settings.translation_provider)
-    },
-    {
-      label: "API key status",
-      value: process.env.OPENAI_API_KEY ? "Configured on server" : "Missing on server"
-    }
-  ];
+  const { workspace, settings } = await getWorkspaceContext();
+  const preferences = {
+    autoDownloadAfterTranslation: settings.auto_export_after_completion,
+    defaultFilenameFormat: "Original + target locale" as const
+  };
 
   return {
-    groups,
+    profile: {
+      name: workspace.name,
+      email: `${workspace.slug}@translayr.app`
+    },
+    translation: {
+      sourceLanguageMode: settings.default_source_language ? "manual" : "auto",
+      sourceLanguage: settings.default_source_language ?? "en",
+      targetLanguage: settings.default_target_language ?? "de",
+      toneStyle: "Neutral",
+      strictTagProtection: settings.inline_tag_validation_mode !== "off",
+      failOnTagMismatch: settings.block_export_on_validation_failure,
+      useGlossaryAutomatically: settings.glossary_prompt_injection,
+      strictGlossaryMode: false,
+      aiBehavior: "Balanced"
+    },
     preferences,
-    apiSettings,
-    securityNotes: [
-      "API credentials stay server-side and are never exposed to the browser.",
-      "Exports can be blocked automatically when placeholder or inline-tag validation fails.",
-      "Uploaded files remain in-memory in the current MVP unless you add storage persistence."
-    ],
-    workspacePlan: `${workspace.plan_name} plan`,
-    workspacePlanMeta: activeMembers.length > 0 ? `${activeMembers.length} active seats` : "No members configured yet",
-    teamSummary: `${editorCount} editors · ${reviewerCount} reviewers`
+    dangerZone: {
+      title: "Delete account",
+      description: "Permanently remove your Translayr account, workspace access, and personal settings.",
+      actionLabel: "Delete account"
+    }
   };
 }
 
@@ -2587,24 +2516,6 @@ function formatLocaleSummary(locales: string[]) {
   }
 
   return `${locales.slice(0, 4).join(", ")} +${locales.length - 4}`;
-}
-
-function getProjectRefFromUrl(urlValue: string | undefined) {
-  if (!urlValue) {
-    return "Not configured";
-  }
-
-  try {
-    const url = new URL(urlValue);
-
-    return url.hostname.replace(".supabase.co", "");
-  } catch {
-    return "Invalid URL";
-  }
-}
-
-function capitalize(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function slugify(value: string) {
