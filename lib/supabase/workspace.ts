@@ -272,7 +272,9 @@ const SUPPORTED_LANGUAGE_CODES = new Set(LANGUAGE_OPTIONS.map((option) => option
 export async function getDashboardShellData(): Promise<DashboardShellData> {
   noStore();
 
-  const { supabase, workspace } = await getWorkspaceContext();
+  const { supabase, workspace, settings } = await getWorkspaceContext();
+  const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const shellName = metadata.profileName?.trim() || workspace.name;
   const { data, error } = await supabase
     .from("projects")
     .select("slug, name")
@@ -289,9 +291,9 @@ export async function getDashboardShellData(): Promise<DashboardShellData> {
   }));
 
   return {
-    workspaceName: workspace.name,
+    workspaceName: shellName,
     workspacePlanName: workspace.plan_name,
-    workspaceAvatarLabel: workspace.avatar_label,
+    workspaceAvatarLabel: buildAvatarLabel(shellName) || workspace.avatar_label,
     projects
   };
 }
@@ -882,6 +884,20 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
     aiBehavior,
     defaultFilenameFormat
   };
+
+  const avatarLabel = buildAvatarLabel(profileName);
+
+  const { error: workspaceError } = await supabase
+    .from("workspaces")
+    .update({
+      name: profileName,
+      avatar_label: avatarLabel || workspace.avatar_label
+    })
+    .eq("id", workspace.id);
+
+  if (workspaceError) {
+    throw new Error(`Failed to save workspace identity: ${workspaceError.message}`);
+  }
 
   const { error } = await supabase
     .from("workspace_settings")
@@ -2814,6 +2830,18 @@ function isAiBehavior(value: unknown): value is SettingsQualityPreset {
 
 function isFilenameFormat(value: unknown): value is SettingsFilenameFormat {
   return value === "Original + target locale" || value === "Original + source + target" || value === "Project slug + locale";
+}
+
+function buildAvatarLabel(value: string) {
+  const initials = value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+
+  return initials || DEFAULT_WORKSPACE_AVATAR_LABEL;
 }
 
 function slugify(value: string) {
