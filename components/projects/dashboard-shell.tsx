@@ -12,10 +12,13 @@ type DashboardShellProps = {
   shellData: DashboardShellData;
 };
 
-const secondaryNavItems = [
+const mainNavItems = [
   { label: "Usage", href: "/usage", icon: UsageIcon },
+  { label: "Glossary", href: "/glossary", icon: GlossaryIcon }
+];
+
+const utilityNavItems = [
   { label: "Billing", href: "/billing", icon: BillingIcon },
-  { label: "Glossary", href: "/glossary", icon: GlossaryIcon },
   { label: "Settings", href: "/settings", icon: SettingsIcon }
 ];
 
@@ -176,7 +179,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
             ) : null}
 
             <div className="space-y-[1px] pt-[8px]">
-              {secondaryNavItems.map((item) => {
+              {mainNavItems.map((item) => {
                 const Icon = item.icon;
                 const active = item.href ? pathname.startsWith(item.href) : false;
 
@@ -202,15 +205,39 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
             </div>
           </div>
 
-          <div className="mt-auto flex items-center gap-[9px] border-t border-[var(--border-light)] px-[14px] py-3">
-            <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--foreground)] text-[10px] font-semibold text-white">
-              {shellData.workspaceAvatarLabel}
+          <div className="mt-auto border-t border-[var(--border-light)]">
+            <div className="px-2 py-2">
+              <div className="space-y-[1px]">
+                {utilityNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = pathname.startsWith(item.href);
+                  const className = [
+                    "flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
+                    active
+                      ? "bg-[var(--background)] text-[var(--foreground)]"
+                      : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                  ].join(" ");
+
+                  return (
+                    <Link key={item.label} href={item.href} prefetch={shouldPrefetch} className={className}>
+                      <Icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-[12.5px] font-medium text-[var(--foreground)]">
-                {shellData.workspaceName}
-              </p>
-              <p className="text-[11px] text-[var(--muted-soft)]">{shellData.workspacePlanName} plan</p>
+
+            <div className="flex items-center gap-[9px] border-t border-[var(--border-light)] px-[14px] py-3">
+              <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--foreground)] text-[10px] font-semibold text-white">
+                {shellData.workspaceAvatarLabel}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-[12.5px] font-medium text-[var(--foreground)]">
+                  {shellData.workspaceName}
+                </p>
+                <p className="text-[11px] text-[var(--muted-soft)]">{shellData.workspacePlanName} plan</p>
+              </div>
             </div>
           </div>
         </aside>
