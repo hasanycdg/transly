@@ -47,31 +47,6 @@ export interface UsageScreenData {
   planPercent: number;
 }
 
-export interface GlossaryMetricItem {
-  label: string;
-  value: string;
-  meta: string;
-}
-
-export interface GlossaryTermItem {
-  source: string;
-  translations: string;
-  status: string;
-  project: string;
-}
-
-export interface GlossaryCollectionItem {
-  name: string;
-  count: string;
-  detail: string;
-}
-
-export interface GlossaryScreenData {
-  metrics: GlossaryMetricItem[];
-  terms: GlossaryTermItem[];
-  collections: GlossaryCollectionItem[];
-}
-
 export interface SettingsValueItem {
   label: string;
   value: string;

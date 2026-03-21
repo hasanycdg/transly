@@ -2,10 +2,21 @@ import "server-only";
 
 import { unstable_noStore as noStore } from "next/cache";
 
+import { mergeGlossaryTranslations, parseGlossaryCsv } from "@/lib/glossary/csv";
 import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
 import { countXliffTranslationWords } from "@/lib/xliff/metrics";
+import type {
+  GlossaryCollectionItem,
+  GlossaryMetricItem,
+  GlossaryProjectOption,
+  GlossaryScreenData,
+  GlossaryStatus,
+  GlossaryTermItem,
+  ImportGlossaryCsvResult,
+  NewGlossaryTermInput
+} from "@/types/glossary";
 import type {
   FileStatus,
   NewProjectInput,
@@ -18,10 +29,6 @@ import type {
 } from "@/types/projects";
 import type {
   DashboardShellData,
-  GlossaryCollectionItem,
-  GlossaryMetricItem,
-  GlossaryScreenData,
-  GlossaryTermItem,
   SettingsGroupData,
   SettingsPreferenceItem,
   SettingsScreenData,
@@ -189,6 +196,7 @@ type GlossaryTermRow = {
   source_language: string;
   status: "draft" | "review" | "approved" | "archived";
   is_protected: boolean;
+  updated_at: string;
 };
 
 type GlossaryTranslationRow = {
@@ -200,6 +208,32 @@ type GlossaryTranslationRow = {
 type ProjectGlossaryTermRow = {
   project_id: string;
   term_id: string;
+};
+
+type GlossaryProjectRow = {
+  id: string;
+  slug: string;
+  name: string;
+};
+
+type GlossaryCollectionLookupRow = {
+  id: string;
+  slug: string;
+  name: string;
+};
+
+type GlossaryTermLookupRow = {
+  id: string;
+  source_term: string;
+  source_language: string;
+};
+
+type GlossaryWriteContext = {
+  collectionsById: Map<string, GlossaryCollectionLookupRow>;
+  collectionIdByName: Map<string, string>;
+  collectionSlugs: Set<string>;
+  projectsByReference: Map<string, GlossaryProjectRow>;
+  termsByKey: Map<string, GlossaryTermLookupRow>;
 };
 
 const DEFAULT_WORKSPACE_NAME = "Workspace";
@@ -581,7 +615,11 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
 
   const { supabase, workspace } = await getWorkspaceContext();
 
-  const [{ data: collectionsData, error: collectionsError }, { data: termsData, error: termsError }] = await Promise.all([
+  const [
+    { data: collectionsData, error: collectionsError },
+    { data: termsData, error: termsError },
+    { data: projectsData, error: projectsError }
+  ] = await Promise.all([
     supabase
       .from("glossary_collections")
       .select("id, name, description")
@@ -589,10 +627,14 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
       .order("name", { ascending: true }),
     supabase
       .from("glossary_terms")
-      .select("id, collection_id, source_term, source_language, status, is_protected")
+      .select("id, collection_id, source_term, source_language, status, is_protected, updated_at")
       .eq("workspace_id", workspace.id)
-      .order("updated_at", { ascending: false })
-      .limit(24)
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("projects")
+      .select("id, slug, name")
+      .eq("workspace_id", workspace.id)
+      .order("name", { ascending: true })
   ]);
 
   if (collectionsError) {
@@ -603,8 +645,13 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
     throw new Error(`Failed to load glossary terms: ${termsError.message}`);
   }
 
+  if (projectsError) {
+    throw new Error(`Failed to load glossary projects: ${projectsError.message}`);
+  }
+
   const collectionRows = (collectionsData as GlossaryCollectionRow[] | null) ?? [];
   const termRows = (termsData as GlossaryTermRow[] | null) ?? [];
+  const projectRows = (projectsData as GlossaryProjectRow[] | null) ?? [];
   const termIds = termRows.map((term) => term.id);
 
   const [{ data: translationsData, error: translationsError }, { data: projectTermLinksData, error: projectTermLinksError }] =
@@ -632,32 +679,16 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
     throw new Error(`Failed to load glossary project links: ${projectTermLinksError.message}`);
   }
 
-  const projectIds = Array.from(
-    new Set(((projectTermLinksData as ProjectGlossaryTermRow[] | null) ?? []).map((item) => item.project_id))
-  );
-  const { data: projectsData, error: projectsError } =
-    projectIds.length > 0
-      ? await supabase.from("projects").select("id, name").in("id", projectIds)
-      : { data: [], error: null };
-
-  if (projectsError) {
-    throw new Error(`Failed to load glossary project names: ${projectsError.message}`);
-  }
-
   const translationsByTermId = groupBy(
     (translationsData as GlossaryTranslationRow[] | null) ?? [],
     (translation) => translation.term_id
   );
-  const projectNamesById = new Map<string, string>(
-    (((projectsData as { id: string; name: string }[] | null) ?? [])).map((project) => [project.id, project.name])
+  const projectLinksByTermId = groupBy(
+    (projectTermLinksData as ProjectGlossaryTermRow[] | null) ?? [],
+    (link) => link.term_id
   );
-  const projectNameByTermId = new Map<string, string>();
-
-  for (const link of (projectTermLinksData as ProjectGlossaryTermRow[] | null) ?? []) {
-    if (!projectNameByTermId.has(link.term_id)) {
-      projectNameByTermId.set(link.term_id, projectNamesById.get(link.project_id) ?? "Shared");
-    }
-  }
+  const projectById = new Map(projectRows.map((project) => [project.id, project]));
+  const collectionById = new Map(collectionRows.map((collection) => [collection.id, collection]));
 
   const distinctLocales = new Set(
     ((translationsData as GlossaryTranslationRow[] | null) ?? []).map((translation) =>
@@ -691,14 +722,32 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
     const translations = (translationsByTermId.get(term.id) ?? [])
       .slice()
       .sort((left, right) => left.locale_code.localeCompare(right.locale_code))
-      .map((translation) => `${translation.locale_code.toUpperCase()} ${translation.translated_term}`)
-      .join(" · ");
+      .map((translation) => ({
+        locale: translation.locale_code.toLowerCase(),
+        term: translation.translated_term
+      }));
+    const linkedProjects = (projectLinksByTermId.get(term.id) ?? [])
+      .map((link) => projectById.get(link.project_id))
+      .filter((project): project is GlossaryProjectRow => Boolean(project));
+    const collection = term.collection_id ? collectionById.get(term.collection_id) ?? null : null;
 
     return {
+      id: term.id,
       source: term.source_term,
-      translations: translations || "No translations yet",
+      sourceLanguage: term.source_language,
+      translations,
+      translationsLabel:
+        translations.length > 0
+          ? translations
+              .map((translation) => `${translation.locale.toUpperCase()} ${translation.term}`)
+              .join(" · ")
+          : "No translations yet",
       status: mapGlossaryStatus(term.status),
-      project: projectNameByTermId.get(term.id) ?? "Shared"
+      project: linkedProjects.length > 0 ? linkedProjects.map((project) => project.name).join(", ") : "Shared",
+      projectSlugs: linkedProjects.map((project) => project.slug),
+      collectionId: collection?.id ?? null,
+      collectionName: collection?.name ?? null,
+      isProtected: term.is_protected
     };
   });
 
@@ -710,15 +759,23 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
   }
 
   const collections: GlossaryCollectionItem[] = collectionRows.map((collection) => ({
+    id: collection.id,
     name: collection.name,
     count: `${termCountByCollectionId.get(collection.id) ?? 0} terms`,
     detail: collection.description ?? "No collection description yet."
   }));
 
+  const projects: GlossaryProjectOption[] = projectRows.map((project) => ({
+    id: project.id,
+    slug: project.slug,
+    name: project.name
+  }));
+
   return {
     metrics,
     terms,
-    collections
+    collections,
+    projects
   };
 }
 
@@ -817,6 +874,230 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData> {
     workspacePlan: `${workspace.plan_name} plan`,
     workspacePlanMeta: activeMembers.length > 0 ? `${activeMembers.length} active seats` : "No members configured yet",
     teamSummary: `${editorCount} editors · ${reviewerCount} reviewers`
+  };
+}
+
+export async function createGlossaryTerm(input: NewGlossaryTermInput): Promise<{ id: string }> {
+  const { supabase, workspace } = await getWorkspaceContext();
+  const glossaryContext = await getGlossaryWriteContext(supabase, workspace.id);
+  const source = input.source.trim();
+  const sourceLanguage = input.sourceLanguage.trim().toLowerCase() || "en";
+
+  if (!source) {
+    throw new Error("Source term is required.");
+  }
+
+  const translations = mergeGlossaryTranslations(input.translations);
+  const existingTerm = glossaryContext.termsByKey.get(getGlossaryTermKey(sourceLanguage, source));
+
+  if (existingTerm) {
+    throw new Error("A glossary term with this source text and language already exists.");
+  }
+
+  const collectionId = resolveGlossaryCollectionId(
+    input.collectionId ?? null,
+    glossaryContext.collectionsById
+  );
+  const project = resolveGlossaryProject(input.projectSlug ?? null, glossaryContext.projectsByReference);
+  const now = new Date().toISOString();
+  const { data: termData, error: termError } = await supabase
+    .from("glossary_terms")
+    .insert({
+      workspace_id: workspace.id,
+      collection_id: collectionId,
+      source_term: source,
+      source_language: sourceLanguage,
+      status: mapGlossaryStatusToDatabase(input.status),
+      is_protected: input.isProtected,
+      updated_at: now
+    })
+    .select("id")
+    .single();
+
+  if (termError) {
+    throw new Error(`Failed to create glossary term: ${termError.message}`);
+  }
+
+  const termId = (termData as { id: string }).id;
+
+  if (translations.length > 0) {
+    const { error: translationError } = await supabase
+      .from("glossary_term_translations")
+      .insert(
+        translations.map((translation) => ({
+          term_id: termId,
+          locale_code: translation.locale,
+          translated_term: translation.term
+        }))
+      );
+
+    if (translationError) {
+      await supabase.from("glossary_terms").delete().eq("id", termId);
+      throw new Error(`Failed to save glossary translations: ${translationError.message}`);
+    }
+  }
+
+  if (project) {
+    const { error: projectLinkError } = await supabase.from("project_glossary_terms").upsert(
+      {
+        project_id: project.id,
+        term_id: termId
+      },
+      {
+        onConflict: "project_id,term_id"
+      }
+    );
+
+    if (projectLinkError) {
+      await supabase.from("glossary_terms").delete().eq("id", termId);
+      throw new Error(`Failed to link glossary term to project: ${projectLinkError.message}`);
+    }
+
+    await insertGlossaryActivities(supabase, [
+      {
+        projectId: project.id,
+        title: "Glossary updated",
+        detail: `Added glossary term "${source}".`
+      }
+    ]);
+  }
+
+  return { id: termId };
+}
+
+export async function importGlossaryCsv(csv: string): Promise<ImportGlossaryCsvResult> {
+  const rows = parseGlossaryCsv(csv);
+  const { supabase, workspace } = await getWorkspaceContext();
+  const glossaryContext = await getGlossaryWriteContext(supabase, workspace.id);
+  const createdCollectionIds = new Set<string>();
+  const linkedProjectPairs = new Set<string>();
+  const projectImportCounts = new Map<string, number>();
+  const importedTerms: ImportGlossaryCsvResult["importedTerms"] = [];
+
+  for (const row of rows) {
+    const collectionResult = row.collectionName
+      ? await ensureGlossaryCollection(supabase, workspace.id, row.collectionName, glossaryContext)
+      : null;
+    const collectionId = collectionResult?.id ?? null;
+
+    if (collectionId && !glossaryContext.collectionsById.has(collectionId)) {
+      throw new Error("Glossary collection could not be resolved after creation.");
+    }
+
+    if (collectionResult?.created) {
+      createdCollectionIds.add(collectionResult.id);
+    }
+
+    const project = resolveGlossaryProject(row.projectRef, glossaryContext.projectsByReference);
+    const termKey = getGlossaryTermKey(row.sourceLanguage, row.source);
+    const existingTerm = glossaryContext.termsByKey.get(termKey);
+    const now = new Date().toISOString();
+    let termId = existingTerm?.id;
+
+    if (termId) {
+      const { error: updateError } = await supabase
+        .from("glossary_terms")
+        .update({
+          collection_id: collectionId,
+          source_term: row.source.trim(),
+          source_language: row.sourceLanguage.trim().toLowerCase(),
+          status: mapGlossaryStatusToDatabase(row.status),
+          is_protected: row.isProtected,
+          updated_at: now
+        })
+        .eq("id", termId);
+
+      if (updateError) {
+        throw new Error(`Failed to update glossary term "${row.source}": ${updateError.message}`);
+      }
+    } else {
+      const { data: termData, error: createError } = await supabase
+        .from("glossary_terms")
+        .insert({
+          workspace_id: workspace.id,
+          collection_id: collectionId,
+          source_term: row.source.trim(),
+          source_language: row.sourceLanguage.trim().toLowerCase(),
+          status: mapGlossaryStatusToDatabase(row.status),
+          is_protected: row.isProtected,
+          updated_at: now
+        })
+        .select("id")
+        .single();
+
+      if (createError) {
+        throw new Error(`Failed to import glossary term "${row.source}": ${createError.message}`);
+      }
+
+      termId = (termData as { id: string }).id;
+      glossaryContext.termsByKey.set(termKey, {
+        id: termId,
+        source_term: row.source.trim(),
+        source_language: row.sourceLanguage.trim().toLowerCase()
+      });
+    }
+
+    if (row.translations.length > 0) {
+      const { error: translationError } = await supabase.from("glossary_term_translations").upsert(
+        row.translations.map((translation) => ({
+          term_id: termId,
+          locale_code: translation.locale,
+          translated_term: translation.term
+        })),
+        {
+          onConflict: "term_id,locale_code"
+        }
+      );
+
+      if (translationError) {
+        throw new Error(`Failed to import translations for "${row.source}": ${translationError.message}`);
+      }
+    }
+
+    if (project) {
+      const { error: projectLinkError } = await supabase.from("project_glossary_terms").upsert(
+        {
+          project_id: project.id,
+          term_id: termId
+        },
+        {
+          onConflict: "project_id,term_id"
+        }
+      );
+
+      if (projectLinkError) {
+        throw new Error(`Failed to link imported term "${row.source}" to project: ${projectLinkError.message}`);
+      }
+
+      linkedProjectPairs.add(`${project.id}::${termId}`);
+      projectImportCounts.set(project.id, (projectImportCounts.get(project.id) ?? 0) + 1);
+    }
+
+    importedTerms.push({
+      source: row.source.trim(),
+      sourceLanguage: row.sourceLanguage.trim().toLowerCase()
+    });
+  }
+
+  if (projectImportCounts.size > 0) {
+    await insertGlossaryActivities(
+      supabase,
+      Array.from(projectImportCounts.entries()).map(([projectId, count]) => ({
+        projectId,
+        title: "Glossary updated",
+        detail:
+          count === 1
+            ? "Imported 1 glossary term from CSV."
+            : `Imported ${count} glossary terms from CSV.`
+      }))
+    );
+  }
+
+  return {
+    importedCount: importedTerms.length,
+    collectionCount: createdCollectionIds.size,
+    projectLinkCount: linkedProjectPairs.size,
+    importedTerms
   };
 }
 
@@ -1337,6 +1618,20 @@ function mapGlossaryStatus(status: GlossaryTermRow["status"]) {
     case "draft":
     default:
       return "Draft";
+  }
+}
+
+function mapGlossaryStatusToDatabase(status: GlossaryStatus): GlossaryTermRow["status"] {
+  switch (status) {
+    case "Approved":
+      return "approved";
+    case "Review":
+      return "review";
+    case "Archived":
+      return "archived";
+    case "Draft":
+    default:
+      return "draft";
   }
 }
 
@@ -1893,6 +2188,187 @@ function startOfCurrentMonth(now: Date) {
 
 function endOfCurrentMonth(now: Date) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+}
+
+async function getGlossaryWriteContext(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string
+): Promise<GlossaryWriteContext> {
+  const [
+    { data: collectionsData, error: collectionsError },
+    { data: projectsData, error: projectsError },
+    { data: termsData, error: termsError }
+  ] = await Promise.all([
+    supabase
+      .from("glossary_collections")
+      .select("id, slug, name")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("projects")
+      .select("id, slug, name")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("glossary_terms")
+      .select("id, source_term, source_language")
+      .eq("workspace_id", workspaceId)
+  ]);
+
+  if (collectionsError) {
+    throw new Error(`Failed to load glossary collections for write: ${collectionsError.message}`);
+  }
+
+  if (projectsError) {
+    throw new Error(`Failed to load glossary projects for write: ${projectsError.message}`);
+  }
+
+  if (termsError) {
+    throw new Error(`Failed to load glossary terms for write: ${termsError.message}`);
+  }
+
+  const collections = (collectionsData as GlossaryCollectionLookupRow[] | null) ?? [];
+  const projects = (projectsData as GlossaryProjectRow[] | null) ?? [];
+  const terms = (termsData as GlossaryTermLookupRow[] | null) ?? [];
+  const projectsByReference = new Map<string, GlossaryProjectRow>();
+
+  for (const project of projects) {
+    projectsByReference.set(normalizeLookupKey(project.slug), project);
+    projectsByReference.set(normalizeLookupKey(project.name), project);
+  }
+
+  return {
+    collectionsById: new Map(collections.map((collection) => [collection.id, collection])),
+    collectionIdByName: new Map(
+      collections.map((collection) => [normalizeLookupKey(collection.name), collection.id])
+    ),
+    collectionSlugs: new Set(collections.map((collection) => collection.slug)),
+    projectsByReference,
+    termsByKey: new Map(
+      terms.map((term) => [getGlossaryTermKey(term.source_language, term.source_term), term])
+    )
+  };
+}
+
+async function ensureGlossaryCollection(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string,
+  name: string,
+  glossaryContext: GlossaryWriteContext
+): Promise<{ id: string; created: boolean }> {
+  const trimmedName = name.trim();
+
+  if (!trimmedName) {
+    throw new Error("Glossary collection name cannot be empty.");
+  }
+
+  const existingId = glossaryContext.collectionIdByName.get(normalizeLookupKey(trimmedName));
+
+  if (existingId) {
+    return { id: existingId, created: false };
+  }
+
+  const slug = buildUniqueSlugFromSet(slugify(trimmedName), glossaryContext.collectionSlugs);
+  const { data, error } = await supabase
+    .from("glossary_collections")
+    .insert({
+      workspace_id: workspaceId,
+      slug,
+      name: trimmedName
+    })
+    .select("id, slug, name")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create glossary collection "${trimmedName}": ${error.message}`);
+  }
+
+  const collection = data as GlossaryCollectionLookupRow;
+
+  glossaryContext.collectionsById.set(collection.id, collection);
+  glossaryContext.collectionIdByName.set(normalizeLookupKey(collection.name), collection.id);
+  glossaryContext.collectionSlugs.add(collection.slug);
+
+  return {
+    id: collection.id,
+    created: true
+  };
+}
+
+function resolveGlossaryCollectionId(
+  collectionId: string | null,
+  collectionsById: Map<string, GlossaryCollectionLookupRow>
+) {
+  if (!collectionId) {
+    return null;
+  }
+
+  if (!collectionsById.has(collectionId)) {
+    throw new Error("Selected glossary collection no longer exists.");
+  }
+
+  return collectionId;
+}
+
+function resolveGlossaryProject(
+  projectRef: string | null,
+  projectsByReference: Map<string, GlossaryProjectRow>
+) {
+  if (!projectRef) {
+    return null;
+  }
+
+  const project = projectsByReference.get(normalizeLookupKey(projectRef));
+
+  if (!project) {
+    throw new Error(`Glossary project "${projectRef}" could not be found.`);
+  }
+
+  return project;
+}
+
+async function insertGlossaryActivities(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  activities: Array<{ projectId: string; title: string; detail: string }>
+) {
+  if (activities.length === 0) {
+    return;
+  }
+
+  const occurredAt = new Date().toISOString();
+  const { error } = await supabase.from("project_activities").insert(
+    activities.map((activity) => ({
+      project_id: activity.projectId,
+      kind: "glossary_updated",
+      title: activity.title,
+      detail: activity.detail,
+      occurred_at: occurredAt
+    }))
+  );
+
+  if (error) {
+    console.error(`Glossary activity logging failed: ${error.message}`);
+  }
+}
+
+function buildUniqueSlugFromSet(baseSlug: string, existingSlugs: Set<string>) {
+  if (!existingSlugs.has(baseSlug)) {
+    return baseSlug;
+  }
+
+  let suffix = 2;
+
+  while (existingSlugs.has(`${baseSlug}-${suffix}`)) {
+    suffix += 1;
+  }
+
+  return `${baseSlug}-${suffix}`;
+}
+
+function getGlossaryTermKey(sourceLanguage: string, source: string) {
+  return `${sourceLanguage.trim().toLowerCase()}::${source.trim().toLowerCase()}`;
+}
+
+function normalizeLookupKey(value: string) {
+  return value.trim().toLowerCase();
 }
 
 function formatLocaleSummary(locales: string[]) {
