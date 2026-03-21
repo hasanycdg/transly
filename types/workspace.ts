@@ -85,7 +85,7 @@ export interface BillingScreenData {
   invoices: BillingInvoiceItem[];
 }
 
-export type SettingsSectionId = "profile" | "translation" | "preferences" | "danger";
+export type SettingsSectionId = "profile" | "translation" | "preferences" | "support" | "danger";
 
 export type SettingsToneStyle = "Neutral" | "Formal" | "Informal" | "Marketing" | "Technical";
 

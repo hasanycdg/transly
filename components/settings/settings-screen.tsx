@@ -63,6 +63,15 @@ const SECTION_ITEMS: SectionMeta[] = [
     icon: PreferencesIcon
   },
   {
+    id: "support",
+    label: "Support",
+    eyebrow: "/ Support",
+    sidebarDescription: "Help, contact, docs, and service status.",
+    heading: "Support",
+    description: "Get help fast, reach the right channel, and keep operational links in one predictable place.",
+    icon: SupportIcon
+  },
+  {
     id: "danger",
     label: "Danger Zone",
     eyebrow: "/ Danger Zone",
@@ -203,8 +212,8 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
               Settings
             </h1>
             <p className="mt-2 text-[12.5px] leading-6 text-[var(--muted)]">
-              A focused control surface for account details, translation defaults, glossary behavior, and delivery
-              preferences.
+              A focused control surface for account details, translation defaults, delivery preferences, support, and
+              sensitive workspace actions.
             </p>
           </div>
 
@@ -260,7 +269,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                   / Sections
                 </p>
                 <p className="mt-2 text-[12px] leading-5 text-[var(--muted)]">
-                  Minimal controls, grouped into four clear settings areas.
+                  Minimal controls, grouped into five clear settings areas.
                 </p>
               </div>
 
@@ -650,6 +659,98 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                 </div>
               ) : null}
 
+              {activeSection === "support" ? (
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
+                  <div className="space-y-5">
+                    <SettingsCard
+                      eyebrow="/ Contact"
+                      title="Support channels"
+                      description="Use the fastest path depending on whether you need product help, operational clarity, or account assistance."
+                    >
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <SupportCard
+                          title="Email support"
+                          description="Best for account questions, product issues, and workflow guidance."
+                          value="support@translayr.app"
+                          meta="Typical response within one business day."
+                          actionLabel="Email support"
+                          href="mailto:support@translayr.app"
+                        />
+                        <SupportCard
+                          title="Priority channel"
+                          description="For plan-specific escalations and critical production blockers."
+                          value={draft.profile.email}
+                          meta="Requests are routed through your workspace contact email."
+                          actionLabel="Use account email"
+                        />
+                      </div>
+                    </SettingsCard>
+
+                    <SettingsCard
+                      eyebrow="/ Help"
+                      title="Guides and documentation"
+                      description="A compact support surface for the material users typically need before opening a ticket."
+                    >
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <ResourceCard
+                          title="Getting started"
+                          description="Project setup, language defaults, and first translation workflow."
+                        />
+                        <ResourceCard
+                          title="Glossary guide"
+                          description="How shared terms, strict glossary mode, and term review work."
+                        />
+                        <ResourceCard
+                          title="File handling"
+                          description="XLIFF imports, tag protection behavior, and export defaults."
+                        />
+                      </div>
+                    </SettingsCard>
+                  </div>
+
+                  <div className="space-y-5">
+                    <SettingsCard
+                      eyebrow="/ Service"
+                      title="Operational status"
+                      description="Keep the most relevant service information visible without turning settings into a dashboard."
+                    >
+                      <div className="space-y-4">
+                        <div className="flex items-start justify-between gap-3 rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
+                          <div>
+                            <p className="text-[13px] font-medium text-[var(--foreground)]">API and translation queue</p>
+                            <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">
+                              No current incidents. Core translation services are operating normally.
+                            </p>
+                          </div>
+                          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--foreground)]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
+                            Healthy
+                          </span>
+                        </div>
+
+                        <div className="space-y-3">
+                          <DetailRow label="Workspace contact" value={draft.profile.email} />
+                          <DetailRow label="Support window" value="Mon-Fri, 09:00-17:00 CET" />
+                          <DetailRow label="Critical issues" value="Handled with priority triage" />
+                        </div>
+                      </div>
+                    </SettingsCard>
+
+                    <SettingsCard
+                      eyebrow="/ Best Practice"
+                      title="Before you contact support"
+                      description="A short checklist that removes the usual back-and-forth for translation issues."
+                    >
+                      <div className="space-y-3 text-[12px] leading-6 text-[var(--muted)]">
+                        <p>Include the project name, source language, target language, and the exact step where the issue happened.</p>
+                        <p>For file issues, mention whether the problem came from import, translation output, glossary enforcement, or export.</p>
+                        <p>If the issue is blocking delivery, say that explicitly so it can be triaged correctly.</p>
+                      </div>
+                    </SettingsCard>
+                  </div>
+                </div>
+              ) : null}
+
               {activeSection === "danger" ? (
                 <SettingsCard
                   eyebrow="/ Danger Zone"
@@ -756,6 +857,21 @@ function SettingRow({
         <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{description}</p>
       </div>
       <div className="w-full xl:w-[280px]">{control}</div>
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 text-[12px]">
+      <span className="text-[var(--muted-soft)]">{label}</span>
+      <span className="text-right font-medium text-[var(--foreground)]">{value}</span>
     </div>
   );
 }
@@ -882,12 +998,77 @@ function PreferencesIcon({ className = "h-4 w-4" }: IconProps) {
   );
 }
 
+function SupportIcon({ className = "h-4 w-4" }: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
+      <path
+        d="M5.2 6.3a2.8 2.8 0 1 1 4.2 2.4c-.8.45-1.4 1-1.4 1.8M8 12.2h.01"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
 function DangerIcon({ className = "h-4 w-4" }: IconProps) {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
       <path d="M8 2.5 13 12H3L8 2.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
       <path d="M8 6v2.8M8 10.8h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function SupportCard({
+  title,
+  description,
+  value,
+  meta,
+  actionLabel,
+  href
+}: {
+  title: string;
+  description: string;
+  value: string;
+  meta: string;
+  actionLabel: string;
+  href?: string;
+}) {
+  const className =
+    "inline-flex items-center justify-center rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]";
+
+  return (
+    <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
+      <p className="text-[13px] font-medium text-[var(--foreground)]">{title}</p>
+      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{description}</p>
+      <p className="mt-4 text-[14px] font-medium text-[var(--foreground)]">{value}</p>
+      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{meta}</p>
+      {href ? (
+        <a href={href} className={["mt-4", className].join(" ")}>
+          {actionLabel}
+        </a>
+      ) : (
+        <div className={["mt-4", className].join(" ")}>{actionLabel}</div>
+      )}
+    </div>
+  );
+}
+
+function ResourceCard({
+  title,
+  description
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
+      <p className="text-[13px] font-medium text-[var(--foreground)]">{title}</p>
+      <p className="mt-2 text-[11.5px] leading-5 text-[var(--muted)]">{description}</p>
+    </div>
   );
 }
 
