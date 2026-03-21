@@ -60,6 +60,11 @@ export interface NewGlossaryTermInput {
   translations: NewGlossaryTranslationInput[];
 }
 
+export interface NewGlossaryCollectionInput {
+  name: string;
+  detail?: string | null;
+}
+
 export interface ImportGlossaryCsvInput {
   csv: string;
 }

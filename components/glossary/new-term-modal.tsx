@@ -7,6 +7,7 @@ import type {
   GlossaryCollectionItem,
   GlossaryProjectOption,
   GlossaryStatus,
+  GlossaryTermItem,
   NewGlossaryTermInput
 } from "@/types/glossary";
 
@@ -18,6 +19,8 @@ type NewTermModalProps = {
   onCreate: (input: NewGlossaryTermInput) => Promise<void> | void;
   submitting?: boolean;
   errorMessage?: string | null;
+  mode?: "create" | "edit";
+  initialTerm?: GlossaryTermItem | null;
 };
 
 type TranslationDraft = {
@@ -34,15 +37,24 @@ export function NewTermModal({
   onClose,
   onCreate,
   submitting = false,
-  errorMessage = null
+  errorMessage = null,
+  mode = "create",
+  initialTerm = null
 }: NewTermModalProps) {
-  const [source, setSource] = useState("");
-  const [sourceLanguage, setSourceLanguage] = useState("en");
-  const [status, setStatus] = useState<GlossaryStatus>("Draft");
-  const [collectionId, setCollectionId] = useState("");
-  const [projectSlug, setProjectSlug] = useState("");
-  const [isProtected, setIsProtected] = useState(false);
-  const [translations, setTranslations] = useState<TranslationDraft[]>([{ locale: "de", term: "" }]);
+  const [source, setSource] = useState(initialTerm?.source ?? "");
+  const [sourceLanguage, setSourceLanguage] = useState(initialTerm?.sourceLanguage ?? "en");
+  const [status, setStatus] = useState<GlossaryStatus>(initialTerm?.status ?? "Draft");
+  const [collectionId, setCollectionId] = useState(initialTerm?.collectionId ?? "");
+  const [projectSlug, setProjectSlug] = useState(initialTerm?.projectSlugs[0] ?? "");
+  const [isProtected, setIsProtected] = useState(initialTerm?.isProtected ?? false);
+  const [translations, setTranslations] = useState<TranslationDraft[]>(
+    initialTerm && initialTerm.translations.length > 0
+      ? initialTerm.translations.map((translation) => ({
+          locale: translation.locale,
+          term: translation.term
+        }))
+      : [{ locale: "de", term: "" }]
+  );
   const [localError, setLocalError] = useState<string | null>(null);
 
   if (!open) {
@@ -91,13 +103,15 @@ export function NewTermModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / New Term
+              {mode === "edit" ? "/ Edit Term" : "/ New Term"}
             </p>
             <h2 className="mt-1 text-[18px] font-semibold tracking-[-0.3px] text-[var(--foreground)]">
-              Add glossary term
+              {mode === "edit" ? "Edit glossary term" : "Add glossary term"}
             </h2>
             <p className="mt-1 text-[12px] text-[var(--muted-soft)]">
-              Save approved terminology, protected phrases, and project-specific language pairs.
+              {mode === "edit"
+                ? "Update translations, status, scope, and protection settings."
+                : "Save approved terminology, protected phrases, and project-specific language pairs."}
             </p>
           </div>
           <button
@@ -292,7 +306,7 @@ export function NewTermModal({
             disabled={!source.trim() || submitting}
             className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium text-white transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting ? "Saving..." : "Save Term"}
+            {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Term"}
           </button>
         </div>
       </div>

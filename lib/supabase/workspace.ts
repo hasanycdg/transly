@@ -10,6 +10,7 @@ import { countXliffTranslationWords } from "@/lib/xliff/metrics";
 import type {
   GlossaryCollectionItem,
   GlossaryMetricItem,
+  NewGlossaryCollectionInput,
   GlossaryProjectOption,
   GlossaryScreenData,
   GlossaryStatus,
@@ -963,6 +964,161 @@ export async function createGlossaryTerm(input: NewGlossaryTermInput): Promise<{
   }
 
   return { id: termId };
+}
+
+export async function updateGlossaryTerm(
+  termId: string,
+  input: NewGlossaryTermInput
+): Promise<{ id: string }> {
+  const { supabase, workspace } = await getWorkspaceContext();
+  const glossaryContext = await getGlossaryWriteContext(supabase, workspace.id);
+  const source = input.source.trim();
+  const sourceLanguage = input.sourceLanguage.trim().toLowerCase() || "en";
+
+  if (!source) {
+    throw new Error("Source term is required.");
+  }
+
+  const { data: existingTermData, error: existingTermError } = await supabase
+    .from("glossary_terms")
+    .select("id, source_term, source_language")
+    .eq("workspace_id", workspace.id)
+    .eq("id", termId)
+    .maybeSingle();
+
+  if (existingTermError) {
+    throw new Error(`Failed to load glossary term: ${existingTermError.message}`);
+  }
+
+  if (!existingTermData) {
+    throw new Error("Glossary term could not be found.");
+  }
+
+  const translations = mergeGlossaryTranslations(input.translations);
+  const duplicateTerm = glossaryContext.termsByKey.get(getGlossaryTermKey(sourceLanguage, source));
+
+  if (duplicateTerm && duplicateTerm.id !== termId) {
+    throw new Error("A glossary term with this source text and language already exists.");
+  }
+
+  const collectionId = resolveGlossaryCollectionId(
+    input.collectionId ?? null,
+    glossaryContext.collectionsById
+  );
+  const project = resolveGlossaryProject(input.projectSlug ?? null, glossaryContext.projectsByReference);
+  const now = new Date().toISOString();
+
+  const { error: updateTermError } = await supabase
+    .from("glossary_terms")
+    .update({
+      collection_id: collectionId,
+      source_term: source,
+      source_language: sourceLanguage,
+      status: mapGlossaryStatusToDatabase(input.status),
+      is_protected: input.isProtected,
+      updated_at: now
+    })
+    .eq("workspace_id", workspace.id)
+    .eq("id", termId);
+
+  if (updateTermError) {
+    throw new Error(`Failed to update glossary term: ${updateTermError.message}`);
+  }
+
+  const { error: deleteTranslationsError } = await supabase
+    .from("glossary_term_translations")
+    .delete()
+    .eq("term_id", termId);
+
+  if (deleteTranslationsError) {
+    throw new Error(`Failed to replace glossary translations: ${deleteTranslationsError.message}`);
+  }
+
+  if (translations.length > 0) {
+    const { error: insertTranslationsError } = await supabase
+      .from("glossary_term_translations")
+      .insert(
+        translations.map((translation) => ({
+          term_id: termId,
+          locale_code: translation.locale,
+          translated_term: translation.term
+        }))
+      );
+
+    if (insertTranslationsError) {
+      throw new Error(`Failed to save glossary translations: ${insertTranslationsError.message}`);
+    }
+  }
+
+  const { error: deleteProjectLinksError } = await supabase
+    .from("project_glossary_terms")
+    .delete()
+    .eq("term_id", termId);
+
+  if (deleteProjectLinksError) {
+    throw new Error(`Failed to update glossary project links: ${deleteProjectLinksError.message}`);
+  }
+
+  if (project) {
+    const { error: insertProjectLinkError } = await supabase.from("project_glossary_terms").insert({
+      project_id: project.id,
+      term_id: termId
+    });
+
+    if (insertProjectLinkError) {
+      throw new Error(`Failed to link glossary term to project: ${insertProjectLinkError.message}`);
+    }
+
+    await insertGlossaryActivities(supabase, [
+      {
+        projectId: project.id,
+        title: "Glossary updated",
+        detail: `Updated glossary term "${source}".`
+      }
+    ]);
+  }
+
+  glossaryContext.termsByKey.delete(
+    getGlossaryTermKey(
+      (existingTermData as GlossaryTermLookupRow).source_language,
+      (existingTermData as GlossaryTermLookupRow).source_term
+    )
+  );
+  glossaryContext.termsByKey.set(getGlossaryTermKey(sourceLanguage, source), {
+    id: termId,
+    source_term: source,
+    source_language: sourceLanguage
+  });
+
+  return { id: termId };
+}
+
+export async function createGlossaryCollection(
+  input: NewGlossaryCollectionInput
+): Promise<{ id: string }> {
+  const { supabase, workspace } = await getWorkspaceContext();
+  const glossaryContext = await getGlossaryWriteContext(supabase, workspace.id);
+  const name = input.name.trim();
+
+  if (!name) {
+    throw new Error("Collection name is required.");
+  }
+
+  const existingId = glossaryContext.collectionIdByName.get(normalizeLookupKey(name));
+
+  if (existingId) {
+    throw new Error("A glossary collection with this name already exists.");
+  }
+
+  const result = await ensureGlossaryCollection(
+    supabase,
+    workspace.id,
+    name,
+    glossaryContext,
+    input.detail ?? null
+  );
+
+  return { id: result.id };
 }
 
 export async function importGlossaryCsv(csv: string): Promise<ImportGlossaryCsvResult> {
@@ -2252,7 +2408,8 @@ async function ensureGlossaryCollection(
   supabase: ReturnType<typeof createServerSupabaseClient>,
   workspaceId: string,
   name: string,
-  glossaryContext: GlossaryWriteContext
+  glossaryContext: GlossaryWriteContext,
+  detail?: string | null
 ): Promise<{ id: string; created: boolean }> {
   const trimmedName = name.trim();
 
@@ -2272,7 +2429,8 @@ async function ensureGlossaryCollection(
     .insert({
       workspace_id: workspaceId,
       slug,
-      name: trimmedName
+      name: trimmedName,
+      description: detail?.trim() || null
     })
     .select("id, slug, name")
     .single();

@@ -4,9 +4,16 @@ import { useRouter } from "next/navigation";
 import { startTransition, useMemo, useState } from "react";
 
 import { getLanguageLabel } from "@/lib/projects/formatters";
-import type { GlossaryScreenData, GlossaryStatus, NewGlossaryTermInput } from "@/types/glossary";
+import type {
+  GlossaryScreenData,
+  GlossaryStatus,
+  GlossaryTermItem,
+  NewGlossaryCollectionInput,
+  NewGlossaryTermInput
+} from "@/types/glossary";
 
 import { ImportCsvModal } from "@/components/glossary/import-csv-modal";
+import { NewCollectionModal } from "@/components/glossary/new-collection-modal";
 import { NewTermModal } from "@/components/glossary/new-term-modal";
 
 type GlossaryScreenProps = {
@@ -22,11 +29,15 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
   const [collectionFilter, setCollectionFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
   const [showNewTermModal, setShowNewTermModal] = useState(false);
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [editingTerm, setEditingTerm] = useState<GlossaryTermItem | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [collectionError, setCollectionError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [isCreatingTerm, setIsCreatingTerm] = useState(false);
+  const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
 
   const filteredTerms = useMemo(() => {
@@ -56,14 +67,15 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
     });
   }, [collectionFilter, data.terms, projectFilter, search, statusFilter]);
 
-  async function handleCreateTerm(input: NewGlossaryTermInput) {
+  async function handleSaveTerm(input: NewGlossaryTermInput) {
     setCreateError(null);
     setFlashMessage(null);
     setIsCreatingTerm(true);
 
     try {
-      const response = await fetch("/api/glossary", {
-        method: "POST",
+      const isEditing = Boolean(editingTerm);
+      const response = await fetch(isEditing ? `/api/glossary/${editingTerm?.id}` : "/api/glossary", {
+        method: isEditing ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json"
         },
@@ -76,7 +88,10 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
       }
 
       setShowNewTermModal(false);
-      setFlashMessage(`Saved glossary term "${input.source}".`);
+      setEditingTerm(null);
+      setFlashMessage(
+        isEditing ? `Updated glossary term "${input.source}".` : `Saved glossary term "${input.source}".`
+      );
       startTransition(() => {
         router.refresh();
       });
@@ -84,6 +99,39 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
       setCreateError(error instanceof Error ? error.message : "Glossary term could not be saved.");
     } finally {
       setIsCreatingTerm(false);
+    }
+  }
+
+  async function handleCreateCollection(input: NewGlossaryCollectionInput) {
+    setCollectionError(null);
+    setFlashMessage(null);
+    setIsCreatingCollection(true);
+
+    try {
+      const response = await fetch("/api/glossary/collections", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Glossary collection could not be created.");
+      }
+
+      setShowCollectionModal(false);
+      setFlashMessage(`Created collection "${input.name}".`);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (error) {
+      setCollectionError(
+        error instanceof Error ? error.message : "Glossary collection could not be created."
+      );
+    } finally {
+      setIsCreatingCollection(false);
     }
   }
 
@@ -156,6 +204,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
               type="button"
               onClick={() => {
                 setCreateError(null);
+                setEditingTerm(null);
                 setShowNewTermModal(true);
               }}
               className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12px] font-medium text-white transition hover:opacity-85"
@@ -195,8 +244,8 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_150px_170px_160px]">
-                  <label className="relative">
+                <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                  <label className="relative min-w-0">
                     <SearchIcon className="pointer-events-none absolute left-[10px] top-1/2 -translate-y-1/2 text-[var(--muted-soft)]" />
                     <input
                       value={search}
@@ -209,7 +258,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                   <select
                     value={statusFilter}
                     onChange={(event) => setStatusFilter(event.target.value as GlossaryStatus | "All")}
-                    className="w-full rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
+                    className="min-w-0 w-full rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
                   >
                     {STATUS_FILTERS.map((status) => (
                       <option key={status} value={status}>
@@ -221,7 +270,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                   <select
                     value={collectionFilter}
                     onChange={(event) => setCollectionFilter(event.target.value)}
-                    className="w-full rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
+                    className="min-w-0 w-full rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
                   >
                     <option value="all">All collections</option>
                     <option value="shared">Shared glossary</option>
@@ -235,7 +284,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                   <select
                     value={projectFilter}
                     onChange={(event) => setProjectFilter(event.target.value)}
-                    className="w-full rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
+                    className="min-w-0 w-full rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
                   >
                     <option value="all">All projects</option>
                     {data.projects.map((project) => (
@@ -247,10 +296,10 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_100px_150px_150px] border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]">
-                {["Source", "Translations", "Status", "Collection", "Project"].map((label) => (
+              <div className="grid grid-cols-[minmax(0,1.05fr)_minmax(0,1.15fr)_100px_150px_140px_70px] border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]">
+                {["Source", "Translations", "Status", "Collection", "Project", ""].map((label) => (
                   <span
-                    key={label}
+                    key={label || "actions"}
                     className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
                   >
                     {label}
@@ -262,7 +311,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                 filteredTerms.map((term) => (
                   <div
                     key={term.id}
-                    className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_100px_150px_150px] items-center border-b border-[var(--border-light)] px-[18px] py-[13px] last:border-b-0"
+                    className="grid grid-cols-[minmax(0,1.05fr)_minmax(0,1.15fr)_100px_150px_140px_70px] items-center border-b border-[var(--border-light)] px-[18px] py-[13px] last:border-b-0"
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-[6px]">
@@ -294,6 +343,20 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                     </div>
 
                     <div className="text-[11.5px] text-[var(--muted-soft)]">{term.project}</div>
+
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCreateError(null);
+                          setEditingTerm(term);
+                          setShowNewTermModal(true);
+                        }}
+                        className="rounded-[6px] border border-[var(--border)] px-[10px] py-[5px] text-[11.5px] font-medium text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--foreground)]"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </div>
                 ))
               ) : (
@@ -307,12 +370,25 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
 
             <div className="space-y-6">
               <div className="rounded-[10px] border border-[var(--border)] bg-white">
-                <div className="border-b border-[var(--border-light)] px-[18px] py-3">
+                <div className="flex items-center justify-between gap-3 border-b border-[var(--border-light)] px-[18px] py-3">
                   <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
                     / Collections
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCollectionError(null);
+                      setShowCollectionModal(true);
+                    }}
+                    className="rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
+                  >
+                    New Collection
+                  </button>
                 </div>
                 <div className="space-y-4 px-[18px] py-4">
+                  <p className="text-[11.5px] text-[var(--muted-soft)]">
+                    Collections are optional. Use them only if you want to group terms by feature, brand, or client.
+                  </p>
                   {data.collections.length > 0 ? (
                     data.collections.map((collection) => (
                       <div
@@ -343,6 +419,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                 <div className="space-y-3 px-[18px] py-4 text-[11.5px] text-[var(--muted)]">
                   <p>Use protected terms for brand names, product labels, and phrases that must stay locked.</p>
                   <p>Approved entries should contain translations for every target locale you expect to ship.</p>
+                  <p>Collections are optional folders. If you do not need grouping, keep terms in the shared glossary.</p>
                   <p>CSV import accepts `source`, optional metadata columns, and locale-based translation columns.</p>
                 </div>
               </div>
@@ -353,17 +430,35 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
 
       {showNewTermModal ? (
         <NewTermModal
+          key={editingTerm?.id ?? "new-term"}
           open={showNewTermModal}
           collections={data.collections}
           projects={data.projects}
           onClose={() => {
             if (!isCreatingTerm) {
               setShowNewTermModal(false);
+              setEditingTerm(null);
             }
           }}
-          onCreate={handleCreateTerm}
+          onCreate={handleSaveTerm}
           submitting={isCreatingTerm}
           errorMessage={createError}
+          mode={editingTerm ? "edit" : "create"}
+          initialTerm={editingTerm}
+        />
+      ) : null}
+
+      {showCollectionModal ? (
+        <NewCollectionModal
+          open={showCollectionModal}
+          onClose={() => {
+            if (!isCreatingCollection) {
+              setShowCollectionModal(false);
+            }
+          }}
+          onCreate={handleCreateCollection}
+          submitting={isCreatingCollection}
+          errorMessage={collectionError}
         />
       ) : null}
 
