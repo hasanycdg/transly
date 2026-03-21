@@ -10,3 +10,4 @@ dist
 .DS_Store
 prisma/dev.db
 .env.example
+supabase/migrations/20260319_000001_translayr_foundation.sql

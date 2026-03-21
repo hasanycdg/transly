@@ -21,6 +21,10 @@ type GlossaryScreenProps = {
 };
 
 const STATUS_FILTERS: Array<GlossaryStatus | "All"> = ["All", "Approved", "Review", "Draft", "Archived"];
+const FILTER_GRID_CLASS =
+  "mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(0,1.35fr)_repeat(3,minmax(0,1fr))]";
+const TERMS_TABLE_GRID_CLASS =
+  "grid grid-cols-[minmax(0,1.55fr)_72px_96px_minmax(0,1fr)_minmax(0,0.9fr)_76px] items-center gap-x-3";
 
 export function GlossaryScreen({ data }: GlossaryScreenProps) {
   const router = useRouter();
@@ -36,9 +40,15 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
   const [collectionError, setCollectionError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [isCreatingTerm, setIsCreatingTerm] = useState(false);
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
+  const [deletingTermId, setDeletingTermId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (!flashMessage) {
@@ -80,6 +90,10 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
       return matchesSearch && matchesStatus && matchesCollection && matchesProject;
     });
   }, [collectionFilter, data.terms, projectFilter, search, statusFilter]);
+
+  if (!isHydrated) {
+    return <GlossaryScreenFallback data={data} />;
+  }
 
   async function handleSaveTerm(input: NewGlossaryTermInput) {
     setCreateError(null);
@@ -190,6 +204,41 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
     }
   }
 
+  async function handleDeleteTerm(term: GlossaryTermItem) {
+    if (deletingTermId) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete glossary term "${term.source}"?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setFlashMessage(null);
+    setDeletingTermId(term.id);
+
+    try {
+      const response = await fetch(`/api/glossary/${term.id}`, {
+        method: "DELETE"
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Glossary term could not be deleted.");
+      }
+
+      setFlashMessage(`Deleted glossary term "${term.source}".`);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Glossary term could not be deleted.");
+    } finally {
+      setDeletingTermId(null);
+    }
+  }
+
   return (
     <>
       <div className="min-h-screen">
@@ -258,7 +307,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                <div className={FILTER_GRID_CLASS}>
                   <label className="relative min-w-0">
                     <SearchIcon className="pointer-events-none absolute left-[10px] top-1/2 -translate-y-1/2 text-[var(--muted-soft)]" />
                     <input
@@ -310,7 +359,12 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-[minmax(0,1.05fr)_minmax(0,1.15fr)_100px_150px_140px_70px] border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]">
+              <div
+                className={[
+                  TERMS_TABLE_GRID_CLASS,
+                  "border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]"
+                ].join(" ")}
+              >
                 {["Source", "Translations", "Status", "Collection", "Project", ""].map((label) => (
                   <span
                     key={label || "actions"}
@@ -325,11 +379,16 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                 filteredTerms.map((term) => (
                   <div
                     key={term.id}
-                    className="grid grid-cols-[minmax(0,1.05fr)_minmax(0,1.15fr)_100px_150px_140px_70px] items-center border-b border-[var(--border-light)] px-[18px] py-[13px] last:border-b-0"
+                    className={[
+                      TERMS_TABLE_GRID_CLASS,
+                      "border-b border-[var(--border-light)] px-[18px] py-[13px] last:border-b-0"
+                    ].join(" ")}
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-[6px]">
-                        <div className="text-[13px] font-medium text-[var(--foreground)]">{term.source}</div>
+                        <div className="truncate text-[13px] font-medium text-[var(--foreground)]" title={term.source}>
+                          {term.source}
+                        </div>
                         <span className="rounded-[5px] border border-[var(--border)] bg-[var(--background)] px-2 py-[2px] text-[10.5px] font-medium uppercase tracking-[0.04em] text-[var(--muted-soft)]">
                           {term.sourceLanguage}
                         </span>
@@ -339,26 +398,33 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
+                      <div className="mt-1 truncate text-[11.5px] text-[var(--muted-soft)]">
                         {getLanguageLabel(term.sourceLanguage)}
                       </div>
                     </div>
 
-                    <div className="truncate pr-4 text-[11.5px] text-[var(--muted)]">
-                      {term.translationsLabel}
+                    <div className="truncate text-[11.5px] text-[var(--muted)]" title={term.translationsLabel}>
+                      {term.translations.length > 0
+                        ? term.translations.map((translation) => translation.locale.toUpperCase()).join(", ")
+                        : "No locales"}
                     </div>
 
                     <div>
                       <span className={getStatusClassName(term.status)}>{term.status}</span>
                     </div>
 
-                    <div className="pr-4 text-[11.5px] text-[var(--muted-soft)]">
-                      {term.collectionName ?? "Shared glossary"}
+                    <div
+                      className="truncate text-[11.5px] text-[var(--muted-soft)]"
+                      title={term.collectionName ?? "Shared glossary"}
+                    >
+                      {term.collectionName ?? "Shared"}
                     </div>
 
-                    <div className="text-[11.5px] text-[var(--muted-soft)]">{term.project}</div>
+                    <div className="truncate text-[11.5px] text-[var(--muted-soft)]" title={term.project}>
+                      {term.project}
+                    </div>
 
-                    <div className="text-right">
+                    <div className="flex flex-col items-stretch gap-[6px]">
                       <button
                         type="button"
                         onClick={() => {
@@ -366,9 +432,17 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                           setEditingTerm(term);
                           setShowNewTermModal(true);
                         }}
-                        className="rounded-[6px] border border-[var(--border)] px-[10px] py-[5px] text-[11.5px] font-medium text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--foreground)]"
+                        className="rounded-[6px] border border-[var(--border)] px-[8px] py-[5px] text-[11px] font-medium text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--foreground)]"
                       >
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deletingTermId === term.id}
+                        onClick={() => void handleDeleteTerm(term)}
+                        className="rounded-[6px] border border-[var(--error-border)] px-[8px] py-[5px] text-[11px] font-medium text-[var(--error)] transition hover:bg-[var(--error-bg)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {deletingTermId === term.id ? "..." : "Delete"}
                       </button>
                     </div>
                   </div>
@@ -509,6 +583,134 @@ function MetricCell({
       </div>
       <div className="text-[12px] text-[var(--muted-soft)]">{label}</div>
       <div className="mt-[5px] text-[11px] text-[var(--muted-soft)]">{meta}</div>
+    </div>
+  );
+}
+
+function GlossaryScreenFallback({ data }: GlossaryScreenProps) {
+  return (
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)] px-7 py-4">
+        <div className="flex flex-col gap-[1px]">
+          <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+            / Glossary
+          </span>
+          <h1 className="text-[18px] font-semibold tracking-[-0.4px] text-[var(--foreground)]">
+            Glossary
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-[6px]">
+          <div className="h-[40px] w-[108px] rounded-[7px] border border-[var(--border)] bg-white" />
+          <div className="h-[40px] w-[102px] rounded-[7px] bg-[var(--foreground)] opacity-90" />
+        </div>
+      </header>
+
+      <div className="flex flex-col gap-6 px-7 py-6">
+        <section className="grid grid-cols-1 overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 xl:grid-cols-4">
+          {data.metrics.map((metric) => (
+            <MetricCell key={metric.label} {...metric} />
+          ))}
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.85fr)]">
+          <div className="rounded-[10px] border border-[var(--border)] bg-white">
+            <div className="border-b border-[var(--border-light)] px-[18px] py-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+                    / Terms
+                  </p>
+                  <h2 className="mt-1 text-[13px] font-medium text-[var(--foreground)]">
+                    Shared localization terms
+                  </h2>
+                </div>
+                <div className="text-right text-[11.5px] text-[var(--muted-soft)]">
+                  {data.terms.length} terms
+                </div>
+              </div>
+
+              <div className={FILTER_GRID_CLASS}>
+                <div className="h-[42px] rounded-[7px] border border-[var(--border)] bg-white" />
+                <div className="h-[42px] rounded-[7px] border border-[var(--border)] bg-white" />
+                <div className="h-[42px] rounded-[7px] border border-[var(--border)] bg-white" />
+                <div className="h-[42px] rounded-[7px] border border-[var(--border)] bg-white" />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div className="min-w-[980px]">
+                <div
+                  className={[
+                    TERMS_TABLE_GRID_CLASS,
+                    "border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]"
+                  ].join(" ")}
+                >
+                  {["Source", "Translations", "Status", "Collection", "Project", ""].map((label) => (
+                    <span
+                      key={label || "actions"}
+                      className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+
+                {Array.from({ length: Math.max(1, Math.min(3, data.terms.length || 1)) }).map((_, index) => (
+                  <div
+                    key={index}
+                    className={[
+                      TERMS_TABLE_GRID_CLASS,
+                      "border-b border-[var(--border-light)] px-[18px] py-[13px] last:border-b-0"
+                    ].join(" ")}
+                  >
+                    <div className="space-y-2">
+                      <div className="h-4 w-24 rounded bg-[var(--background)]" />
+                      <div className="h-3 w-16 rounded bg-[var(--background)]" />
+                    </div>
+                    <div className="h-4 w-16 rounded bg-[var(--background)]" />
+                    <div className="h-8 w-20 rounded-[6px] bg-[var(--background)]" />
+                    <div className="h-4 w-24 rounded bg-[var(--background)]" />
+                    <div className="h-4 w-16 rounded bg-[var(--background)]" />
+                    <div className="flex justify-end gap-[6px]">
+                      <div className="h-8 w-16 rounded-[6px] bg-[var(--background)]" />
+                      <div className="h-8 w-20 rounded-[6px] bg-[var(--background)]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="rounded-[10px] border border-[var(--border)] bg-white">
+              <div className="flex items-center justify-between gap-3 border-b border-[var(--border-light)] px-[18px] py-3">
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+                  / Collections
+                </p>
+                <div className="h-[40px] w-[124px] rounded-[7px] border border-[var(--border)] bg-white" />
+              </div>
+              <div className="space-y-4 px-[18px] py-4">
+                <div className="h-4 w-3/4 rounded bg-[var(--background)]" />
+                <div className="h-16 rounded-[8px] bg-[var(--background)]" />
+              </div>
+            </div>
+
+            <div className="rounded-[10px] border border-[var(--border)] bg-white">
+              <div className="border-b border-[var(--border-light)] px-[18px] py-3">
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+                  / Guidance
+                </p>
+              </div>
+              <div className="space-y-3 px-[18px] py-4">
+                <div className="h-4 w-full rounded bg-[var(--background)]" />
+                <div className="h-4 w-11/12 rounded bg-[var(--background)]" />
+                <div className="h-4 w-10/12 rounded bg-[var(--background)]" />
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

@@ -25,6 +25,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const projects = shellData.projects;
+  const shouldPrefetch = process.env.NODE_ENV === "production";
 
   useEffect(() => {
     setHasMounted(true);
@@ -99,6 +100,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                 <div className="space-y-[1px]">
                   <Link
                     href="/projects"
+                    prefetch={shouldPrefetch}
                     className={[
                       "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
                       pathname === "/projects"
@@ -124,6 +126,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                         <Link
                           key={project.id}
                           href={`/projects/${project.id}`}
+                          prefetch={shouldPrefetch}
                           className={linkClassName}
                           title={project.name}
                         >
@@ -136,6 +139,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                       <div key={project.id} className="group/project relative flex items-center">
                         <Link
                           href={`/projects/${project.id}`}
+                          prefetch={shouldPrefetch}
                           className={[
                             linkClassName,
                             "min-w-0 flex-1 pr-7"
@@ -183,7 +187,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                 ].join(" ");
 
                 return item.href ? (
-                  <Link key={item.label} href={item.href} className={className}>
+                  <Link key={item.label} href={item.href} prefetch={shouldPrefetch} className={className}>
                     <Icon />
                     <span>{item.label}</span>
                   </Link>

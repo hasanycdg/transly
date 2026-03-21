@@ -1121,6 +1121,58 @@ export async function createGlossaryCollection(
   return { id: result.id };
 }
 
+export async function deleteGlossaryTerm(termId: string): Promise<void> {
+  const { supabase, workspace } = await getWorkspaceContext();
+  const { data: termData, error: termError } = await supabase
+    .from("glossary_terms")
+    .select("id, source_term")
+    .eq("workspace_id", workspace.id)
+    .eq("id", termId)
+    .maybeSingle();
+
+  if (termError) {
+    throw new Error(`Failed to load glossary term: ${termError.message}`);
+  }
+
+  if (!termData) {
+    throw new Error("Glossary term could not be found.");
+  }
+
+  const { data: projectLinksData, error: projectLinksError } = await supabase
+    .from("project_glossary_terms")
+    .select("project_id")
+    .eq("term_id", termId);
+
+  if (projectLinksError) {
+    throw new Error(`Failed to load glossary term links: ${projectLinksError.message}`);
+  }
+
+  const { error: deleteError } = await supabase
+    .from("glossary_terms")
+    .delete()
+    .eq("workspace_id", workspace.id)
+    .eq("id", termId);
+
+  if (deleteError) {
+    throw new Error(`Failed to delete glossary term: ${deleteError.message}`);
+  }
+
+  const linkedProjectIds = Array.from(
+    new Set(((projectLinksData as Array<{ project_id: string }> | null) ?? []).map((row) => row.project_id))
+  );
+
+  if (linkedProjectIds.length > 0) {
+    await insertGlossaryActivities(
+      supabase,
+      linkedProjectIds.map((projectId) => ({
+        projectId,
+        title: "Glossary updated",
+        detail: `Deleted glossary term "${(termData as { source_term: string }).source_term}".`
+      }))
+    );
+  }
+}
+
 export async function importGlossaryCsv(csv: string): Promise<ImportGlossaryCsvResult> {
   const rows = parseGlossaryCsv(csv);
   const { supabase, workspace } = await getWorkspaceContext();

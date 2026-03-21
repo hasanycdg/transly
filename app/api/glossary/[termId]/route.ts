@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { normalizeGlossaryStatus } from "@/lib/glossary/csv";
-import { updateGlossaryTerm } from "@/lib/supabase/workspace";
+import { deleteGlossaryTerm, updateGlossaryTerm } from "@/lib/supabase/workspace";
 import type { NewGlossaryTermInput, NewGlossaryTranslationInput } from "@/types/glossary";
 
 type RouteContext = {
@@ -69,6 +69,41 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Glossary term update failed.";
+
+    return NextResponse.json(
+      {
+        error: message
+      },
+      {
+        status: getGlossaryRouteStatus(message)
+      }
+    );
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const { termId } = await context.params;
+
+    if (!termId) {
+      return NextResponse.json(
+        {
+          error: "Glossary term id is required."
+        },
+        { status: 400 }
+      );
+    }
+
+    await deleteGlossaryTerm(termId);
+
+    return NextResponse.json(
+      {
+        ok: true
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Glossary term deletion failed.";
 
     return NextResponse.json(
       {
