@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { startTransition, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 
 import { getLanguageLabel } from "@/lib/projects/formatters";
 import type {
@@ -39,6 +39,20 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
   const [isCreatingTerm, setIsCreatingTerm] = useState(false);
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
+
+  useEffect(() => {
+    if (!flashMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFlashMessage(null);
+    }, 5000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [flashMessage]);
 
   const filteredTerms = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
