@@ -9,9 +9,17 @@ type BillingScreenProps = {
   data: BillingScreenData;
 };
 
+type BillingMutationResponse = {
+  data?: BillingScreenData;
+  error?: string;
+  redirectMode?: "checkout" | "portal";
+  redirectUrl?: string;
+};
+
 export function BillingScreen({ data }: BillingScreenProps) {
   const router = useRouter();
   const [isUpdatingPlanId, setIsUpdatingPlanId] = useState<string | null>(null);
+  const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -43,10 +51,15 @@ export function BillingScreen({ data }: BillingScreenProps) {
         },
         body: JSON.stringify({ planId })
       });
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as BillingMutationResponse | null;
 
       if (!response.ok) {
         throw new Error(payload?.error ?? "Billing plan could not be updated.");
+      }
+
+      if (payload?.redirectUrl) {
+        window.location.assign(payload.redirectUrl);
+        return;
       }
 
       setSuccessMessage("Subscription updated.");
@@ -57,6 +70,32 @@ export function BillingScreen({ data }: BillingScreenProps) {
       setErrorMessage(error instanceof Error ? error.message : "Billing plan could not be updated.");
     } finally {
       setIsUpdatingPlanId(null);
+    }
+  }
+
+  async function handleOpenPortal() {
+    if (isOpeningPortal) {
+      return;
+    }
+
+    try {
+      setIsOpeningPortal(true);
+      setErrorMessage(null);
+
+      const response = await fetch("/api/billing/portal", {
+        method: "POST"
+      });
+      const payload = (await response.json().catch(() => null)) as BillingMutationResponse | null;
+
+      if (!response.ok || !payload?.redirectUrl) {
+        throw new Error(payload?.error ?? "Billing portal could not be opened.");
+      }
+
+      window.location.assign(payload.redirectUrl);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Billing portal could not be opened.");
+    } finally {
+      setIsOpeningPortal(false);
     }
   }
 
@@ -114,7 +153,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
                   Choose your subscription
                 </h2>
                 <p className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
-                  Switch plans directly here. Usage limits update with the selected subscription.
+                  Paid plans are billed monthly excl. VAT. New paid subscriptions open in Stripe Checkout.
                 </p>
               </div>
 
@@ -209,9 +248,20 @@ export function BillingScreen({ data }: BillingScreenProps) {
                 </div>
                 <div className="rounded-[12px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
                   <DetailRow label="Billing email" value={data.billingEmail} />
+                  {data.manageBillingAvailable ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleOpenPortal();
+                      }}
+                      disabled={isOpeningPortal}
+                      className="mt-3 rounded-[10px] border border-[var(--border)] bg-white px-3 py-2 text-[12px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      {isOpeningPortal ? "Opening Stripe..." : "Manage in Stripe"}
+                    </button>
+                  ) : null}
                   <div className="mt-3 border-t border-[var(--border-light)] pt-3 text-[11.5px] leading-5 text-[var(--muted)]">
-                    Payment provider wiring is not connected yet, but the billing workspace is now in place and the
-                    subscription plan can already be managed here.
+                    {data.paymentNotice}
                   </div>
                 </div>
               </div>

@@ -81,6 +81,8 @@ export interface BillingScreenData {
   billingEmail: string;
   paymentMethodLabel: string;
   paymentMethodMeta: string;
+  paymentNotice: string;
+  manageBillingAvailable: boolean;
   plans: BillingPlanOption[];
   invoices: BillingInvoiceItem[];
 }

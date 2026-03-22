@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getBillingScreenData, updateBillingPlan } from "@/lib/supabase/workspace";
+import { startBillingPlanSelection } from "@/lib/stripe/billing";
+import { getBillingScreenData } from "@/lib/supabase/workspace";
 
 export async function GET() {
   try {
@@ -31,9 +32,9 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const data = await updateBillingPlan(planId);
+    const result = await startBillingPlanSelection(planId, new URL(request.url).origin);
 
-    return NextResponse.json(data, { status: 200 });
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Billing plan could not be updated.";
 
@@ -42,7 +43,7 @@ export async function PATCH(request: Request) {
         error: message
       },
       {
-        status: /required|supported/i.test(message) ? 400 : 500
+        status: /required|supported|linked/i.test(message) ? 400 : 500
       }
     );
   }

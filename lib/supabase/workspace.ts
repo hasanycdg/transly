@@ -3,6 +3,12 @@ import "server-only";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { mergeGlossaryTranslations, parseGlossaryCsv } from "@/lib/glossary/csv";
+import {
+  BILLING_PLANS,
+  DEFAULT_WORKSPACE_PLAN_ID,
+  getBillingPlanDefinition,
+  type BillingPlanDefinition
+} from "@/lib/billing/plans";
 import { LANGUAGE_OPTIONS } from "@/lib/languages";
 import { formatCompactNumber } from "@/lib/projects/formatters";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
@@ -83,6 +89,11 @@ type WorkspaceSettingsMetadata = {
   strictGlossaryMode?: boolean;
   aiBehavior?: SettingsQualityPreset;
   defaultFilenameFormat?: SettingsFilenameFormat;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripeSubscriptionStatus?: string;
+  stripePriceId?: string;
+  stripeCurrentPeriodEnd?: string;
 };
 
 export type TranslationRuntimeSettings = {
@@ -265,55 +276,12 @@ type GlossaryWriteContext = {
   termsByKey: Map<string, GlossaryTermLookupRow>;
 };
 
-type BillingPlanDefinition = {
-  id: string;
-  name: string;
-  basePriceCents: number;
-  creditsLimit: number;
-  description: string;
-  features: string[];
-};
-
 const DEFAULT_WORKSPACE_NAME = "Workspace";
 const DEFAULT_WORKSPACE_SLUG = "workspace";
-const DEFAULT_WORKSPACE_PLAN = "Pro";
+const DEFAULT_WORKSPACE_PLAN = getBillingPlanDefinition(DEFAULT_WORKSPACE_PLAN_ID).name;
 const DEFAULT_WORKSPACE_AVATAR_LABEL = "W";
-const DEFAULT_CREDITS_LIMIT = 100_000;
+const DEFAULT_CREDITS_LIMIT = getBillingPlanDefinition(DEFAULT_WORKSPACE_PLAN_ID).creditsLimit;
 const SUPPORTED_LANGUAGE_CODES = new Set(LANGUAGE_OPTIONS.map((option) => option.code));
-const BILLING_PLANS: BillingPlanDefinition[] = [
-  {
-    id: "starter",
-    name: "Starter",
-    basePriceCents: 1900,
-    creditsLimit: 25_000,
-    description: "For smaller localization workloads and lightweight weekly release cycles.",
-    features: ["25k monthly credits", "Core XLIFF translation", "Glossary support"]
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    basePriceCents: 4900,
-    creditsLimit: 100_000,
-    description: "For product teams shipping continuously across multiple locales.",
-    features: ["100k monthly credits", "Review workflow", "Priority glossary injection"]
-  },
-  {
-    id: "scale",
-    name: "Scale",
-    basePriceCents: 12900,
-    creditsLimit: 300_000,
-    description: "For larger teams coordinating launches, QA, and exports at higher volume.",
-    features: ["300k monthly credits", "Faster batch throughput", "Shared team operations"]
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    basePriceCents: 24900,
-    creditsLimit: 1_000_000,
-    description: "For high-volume localization programs that need headroom and tighter control.",
-    features: ["1M monthly credits", "Custom policy defaults", "Dedicated support channel"]
-  }
-];
 
 export async function getDashboardShellData(): Promise<DashboardShellData> {
   noStore();
@@ -723,6 +691,13 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
   const activeProjects = projects.filter((project) => project.status !== "Completed").length;
   const reviewProjects = projects.filter((project) => project.status === "In Review").length;
   const billingEmail = metadata.profileEmail ?? `${workspace.slug}@translayr.app`;
+  const manageBillingAvailable = Boolean(metadata.stripeCustomerId);
+  const subscriptionStatusLabel = metadata.stripeSubscriptionStatus
+    ? formatStripeStatusLabel(metadata.stripeSubscriptionStatus)
+    : null;
+  const subscriptionPeriodEnd = metadata.stripeCurrentPeriodEnd
+    ? safeParseDate(metadata.stripeCurrentPeriodEnd)
+    : null;
 
   const metrics: UsageMetricItem[] = [
     {
@@ -752,7 +727,7 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
     id: plan.id,
     name: plan.name,
     price: formatCurrency(plan.basePriceCents / 100),
-    priceMeta: "per month",
+    priceMeta: plan.basePriceCents > 0 ? "per month excl. VAT" : "monthly limit",
     credits: `${formatCompactNumber(plan.creditsLimit)} credits`,
     description: plan.description,
     features: plan.features,
@@ -775,8 +750,18 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
     projectedSpendValue: formatCurrency(projectedSpendCents / 100),
     creditsRemainingValue: formatCompactNumber(creditsRemaining),
     billingEmail,
-    paymentMethodLabel: "Visa ending in 4242",
-    paymentMethodMeta: `Invoices are sent to ${billingEmail}.`,
+    paymentMethodLabel: manageBillingAvailable ? "Managed in Stripe" : "No Stripe billing session yet",
+    paymentMethodMeta: manageBillingAvailable
+      ? subscriptionStatusLabel && subscriptionPeriodEnd
+        ? `${subscriptionStatusLabel} until ${formatLongDate(subscriptionPeriodEnd)}.`
+        : subscriptionStatusLabel
+          ? `${subscriptionStatusLabel}.`
+          : `Billing is linked to ${billingEmail}.`
+      : `Selecting a paid plan opens Stripe Checkout for ${billingEmail}.`,
+    paymentNotice: manageBillingAvailable
+      ? "Use the Stripe customer portal for invoices, payment methods, and cancellations."
+      : "Prices are billed monthly and shown excl. VAT.",
+    manageBillingAvailable,
     plans,
     invoices
   };
@@ -2948,7 +2933,20 @@ function parseWorkspaceSettingsMetadata(value: Record<string, unknown> | null | 
     aiBehavior: isAiBehavior(metadata.aiBehavior) ? metadata.aiBehavior : undefined,
     defaultFilenameFormat: isFilenameFormat(metadata.defaultFilenameFormat)
       ? metadata.defaultFilenameFormat
-      : undefined
+      : undefined,
+    stripeCustomerId:
+      typeof metadata.stripeCustomerId === "string" ? metadata.stripeCustomerId : undefined,
+    stripeSubscriptionId:
+      typeof metadata.stripeSubscriptionId === "string" ? metadata.stripeSubscriptionId : undefined,
+    stripeSubscriptionStatus:
+      typeof metadata.stripeSubscriptionStatus === "string"
+        ? metadata.stripeSubscriptionStatus
+        : undefined,
+    stripePriceId: typeof metadata.stripePriceId === "string" ? metadata.stripePriceId : undefined,
+    stripeCurrentPeriodEnd:
+      typeof metadata.stripeCurrentPeriodEnd === "string"
+        ? metadata.stripeCurrentPeriodEnd
+        : undefined
   };
 }
 
@@ -3038,16 +3036,6 @@ function buildAvatarLabel(value: string) {
   return initials || DEFAULT_WORKSPACE_AVATAR_LABEL;
 }
 
-function getBillingPlanDefinition(planName: string): BillingPlanDefinition {
-  const normalizedPlanName = planName.trim().toLowerCase();
-
-  return (
-    BILLING_PLANS.find((plan) => plan.name.toLowerCase() === normalizedPlanName || plan.id === normalizedPlanName) ??
-    BILLING_PLANS.find((plan) => plan.name === DEFAULT_WORKSPACE_PLAN) ??
-    BILLING_PLANS[1]
-  );
-}
-
 function buildFallbackBillingCycle(
   now: Date,
   plan: BillingPlanDefinition,
@@ -3080,6 +3068,20 @@ function mapBillingInvoiceItem(
     statusLabel: cycle.status === "active" ? "Open" : cycle.status === "closed" ? "Paid" : "Projected",
     creditsLabel: `${formatCompactNumber(cycle.credits_used)} / ${formatCompactNumber(cycle.credits_limit)}`
   };
+}
+
+function formatStripeStatusLabel(status: string) {
+  return status
+    .split("_")
+    .filter(Boolean)
+    .map((segment) => segment[0]?.toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function safeParseDate(value: string) {
+  const parsed = new Date(value);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function slugify(value: string) {

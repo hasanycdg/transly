@@ -142,7 +142,7 @@ export function UsageScreen({ data }: UsageScreenProps) {
               </div>
               <div className="px-[18px] py-4">
                 <div className="mb-2 flex items-center justify-between text-[12px] text-[var(--muted)]">
-                  <span>Enterprise usage allocation</span>
+                  <span>Current plan allocation</span>
                   <span className="font-medium text-[var(--foreground)]">{data.planValue}</span>
                 </div>
                 <div className="h-[3px] overflow-hidden rounded-full bg-[var(--border)]">
