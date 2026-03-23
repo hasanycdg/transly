@@ -1,5 +1,6 @@
 "use client";
 
+import JSZip from "jszip";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -7,6 +8,11 @@ import { getProjectStatusTone } from "@/lib/projects/display";
 import { formatCompactNumber, formatPercent, formatProjectDate, getLanguageLabel } from "@/lib/projects/formatters";
 import { getProjectSummary } from "@/lib/projects/mock-data";
 import { estimateTranslationFileWordCount } from "@/lib/translation/word-count";
+import {
+  buildTranslatedArchivePath,
+  createUniqueArchivePaths,
+  expandProjectUploadSelection
+} from "@/lib/uploads/project-archive";
 import type { ProjectFileRecord, ProjectFileSyncInput, ProjectRecord } from "@/types/projects";
 import type { TranslationApiErrorShape, TranslationApiSuccess } from "@/types/translation";
 
@@ -23,6 +29,7 @@ type ProjectTranslationOutput = TranslationApiSuccess & {
   id: string;
   sourceFileName: string;
   targetLanguage: string;
+  sourceArchiveName?: string;
 };
 
 type ProjectTranslationFailure = {
@@ -39,18 +46,26 @@ type UploadedSourceFile = {
   content: string;
   words: number;
   lastUpdated: string;
+  sourceArchiveName?: string;
 };
 
 type RuntimeFileState = Pick<ProjectFileRecord, "status" | "progress" | "lastUpdated" | "words">;
+type SelectedUploadFile = Pick<UploadedSourceFile, "file" | "name" | "sourceArchiveName"> & {
+  size: number;
+};
 
 export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps) {
   const [hasMounted, setHasMounted] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedUploadFile[]>([]);
   const [uploadedSourceFiles, setUploadedSourceFiles] = useState<UploadedSourceFile[]>([]);
   const [persistedFiles, setPersistedFiles] = useState<ProjectFileRecord[]>(project?.files ?? []);
   const [reviewFileId, setReviewFileId] = useState<string | null>(null);
   const [runtimeFileStates, setRuntimeFileStates] = useState<Record<string, RuntimeFileState>>({});
+  const [isPreparingUploads, setIsPreparingUploads] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isExportingZip, setIsExportingZip] = useState(false);
   const [translationProgress, setTranslationProgress] = useState(0);
   const [currentTaskLabel, setCurrentTaskLabel] = useState<string | null>(null);
   const [translationError, setTranslationError] = useState<string | null>(null);
@@ -78,36 +93,83 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
     }
   }, [translationOutputs]);
 
-  useEffect(() => {
-    let cancelled = false;
+  async function handleFilesSelected(rawFiles: File[]) {
+    setUploadError(null);
+    setUploadNotice(null);
+    setCurrentTaskLabel(null);
+    setReviewFileId(null);
+    setTranslationError(null);
+    setTranslationOutputs([]);
+    setTranslationFailures([]);
+    setRuntimeFileStates({});
+    autoDownloadedOutputIdsRef.current.clear();
 
-    async function buildSourceFileSnapshots() {
-      const snapshots = await Promise.all(
-        selectedFiles.map(async (file) => {
-          const content = await file.text();
+    if (rawFiles.length === 0) {
+      setSelectedFiles([]);
+      setUploadedSourceFiles([]);
+      return;
+    }
+
+    setIsPreparingUploads(true);
+
+    try {
+      const expandedSelection = await expandProjectUploadSelection(rawFiles);
+
+      if (expandedSelection.files.length === 0) {
+        setSelectedFiles([]);
+        setUploadedSourceFiles([]);
+        setUploadError("No supported translation files were found in the selected ZIP archives.");
+        return;
+      }
+
+      const sourceSnapshots = await Promise.all(
+        expandedSelection.files.map(async (file) => {
+          const content = await file.file.text();
 
           return {
-            id: getClientFileId(file),
-            file,
+            id: getClientFileId(file.name, file.file),
+            file: file.file,
             name: file.name,
             content,
             words: estimateTranslationFileWordCount(file.name, content),
-            lastUpdated: new Date(file.lastModified || Date.now()).toISOString()
-          };
+            lastUpdated: new Date(file.file.lastModified || Date.now()).toISOString(),
+            sourceArchiveName: file.sourceArchiveName
+          } satisfies UploadedSourceFile;
         })
       );
 
-      if (!cancelled) {
-        setUploadedSourceFiles(snapshots);
+      setSelectedFiles(
+        expandedSelection.files.map((file) => ({
+          file: file.file,
+          name: file.name,
+          size: file.file.size,
+          sourceArchiveName: file.sourceArchiveName
+        }))
+      );
+      setUploadedSourceFiles(sourceSnapshots);
+
+      const extractedCount = expandedSelection.archives.reduce(
+        (sum, archive) => sum + archive.extractedCount,
+        0
+      );
+      const ignoredCount = expandedSelection.archives.reduce(
+        (sum, archive) => sum + archive.ignoredCount,
+        0
+      );
+
+      if (expandedSelection.archives.length > 0) {
+        setUploadNotice(
+          `Extracted ${extractedCount} file${extractedCount === 1 ? "" : "s"} from ${expandedSelection.archives.length} ZIP archive${expandedSelection.archives.length === 1 ? "" : "s"}${ignoredCount > 0 ? ` and ignored ${ignoredCount} unsupported or system entr${ignoredCount === 1 ? "y" : "ies"}` : ""}.`
+        );
       }
+    } catch (error) {
+      setSelectedFiles([]);
+      setUploadedSourceFiles([]);
+      setUploadError(error instanceof Error ? error.message : "The selected files could not be prepared.");
+    } finally {
+      setIsPreparingUploads(false);
     }
-
-    void buildSourceFileSnapshots();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedFiles]);
+  }
 
   const runtimeFiles = useMemo(() => {
     if (!project) {
@@ -255,6 +317,11 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
       return;
     }
 
+    if (isPreparingUploads) {
+      setTranslationError("Files are still being prepared. Try again in a second.");
+      return;
+    }
+
     const unsupportedFiles = selectedFiles.filter((file) => !isSupportedTranslationFile(file.name));
 
     if (unsupportedFiles.length > 0) {
@@ -279,7 +346,8 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
         file: sourceFile.file,
         sourceFileName: sourceFile.name,
         targetLanguage,
-        words: sourceFile.words
+        words: sourceFile.words,
+        sourceArchiveName: sourceFile.sourceArchiveName
       }))
     );
 
@@ -363,7 +431,8 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
             ...payload,
             id: `${job.sourceFileName}-${job.targetLanguage}-${index}`,
             sourceFileName: job.sourceFileName,
-            targetLanguage: job.targetLanguage
+            targetLanguage: job.targetLanguage,
+            sourceArchiveName: job.sourceArchiveName
           });
           finalRuntimeStates[job.id] = {
             status: "Done",
@@ -446,6 +515,33 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
     }
   }
 
+  async function handleDownloadOutputZip() {
+    if (translationOutputs.length === 0 || isExportingZip) {
+      return;
+    }
+
+    setIsExportingZip(true);
+
+    try {
+      const zip = new JSZip();
+      const archivePaths = createUniqueArchivePaths(
+        translationOutputs.map((output) => ({
+          preferredPath: buildTranslatedArchivePath(output.sourceFileName, output.fileName),
+          sourcePath: output.sourceFileName
+        }))
+      );
+
+      translationOutputs.forEach((output, index) => {
+        zip.file(archivePaths[index] ?? output.fileName, output.translatedContent);
+      });
+
+      const bundle = await zip.generateAsync({ type: "blob" });
+      downloadBlob(buildTranslationBundleFileName(currentProject.id), bundle);
+    } finally {
+      setIsExportingZip(false);
+    }
+  }
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--background)] px-7 py-4">
@@ -485,10 +581,10 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
             <button
               type="button"
               onClick={handleStartTranslation}
-              disabled={hasMounted ? isTranslating || selectedFiles.length === 0 : undefined}
+              disabled={hasMounted ? isTranslating || isPreparingUploads || selectedFiles.length === 0 : undefined}
               className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium text-white transition hover:opacity-85"
             >
-              {hasMounted && isTranslating ? "Translating..." : "Start Translation"}
+              {hasMounted && isTranslating ? "Translating..." : isPreparingUploads ? "Preparing..." : "Start Translation"}
             </button>
             <button
               type="button"
@@ -497,6 +593,14 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
             >
               Export All
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadOutputZip}
+              disabled={hasMounted ? translationOutputs.length === 0 || isExportingZip : undefined}
+              className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
+            >
+              {isExportingZip ? "Building ZIP..." : "Export ZIP"}
             </button>
           </div>
         </div>
@@ -531,9 +635,21 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
         <ProjectUploadZone
           inputId={uploadInputId}
           files={selectedFiles}
-          onFilesSelected={setSelectedFiles}
+          onFilesSelected={handleFilesSelected}
           variant="workspace"
         />
+
+        {uploadError ? (
+          <div className="rounded-[10px] border border-[var(--danger-border)] bg-[var(--danger-bg)] px-4 py-3 text-[12px] text-[var(--danger)]">
+            {uploadError}
+          </div>
+        ) : null}
+
+        {uploadNotice ? (
+          <div className="rounded-[10px] border border-[var(--border)] bg-white px-4 py-3 text-[12px] text-[var(--muted)]">
+            {uploadNotice}
+          </div>
+        ) : null}
 
         {hasMounted ? (
           <section className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-white">
@@ -547,35 +663,39 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[13px] font-medium text-[var(--foreground)]">
-                    {isTranslating
+                    {isPreparingUploads
+                      ? "Preparing uploaded files"
+                      : isTranslating
                       ? "Translation in progress"
                       : translationOutputs.length > 0
                         ? "Translation outputs ready"
                         : "Ready to translate"}
                   </p>
                   <p className="mt-1 text-[12px] text-[var(--muted-soft)]">
-                    {isTranslating
+                    {isPreparingUploads
+                      ? "ZIP contents are being unpacked and analyzed."
+                      : isTranslating
                       ? currentTaskLabel ?? "Preparing translation jobs..."
                       : translationOutputs.length > 0
-                        ? `${translationOutputs.length} translated output${translationOutputs.length === 1 ? "" : "s"} ready for download.`
+                        ? `${translationOutputs.length} translated output${translationOutputs.length === 1 ? "" : "s"} ready for download or ZIP export.`
                         : "Uploaded XLIFF files will be translated once for each project target language."}
                   </p>
                 </div>
 
                 <div className="min-w-[120px] text-right">
                   <p className="text-[11.5px] font-medium text-[var(--muted)]">
-                    {isTranslating ? `${translationProgress}%` : translationOutputs.length > 0 ? "Complete" : "Idle"}
+                    {isPreparingUploads ? "Preparing" : isTranslating ? `${translationProgress}%` : translationOutputs.length > 0 ? "Complete" : "Idle"}
                   </p>
                 </div>
               </div>
 
               <ProgressBar
-                value={isTranslating ? translationProgress : translationOutputs.length > 0 ? 100 : 0}
+                value={isPreparingUploads ? 8 : isTranslating ? translationProgress : translationOutputs.length > 0 ? 100 : 0}
                 size="sm"
                 tone={
                   translationError && translationOutputs.length === 0
                     ? "danger"
-                    : isTranslating
+                    : isPreparingUploads || isTranslating
                       ? "processing"
                       : translationOutputs.length > 0
                         ? "success"
@@ -815,8 +935,8 @@ function buildRuntimeFileId(sourceFileId: string, targetLanguage: string) {
   return `runtime:${sourceFileId}:${targetLanguage}`;
 }
 
-function getClientFileId(file: File) {
-  return `${file.name}-${file.size}-${file.lastModified}`;
+function getClientFileId(logicalName: string, file: File) {
+  return `${logicalName}-${file.size}-${file.lastModified}`;
 }
 
 function mergeProjectFiles(existingFiles: ProjectFileRecord[], runtimeFiles: ProjectFileRecord[]) {
@@ -908,8 +1028,17 @@ function deriveProjectStatusFromFiles(files: ProjectFileRecord[], fallbackStatus
   return fallbackStatus;
 }
 
+function buildTranslationBundleFileName(projectId: string) {
+  const dateStamp = new Date().toISOString().slice(0, 10);
+  return `${projectId}-translations-${dateStamp}.zip`;
+}
+
 function downloadTextFile(fileName: string, content: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
+  downloadBlob(fileName, blob);
+}
+
+function downloadBlob(fileName: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

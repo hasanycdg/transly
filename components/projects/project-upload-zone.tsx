@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 type ProjectUploadZoneProps = {
-  files: File[];
+  files: Array<Pick<File, "name" | "size">>;
   inputId: string;
   onFilesSelected: (files: File[]) => void;
   variant?: "strip" | "workspace";
@@ -50,7 +50,7 @@ export function ProjectUploadZone({
         <input
           id={inputId}
           type="file"
-          accept=".xliff,.xlf,.po,.strings,.resx"
+          accept=".xliff,.xlf,.po,.strings,.resx,.zip"
           multiple
           className="hidden"
           onChange={(event) => handleFiles(event.target.files)}
@@ -65,13 +65,13 @@ export function ProjectUploadZone({
               Drop files to upload
             </p>
             <p className="mt-0.5 text-[12px] text-[var(--muted-soft)]">
-              XLIFF, .po, or .strings - or click to browse
+              XLIFF, .po, .strings, .resx, or .zip
             </p>
           </div>
         </div>
 
         <div className="ml-auto flex flex-wrap gap-[5px]">
-          {[".XLIFF", ".PO", ".strings"].map((extension) => (
+          {[".XLIFF", ".PO", ".strings", ".ZIP"].map((extension) => (
             <span
               key={extension}
               className="inline-flex items-center rounded-[5px] border border-[var(--border)] bg-[var(--background)] px-2 py-[3px] text-[10.5px] font-medium tracking-[0.03em] text-[var(--muted-soft)]"
@@ -132,7 +132,7 @@ export function ProjectUploadZone({
         <input
           id={inputId}
           type="file"
-          accept=".xliff,.xlf,.po,.strings,.resx"
+          accept=".xliff,.xlf,.po,.strings,.resx,.zip"
           multiple
           className="hidden"
           onChange={(event) => handleFiles(event.target.files)}
@@ -146,13 +146,13 @@ export function ProjectUploadZone({
               Upload translation files
             </p>
             <p className="mt-0.5 text-[12px] text-[var(--muted-soft)]">
-              .xliff, .po, .strings, .resx
+              .xliff, .po, .strings, .resx, .zip
             </p>
           </div>
         </div>
 
         <div className="ml-auto flex flex-wrap gap-[5px]">
-          {[".XLIFF", ".PO", ".strings", ".RESX"].map((extension) => (
+          {[".XLIFF", ".PO", ".strings", ".RESX", ".ZIP"].map((extension) => (
             <span
               key={extension}
               className="inline-flex items-center rounded-[5px] border border-[var(--border)] bg-white px-2 py-[3px] text-[10.5px] font-medium tracking-[0.03em] text-[var(--muted-soft)]"
