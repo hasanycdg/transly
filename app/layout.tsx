@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Bodoni_Moda, Manrope } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { AppLocaleProvider } from "@/components/app-locale-provider";
@@ -7,9 +7,15 @@ import { getCurrentAppLocale } from "@/lib/supabase/workspace";
 
 import "./globals.css";
 
-const inter = Inter({
+const manrope = Manrope({
   subsets: ["latin"],
   variable: "--font-sans"
+});
+
+const bodoni = Bodoni_Moda({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-display"
 });
 
 export const metadata: Metadata = {
@@ -26,7 +32,7 @@ export default async function RootLayout({
   const locale = await getCurrentAppLocale();
 
   return (
-    <html lang={locale} className={inter.variable} suppressHydrationWarning>
+    <html lang={locale} className={`${manrope.variable} ${bodoni.variable}`} suppressHydrationWarning>
       <body>
         <AppLocaleProvider locale={locale}>{children}</AppLocaleProvider>
       </body>
