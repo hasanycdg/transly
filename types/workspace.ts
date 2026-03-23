@@ -1,4 +1,4 @@
-import type { ProjectRecord } from "@/types/projects";
+import type { FileStatus, ProjectRecord, ProjectStatus } from "@/types/projects";
 
 export interface DashboardProjectLink {
   id: string;
@@ -24,6 +24,57 @@ export interface UsageTrendPoint {
   value: number;
 }
 
+export interface UsageSummaryOverview {
+  wordsUsed: number;
+  totalWords: number;
+  creditsUsed: number;
+  remainingUsage: number;
+  percentConsumed: number;
+  cycleLabel: string;
+  resetDateLabel: string;
+  resetRelativeLabel: string;
+}
+
+export interface UsageProjectInsightItem {
+  id: string;
+  name: string;
+  languages: string;
+  fileCount: number;
+  wordsUsed: number;
+  sharePercent: number;
+  status: ProjectStatus;
+}
+
+export interface UsageLanguageInsightItem {
+  code: string;
+  label: string;
+  fileCount: number;
+  wordsUsed: number;
+  sharePercent: number;
+}
+
+export interface UsageTopFileItem {
+  id: string;
+  name: string;
+  projectName: string;
+  languagePair: string;
+  wordsUsed: number;
+  status: FileStatus;
+  updatedLabel: string;
+}
+
+export type UsageActivityKind = "upload" | "translation" | "export";
+
+export interface UsageActivityFeedItem {
+  id: string;
+  kind: UsageActivityKind;
+  title: string;
+  detail: string;
+  projectName: string;
+  timestampLabel: string;
+  timestamp: string;
+}
+
 export interface UsageSnapshotItem {
   label: string;
   value: string;
@@ -37,10 +88,15 @@ export interface UsageBreakdownItem {
 }
 
 export interface UsageScreenData {
+  summary: UsageSummaryOverview;
   metrics: UsageMetricItem[];
   trend: UsageTrendPoint[];
   snapshots: UsageSnapshotItem[];
   breakdown: UsageBreakdownItem[];
+  projectUsage: UsageProjectInsightItem[];
+  languageUsage: UsageLanguageInsightItem[];
+  topFiles: UsageTopFileItem[];
+  activity: UsageActivityFeedItem[];
   updatedLabel: string;
   planValue: string;
   planMeta: string;

@@ -10,7 +10,7 @@ import {
   type BillingPlanDefinition
 } from "@/lib/billing/plans";
 import { LANGUAGE_OPTIONS } from "@/lib/languages";
-import { formatCompactNumber } from "@/lib/projects/formatters";
+import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
 import { countXliffTranslationWords } from "@/lib/xliff/metrics";
@@ -44,10 +44,15 @@ import type {
   SettingsQualityPreset,
   SettingsScreenData,
   SettingsToneStyle,
+  UsageActivityFeedItem,
   UsageBreakdownItem,
+  UsageLanguageInsightItem,
   UsageMetricItem,
+  UsageProjectInsightItem,
   UsageScreenData,
+  UsageSummaryOverview,
   UsageSnapshotItem,
+  UsageTopFileItem,
   UsageTrendPoint
 } from "@/types/workspace";
 
@@ -578,6 +583,12 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
   const trend = effectiveUsageRows.length > 0 ? effectiveUsageRows.map(mapUsageTrendPoint) : buildEmptyUsageTrend(now);
   const breakdown = breakdownRows.length > 0 ? mapUsageBreakdownRows(breakdownRows) : buildFallbackUsageBreakdown(totalUploads, totalExports, totalReviews, creditsUsed);
   const projectedSpend = billingCycle ? billingCycle.projected_spend_cents : 0;
+  const cycleStart = billingCycle?.period_start
+    ? new Date(`${billingCycle.period_start}T00:00:00.000Z`)
+    : startOfCurrentMonth(now);
+  const cycleEnd = billingCycle?.period_end
+    ? new Date(`${billingCycle.period_end}T00:00:00.000Z`)
+    : endOfCurrentMonth(now);
   const updatedLabel = derivedUsage.lastUpdatedAt
     ? `Updated ${formatTimeLabel(derivedUsage.lastUpdatedAt)}`
     : effectiveUsageRows.length > 0
@@ -585,8 +596,22 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
       : `Updated ${formatTimeLabel(now)}`;
   const planValue = `${formatCompactNumber(creditsUsed)} / ${formatCompactNumber(creditsLimit)} credits`;
   const planMeta = `${formatCompactNumber(Math.max(creditsLimit - creditsUsed, 0))} credits remaining before ${formatLongDate(
-    billingCycle?.period_end ? new Date(`${billingCycle.period_end}T00:00:00.000Z`) : endOfCurrentMonth(now)
+    cycleEnd
   )}.`;
+  const summary: UsageSummaryOverview = {
+    wordsUsed: creditsUsed,
+    totalWords: creditsLimit,
+    creditsUsed,
+    remainingUsage: Math.max(creditsLimit - creditsUsed, 0),
+    percentConsumed: cycleConsumedPercent,
+    cycleLabel: `${formatShortDate(cycleStart)} - ${formatShortDate(cycleEnd)}`,
+    resetDateLabel: formatLongDate(cycleEnd),
+    resetRelativeLabel: describeResetDate(cycleEnd, now)
+  };
+  const projectUsage = buildUsageProjectInsights(projects, creditsUsed);
+  const languageUsage = buildUsageLanguageInsights(projects, creditsUsed);
+  const topFiles = buildUsageTopFiles(projects);
+  const activity = buildUsageActivityFeed(projects);
 
   const metrics: UsageMetricItem[] = [
     {
@@ -632,20 +657,21 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
     },
     {
       label: "Current cycle",
-      value: `${formatShortDate(
-        billingCycle?.period_start ? new Date(`${billingCycle.period_start}T00:00:00.000Z`) : startOfCurrentMonth(now)
-      )} - ${formatShortDate(
-        billingCycle?.period_end ? new Date(`${billingCycle.period_end}T00:00:00.000Z`) : endOfCurrentMonth(now)
-      )}`,
+      value: `${formatShortDate(cycleStart)} - ${formatShortDate(cycleEnd)}`,
       detail: `${cycleConsumedPercent}% consumed`
     }
   ];
 
   return {
+    summary,
     metrics,
     trend,
     snapshots,
     breakdown,
+    projectUsage,
+    languageUsage,
+    topFiles,
+    activity,
     updatedLabel,
     planValue,
     planMeta,
@@ -2616,6 +2642,116 @@ function buildEmptyUsageTrend(now: Date): UsageTrendPoint[] {
   });
 }
 
+function buildUsageProjectInsights(
+  projects: ProjectRecord[],
+  totalUsed: number
+): UsageProjectInsightItem[] {
+  return projects
+    .map((project) => {
+      const translatedFiles = project.files.filter((file) => file.status !== "Queued");
+      const wordsUsed = translatedFiles.reduce((sum, file) => sum + file.words, 0);
+
+      return {
+        id: project.id,
+        name: project.name,
+        languages: project.targetLanguages.map(getLanguageLabel).join(", "),
+        fileCount: translatedFiles.length,
+        wordsUsed,
+        sharePercent: totalUsed > 0 ? Math.round((wordsUsed / totalUsed) * 100) : 0,
+        status: project.status
+      };
+    })
+    .filter((project) => project.wordsUsed > 0)
+    .sort((left, right) => right.wordsUsed - left.wordsUsed);
+}
+
+function buildUsageLanguageInsights(
+  projects: ProjectRecord[],
+  totalUsed: number
+): UsageLanguageInsightItem[] {
+  const aggregated = new Map<string, UsageLanguageInsightItem>();
+
+  for (const project of projects) {
+    for (const file of project.files) {
+      if (file.status === "Queued") {
+        continue;
+      }
+
+      const existing = aggregated.get(file.targetLanguage) ?? {
+        code: file.targetLanguage,
+        label: getLanguageLabel(file.targetLanguage),
+        fileCount: 0,
+        wordsUsed: 0,
+        sharePercent: 0
+      };
+
+      existing.fileCount += 1;
+      existing.wordsUsed += file.words;
+      aggregated.set(file.targetLanguage, existing);
+    }
+  }
+
+  return Array.from(aggregated.values())
+    .map((language) => ({
+      ...language,
+      sharePercent: totalUsed > 0 ? Math.round((language.wordsUsed / totalUsed) * 100) : 0
+    }))
+    .sort((left, right) => right.wordsUsed - left.wordsUsed);
+}
+
+function buildUsageTopFiles(projects: ProjectRecord[]): UsageTopFileItem[] {
+  return projects
+    .flatMap((project) =>
+      project.files
+        .filter((file) => file.status !== "Queued")
+        .map((file) => ({
+          id: file.id,
+          name: file.name,
+          projectName: project.name,
+          languagePair: `${getLanguageLabel(file.sourceLanguage)} -> ${getLanguageLabel(file.targetLanguage)}`,
+          wordsUsed: file.words,
+          status: file.status,
+          updatedLabel: formatShortDate(new Date(file.lastUpdated))
+        }))
+    )
+    .sort((left, right) => right.wordsUsed - left.wordsUsed)
+    .slice(0, 8);
+}
+
+function buildUsageActivityFeed(projects: ProjectRecord[]): UsageActivityFeedItem[] {
+  return projects
+    .flatMap((project) =>
+      project.recentActivity.map((activity) => ({
+        id: `${project.id}-${activity.id}`,
+        kind: classifyUsageActivityKind(activity.title, activity.detail),
+        title: activity.title,
+        detail: activity.detail,
+        projectName: project.name,
+        timestampLabel: formatActivityTimestamp(new Date(activity.timestamp)),
+        timestamp: activity.timestamp
+      }))
+    )
+    .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
+    .slice(0, 12);
+}
+
+function classifyUsageActivityKind(
+  title: string,
+  detail: string
+): UsageActivityFeedItem["kind"] {
+  const normalized = `${title} ${detail}`.toLowerCase();
+
+  if (normalized.includes("export") || normalized.includes("handoff") || normalized.includes("bundle")) {
+    return "export";
+  }
+
+  if (normalized.includes("upload") || normalized.includes("import") || normalized.includes("sync")) {
+    return "upload";
+  }
+
+  return "translation";
+}
+
 function formatDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -2634,12 +2770,39 @@ function formatLongDate(date: Date) {
   }).format(date);
 }
 
+function formatActivityTimestamp(date: Date) {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(date);
+}
+
 function formatTimeLabel(date: Date) {
   return new Intl.DateTimeFormat("en", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false
   }).format(date);
+}
+
+function describeResetDate(resetDate: Date, now: Date) {
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  const normalizedNow = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const normalizedReset = Date.UTC(resetDate.getUTCFullYear(), resetDate.getUTCMonth(), resetDate.getUTCDate());
+  const dayDiff = Math.max(0, Math.ceil((normalizedReset - normalizedNow) / millisecondsPerDay));
+
+  if (dayDiff === 0) {
+    return "Resets today";
+  }
+
+  if (dayDiff === 1) {
+    return "Resets in 1 day";
+  }
+
+  return `Resets in ${dayDiff} days`;
 }
 
 function formatDelta(value: number) {
