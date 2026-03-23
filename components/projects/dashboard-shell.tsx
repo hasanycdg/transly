@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
+import { createClient } from "@/lib/supabase/client";
 import type { DashboardShellData } from "@/types/workspace";
 
 type DashboardShellProps = {
@@ -27,9 +28,11 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
   const locale = useAppLocale();
   const pathname = usePathname();
   const router = useRouter();
+  const [supabase] = useState(() => createClient());
   const [hasMounted, setHasMounted] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const projects = shellData.projects;
   const shouldPrefetch = process.env.NODE_ENV === "production";
   const copy =
@@ -46,6 +49,9 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           deleteProjectConfirm: (projectName: string) =>
             `„${projectName}“ löschen? Das Projekt wird aus der Datenbank entfernt, archivierte Nutzungsstatistiken bleiben aber verfügbar.`,
           deleteProjectFailed: "Das Projekt konnte nicht gelöscht werden.",
+          signOut: "Abmelden",
+          signingOut: "Abmeldung läuft...",
+          signOutFailed: "Die Abmeldung konnte nicht abgeschlossen werden.",
           planSuffix: "Tarif"
         }
       : {
@@ -60,12 +66,19 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           deleteProjectConfirm: (projectName: string) =>
             `Delete "${projectName}"? The project will be removed from the database, but archived usage statistics will stay available.`,
           deleteProjectFailed: "Project deletion failed.",
+          signOut: "Sign out",
+          signingOut: "Signing out...",
+          signOutFailed: "Sign-out failed.",
           planSuffix: "plan"
         };
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  useEffect(() => {
+    router.prefetch("/login");
+  }, [router]);
 
   async function handleDeleteProject(projectId: string, projectName: string) {
     if (deletingProjectId) {
@@ -99,6 +112,28 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
       window.alert(error instanceof Error ? error.message : copy.deleteProjectFailed);
     } finally {
       setDeletingProjectId(null);
+    }
+  }
+
+  async function handleSignOut() {
+    if (isSigningOut) {
+      return;
+    }
+
+    try {
+      setIsSigningOut(true);
+
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        throw error;
+      }
+
+      router.replace("/login");
+      router.refresh();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : copy.signOutFailed);
+      setIsSigningOut(false);
     }
   }
 
@@ -270,18 +305,29 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-[9px] border-t border-[var(--border-light)] px-[14px] py-3">
-              <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--foreground)] text-[10px] font-semibold text-white">
-                {shellData.workspaceAvatarLabel}
+            <div className="border-t border-[var(--border-light)] px-[14px] py-3">
+              <div className="flex items-center gap-[9px]">
+                <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--foreground)] text-[10px] font-semibold text-white">
+                  {shellData.workspaceAvatarLabel}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-[12.5px] font-medium text-[var(--foreground)]">
+                    {shellData.workspaceName}
+                  </p>
+                  <p className="text-[11px] text-[var(--muted-soft)]">
+                    {shellData.workspacePlanName} {copy.planSuffix}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="truncate text-[12.5px] font-medium text-[var(--foreground)]">
-                  {shellData.workspaceName}
-                </p>
-                <p className="text-[11px] text-[var(--muted-soft)]">
-                  {shellData.workspacePlanName} {copy.planSuffix}
-                </p>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
+                disabled={isSigningOut}
+                className="mt-3 flex h-9 w-full items-center justify-center rounded-[8px] border border-[var(--border)] bg-white px-3 text-[12.5px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background)] disabled:cursor-progress disabled:opacity-70"
+              >
+                {isSigningOut ? copy.signingOut : copy.signOut}
+              </button>
             </div>
           </div>
         </aside>

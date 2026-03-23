@@ -12,7 +12,7 @@ import {
 import { DEFAULT_APP_LOCALE, getIntlLocale, normalizeAppLocale } from "@/lib/i18n";
 import { LANGUAGE_OPTIONS } from "@/lib/languages";
 import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
-import { createServerSupabaseClient } from "@/lib/supabase/client";
+import { createServerSupabaseClient } from "@/lib/supabase/admin";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
 import { countXliffTranslationWords } from "@/lib/xliff/metrics";
 import type { AppLocale } from "@/types/i18n";

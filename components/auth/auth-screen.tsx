@@ -1,226 +1,472 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { startTransition, useEffect, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
+import { createClient } from "@/lib/supabase/client";
+import { getAppUrl } from "@/lib/supabase/env";
+
+const DISPLAY_FONT_CLASS_NAME = "[font-family:var(--font-display)] font-medium tracking-[-0.06em]";
+const PRIMARY_BUTTON_CLASS_NAME =
+  "inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#5d554c] px-5 text-[14px] font-medium text-white transition hover:bg-[#504941] disabled:cursor-progress disabled:opacity-70";
 
 type AuthScreenProps = {
   mode: "login" | "register";
 };
 
+type FormValues = {
+  acceptTerms: boolean;
+  confirmPassword: string;
+  email: string;
+  name: string;
+  password: string;
+  workspace: string;
+};
+
 export function AuthScreen({ mode }: AuthScreenProps) {
   const locale = useAppLocale();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isRegister = mode === "register";
+  const [supabase] = useState(() => createClient());
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formValues, setFormValues] = useState({
-    name: "",
-    workspace: "",
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [formValues, setFormValues] = useState<FormValues>({
+    acceptTerms: false,
+    confirmPassword: "",
     email: "",
-    password: ""
+    name: "",
+    password: "",
+    workspace: ""
   });
 
   const copy =
     locale === "de"
       ? {
+          brand: "Translayr",
           backHome: "Zur Landingpage",
-          badge: isRegister ? "Neuen Workspace starten" : "Wieder im Workspace arbeiten",
-          heading: isRegister ? "Registrieren" : "Anmelden",
+          badge: isRegister ? "Neuen Workspace anlegen" : "Zurück in deinen Workspace",
+          heading: isRegister ? "Registrieren ohne Umwege." : "Anmelden und weiterarbeiten.",
           description: isRegister
-            ? "Erstelle deinen Zugang und gehe danach direkt in dein Dashboard."
-            : "Melde dich an und springe ohne Umwege zurück in dein Dashboard.",
-          name: "Vollständiger Name",
-          workspace: "Workspace-Name",
-          email: "E-Mail",
-          password: "Passwort",
+            ? "Ein klarer Einstieg für Teams, die ihren Übersetzungs-Workflow sofort in einem sauberen Dashboard organisieren wollen."
+            : "Melde dich an und springe direkt zurück in Projekte, Glossar, Usage und Billing.",
+          tabs: {
+            login: "Anmelden",
+            register: "Registrieren"
+          },
+          sectionEyebrow: isRegister ? "/ Zugang erstellen" : "/ Workspace öffnen",
+          highlights: isRegister
+            ? [
+                {
+                  title: "Klarer Start",
+                  description: "Name, Workspace und Zugang in einem kompakten Flow."
+                },
+                {
+                  title: "Sofort produktiv",
+                  description: "Direkter Sprung ins Dashboard."
+                }
+              ]
+            : [
+                {
+                  title: "Schneller Wiedereinstieg",
+                  description: "Ohne Umweg zurück in deine Projekte."
+                },
+                {
+                  title: "Fokussierter Zugriff",
+                  description: "Nur die Felder, die du wirklich brauchst."
+                }
+              ],
+          formEyebrow: "/ Mit E-Mail fortfahren",
+          formTitle: isRegister ? "Zugang einrichten" : "Workspace öffnen",
+          formBody: isRegister
+            ? "Die wichtigsten Daten festlegen und direkt weiter."
+            : "Mit deinen Zugangsdaten direkt weiter.",
+          nameLabel: "Vollständiger Name",
+          workspaceLabel: "Workspace-Name",
+          emailLabel: "E-Mail",
+          passwordLabel: "Passwort",
+          confirmPasswordLabel: "Passwort bestätigen",
+          namePlaceholder: "Max Mustermann",
+          workspacePlaceholder: "Acme Localization",
+          emailPlaceholder: "team@firma.de",
+          passwordPlaceholder: "Mindestens 8 Zeichen",
+          confirmPasswordPlaceholder: "Passwort wiederholen",
+          termsLabel: "Ich stimme den Nutzungsbedingungen und Datenschutzrichtlinien zu.",
           submit: isRegister ? "Konto erstellen" : "Jetzt anmelden",
           submitting: isRegister ? "Konto wird erstellt..." : "Anmeldung läuft...",
           alternatePrompt: isRegister ? "Schon ein Konto?" : "Noch kein Konto?",
           alternateCta: isRegister ? "Anmelden" : "Registrieren",
           alternateHref: isRegister ? "/login" : "/register",
-          panelEyebrow: "/ Direkt ins Dashboard",
-          panelTitle: "Sauberer Einstieg ohne zusätzlichen Umweg",
-          panelBody:
-            "Nach dem Absenden leiten wir direkt auf die bestehende Projektübersicht weiter, damit dein Dashboard sofort erreichbar ist.",
-          points: [
-            "Schneller Einstieg in Projekte, Glossar und Usage",
-            "Klarer Flow für Desktop und Mobile",
-            "Direkter Sprung in das vorhandene Dashboard"
-          ]
+          directNote: "Direkter Weitergang zur Projektübersicht.",
+          success: {
+            confirmEmail:
+              "Dein Konto wurde erstellt. Bitte bestätige jetzt deine E-Mail, bevor du ins Dashboard gehst."
+          },
+          errors: {
+            passwordMismatch: "Die Passwörter stimmen nicht überein.",
+            termsRequired: "Bitte bestätige die Nutzungsbedingungen, um fortzufahren."
+          }
         }
       : {
+          brand: "Translayr",
           backHome: "Back to landing page",
-          badge: isRegister ? "Launch a new workspace" : "Return to your workspace",
-          heading: isRegister ? "Create account" : "Sign in",
+          badge: isRegister ? "Create a new workspace" : "Return to your workspace",
+          heading: isRegister ? "Register without extra steps." : "Sign in and keep moving.",
           description: isRegister
-            ? "Set up your access and move straight into the dashboard."
-            : "Sign in and jump straight back into your dashboard.",
-          name: "Full name",
-          workspace: "Workspace name",
-          email: "Email",
-          password: "Password",
+            ? "A focused entry point for teams that want to organize their translation workflow in a clean dashboard right away."
+            : "Sign in and jump straight back into projects, glossary, usage, and billing.",
+          tabs: {
+            login: "Sign in",
+            register: "Register"
+          },
+          sectionEyebrow: isRegister ? "/ Create access" : "/ Open workspace",
+          highlights: isRegister
+            ? [
+                {
+                  title: "Clear starting point",
+                  description: "Name, workspace, and access in one compact flow."
+                },
+                {
+                  title: "Useful immediately",
+                  description: "Direct jump into the dashboard."
+                }
+              ]
+            : [
+                {
+                  title: "Fast return",
+                  description: "Back to your projects without extra clicks."
+                },
+                {
+                  title: "Focused access",
+                  description: "Only the fields you actually need."
+                }
+              ],
+          formEyebrow: "/ Continue with email",
+          formTitle: isRegister ? "Set up access" : "Open your workspace",
+          formBody: isRegister
+            ? "Define the essentials and continue directly."
+            : "Enter your details and continue directly.",
+          nameLabel: "Full name",
+          workspaceLabel: "Workspace name",
+          emailLabel: "Email",
+          passwordLabel: "Password",
+          confirmPasswordLabel: "Confirm password",
+          namePlaceholder: "Jane Doe",
+          workspacePlaceholder: "Acme Localization",
+          emailPlaceholder: "team@company.com",
+          passwordPlaceholder: "At least 8 characters",
+          confirmPasswordPlaceholder: "Repeat password",
+          termsLabel: "I agree to the terms of service and privacy policy.",
           submit: isRegister ? "Create account" : "Sign in now",
           submitting: isRegister ? "Creating account..." : "Signing in...",
           alternatePrompt: isRegister ? "Already have an account?" : "Need an account?",
           alternateCta: isRegister ? "Sign in" : "Register",
           alternateHref: isRegister ? "/login" : "/register",
-          panelEyebrow: "/ Straight into the dashboard",
-          panelTitle: "Clean entry without an extra detour",
-          panelBody:
-            "After submit, the flow redirects directly to the existing project overview so the dashboard is immediately reachable.",
-          points: [
-            "Fast entry into projects, glossary, and usage",
-            "Clear flow for desktop and mobile",
-            "Direct jump into the existing dashboard"
-          ]
+          directNote: "Direct redirect into the project overview.",
+          success: {
+            confirmEmail:
+              "Your account was created. Please confirm your email before entering the dashboard."
+          },
+          errors: {
+            passwordMismatch: "Passwords do not match.",
+            termsRequired: "Please confirm the terms to continue."
+          }
         };
 
-  useEffect(() => {
-    router.prefetch("/projects");
-  }, [router]);
+  const redirectTo = getSafeRedirectPath(searchParams.get("redirectTo"));
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    router.prefetch(redirectTo);
+    router.prefetch(copy.alternateHref);
+  }, [copy.alternateHref, redirectTo, router]);
+
+  function updateField<K extends keyof FormValues>(field: K, value: FormValues[K]) {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setFormValues((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (isSubmitting) {
       return;
     }
 
-    setIsSubmitting(true);
-    startTransition(() => {
-      router.push("/projects");
-    });
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (isRegister) {
+      if (formValues.password !== formValues.confirmPassword) {
+        setErrorMessage(copy.errors.passwordMismatch);
+        return;
+      }
+
+      if (!formValues.acceptTerms) {
+        setErrorMessage(copy.errors.termsRequired);
+        return;
+      }
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      if (isRegister) {
+        const { data, error } = await supabase.auth.signUp({
+          email: formValues.email.trim(),
+          password: formValues.password,
+          options: {
+            emailRedirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+            data: {
+              full_name: formValues.name.trim(),
+              workspace_name: formValues.workspace.trim()
+            }
+          }
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data.session) {
+          router.replace(redirectTo);
+          router.refresh();
+          return;
+        }
+
+        setSuccessMessage(copy.success.confirmEmail);
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: formValues.email.trim(),
+        password: formValues.password
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      router.replace(redirectTo);
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Authentication failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(17,17,16,0.06),_transparent_35%),linear-gradient(180deg,_#fcfcfa_0%,_#f3f0e9_100%)] px-5 py-6 text-[var(--foreground)] sm:px-8 lg:px-10">
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl flex-col rounded-[32px] border border-[rgba(17,17,16,0.08)] bg-[rgba(255,255,255,0.88)] p-4 shadow-[0_24px_80px_rgba(17,17,16,0.08)] backdrop-blur sm:p-6 lg:grid lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:p-8">
-        <section className="flex flex-col justify-between rounded-[28px] bg-[linear-gradient(160deg,_rgba(17,17,16,0.98)_0%,_rgba(41,56,52,0.94)_100%)] p-7 text-white">
-          <div className="space-y-5">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-[12px] font-medium text-white/74 transition hover:text-white"
-            >
-              <span className="text-[15px]">←</span>
-              {copy.backHome}
-            </Link>
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(17,17,16,0.06),_transparent_34%),linear-gradient(180deg,_#fbf8f2_0%,_#f3efe8_100%)] px-5 py-4 text-[var(--foreground)] sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1200px] rounded-[28px] border border-[rgba(17,17,16,0.08)] bg-[rgba(255,255,255,0.82)] p-4 shadow-[0_20px_60px_rgba(17,17,16,0.08)] backdrop-blur sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[rgba(17,17,16,0.08)] pb-4">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#12100f] text-white">
+              <BrandIcon />
+            </span>
+            <span className="text-[15px] font-medium tracking-[-0.03em]">{copy.brand}</span>
+          </Link>
 
-            <div className="inline-flex w-fit rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-white/72">
+          <Link
+            href="/"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-[#dfd7cc] bg-[rgba(255,255,255,0.72)] px-4 text-[13px] font-medium text-[#161412] transition hover:bg-white"
+          >
+            {copy.backHome}
+          </Link>
+        </div>
+
+        <div className="mt-5 grid gap-5 lg:grid-cols-[0.88fr_1.12fr]">
+          <section className="rounded-[24px] border border-[rgba(17,17,16,0.08)] bg-[linear-gradient(180deg,_#f4efe8_0%,_#f9f6f1_100%)] p-5 lg:p-6">
+            <div className="inline-flex rounded-full border border-[#e3dacc] bg-white px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[#8e8478]">
               {copy.badge}
             </div>
 
-            <div className="max-w-md space-y-3">
-              <h1 className="text-4xl font-semibold tracking-[-0.06em] text-white sm:text-[46px]">
-                {copy.heading}
-              </h1>
-              <p className="max-w-sm text-[15px] leading-7 text-white/74">{copy.description}</p>
-            </div>
-          </div>
-
-          <div className="mt-10 rounded-[24px] border border-white/10 bg-white/8 p-5">
-            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/54">
-              {copy.panelEyebrow}
+            <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.18em] text-[#9c9389]">
+              {copy.sectionEyebrow}
             </p>
-            <h2 className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-white">
-              {copy.panelTitle}
-            </h2>
-            <p className="mt-3 text-[14px] leading-7 text-white/72">{copy.panelBody}</p>
-            <div className="mt-5 space-y-3">
-              {copy.points.map((point) => (
+            <h1 className={`${DISPLAY_FONT_CLASS_NAME} mt-3 max-w-[480px] text-[clamp(1.9rem,3vw,2.8rem)] leading-[0.98] text-[#171412]`}>
+              {copy.heading}
+            </h1>
+            <p className="mt-4 max-w-[460px] text-[14px] leading-[1.7] tracking-[-0.02em] text-[#5f5851]">
+              {copy.description}
+            </p>
+
+            <div className="mt-6 grid gap-3">
+              {copy.highlights.map((item) => (
                 <div
-                  key={point}
-                  className="flex items-center gap-3 rounded-[16px] border border-white/10 bg-black/10 px-4 py-3 text-[13px] text-white/78"
+                  key={item.title}
+                  className="rounded-[16px] border border-[#e6ddd2] bg-white/72 px-4 py-3 shadow-[0_8px_18px_rgba(17,15,13,0.03)]"
                 >
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/12 bg-white/10 text-[12px]">
-                    ✓
-                  </span>
-                  <span>{point}</span>
+                  <div className="text-[15px] font-medium tracking-[-0.03em] text-[#171412]">{item.title}</div>
+                  <div className="mt-1 text-[13px] leading-[1.65] text-[#655d56]">{item.description}</div>
                 </div>
               ))}
             </div>
-          </div>
-        </section>
 
-        <section className="flex items-center py-6 lg:py-0">
-          <div className="w-full rounded-[28px] border border-[rgba(17,17,16,0.08)] bg-white p-6 shadow-[0_18px_55px_rgba(17,17,16,0.05)] sm:p-8">
-            <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="mt-6 rounded-[16px] border border-[#e3dacc] bg-white px-4 py-3 text-[13px] leading-[1.65] text-[#655d56]">
+              {copy.directNote}
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[rgba(17,17,16,0.08)] bg-white p-5 shadow-[0_16px_40px_rgba(17,15,13,0.04)] lg:p-6">
+            <div className="inline-flex rounded-[14px] border border-[#e4dbcf] bg-[#faf6f0] p-1">
+              <Link
+                href="/login"
+                className={[
+                  "inline-flex h-10 items-center justify-center rounded-[10px] px-4 text-[13px] font-medium transition",
+                  !isRegister ? "bg-white text-[#171412] shadow-[0_4px_10px_rgba(17,15,13,0.04)]" : "text-[#8f857a]"
+                ].join(" ")}
+              >
+                {copy.tabs.login}
+              </Link>
+              <Link
+                href="/register"
+                className={[
+                  "inline-flex h-10 items-center justify-center rounded-[10px] px-4 text-[13px] font-medium transition",
+                  isRegister ? "bg-white text-[#171412] shadow-[0_4px_10px_rgba(17,15,13,0.04)]" : "text-[#8f857a]"
+                ].join(" ")}
+              >
+                {copy.tabs.register}
+              </Link>
+            </div>
+
+            <div className="mt-5">
+              <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-[#9c9389]">{copy.formEyebrow}</p>
+              <h2 className="mt-2 text-[22px] font-medium tracking-[-0.04em] text-[#171412]">{copy.formTitle}</h2>
+              <p className="mt-1.5 max-w-[520px] text-[13px] leading-[1.7] text-[#655d56]">{copy.formBody}</p>
+            </div>
+
+            {errorMessage ? (
+              <div className="mt-5 rounded-[16px] border border-[#efc8c8] bg-[#fdf1f1] px-4 py-3 text-[13px] text-[#9b1d1d]">
+                {errorMessage}
+              </div>
+            ) : null}
+
+            {successMessage ? (
+              <div className="mt-5 rounded-[16px] border border-[#d8e8dd] bg-[#f2f8f4] px-4 py-3 text-[13px] text-[#2f6b47]">
+                {successMessage}
+              </div>
+            ) : null}
+
+            <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
               {isRegister ? (
-                <>
-                  <FormField
-                    label={copy.name}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <AuthField
+                    label={copy.nameLabel}
                     value={formValues.name}
-                    onChange={(value) => setFormValues((current) => ({ ...current, name: value }))}
-                    placeholder={locale === "de" ? "Max Mustermann" : "Jane Doe"}
+                    onChange={(value) => updateField("name", value)}
+                    placeholder={copy.namePlaceholder}
+                    autoComplete="name"
                   />
-                  <FormField
-                    label={copy.workspace}
+                  <AuthField
+                    label={copy.workspaceLabel}
                     value={formValues.workspace}
-                    onChange={(value) => setFormValues((current) => ({ ...current, workspace: value }))}
-                    placeholder={locale === "de" ? "Acme Lokalisierung" : "Acme Localization"}
+                    onChange={(value) => updateField("workspace", value)}
+                    placeholder={copy.workspacePlaceholder}
+                    autoComplete="organization"
                   />
-                </>
+                </div>
               ) : null}
 
-              <FormField
-                label={copy.email}
+              <AuthField
+                label={copy.emailLabel}
                 type="email"
                 value={formValues.email}
-                onChange={(value) => setFormValues((current) => ({ ...current, email: value }))}
-                placeholder={locale === "de" ? "team@firma.de" : "team@company.com"}
-              />
-              <FormField
-                label={copy.password}
-                type="password"
-                value={formValues.password}
-                onChange={(value) => setFormValues((current) => ({ ...current, password: value }))}
-                placeholder="••••••••"
-                minLength={8}
+                onChange={(value) => updateField("email", value)}
+                placeholder={copy.emailPlaceholder}
+                autoComplete="email"
               />
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="inline-flex h-12 w-full items-center justify-center rounded-[16px] bg-[var(--foreground)] px-5 text-[14px] font-medium text-white transition hover:opacity-92 disabled:cursor-progress disabled:opacity-70"
-              >
+              {isRegister ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <AuthField
+                    label={copy.passwordLabel}
+                    type="password"
+                    value={formValues.password}
+                    onChange={(value) => updateField("password", value)}
+                    placeholder={copy.passwordPlaceholder}
+                    minLength={8}
+                    autoComplete="new-password"
+                  />
+                  <AuthField
+                    label={copy.confirmPasswordLabel}
+                    type="password"
+                    value={formValues.confirmPassword}
+                    onChange={(value) => updateField("confirmPassword", value)}
+                    placeholder={copy.confirmPasswordPlaceholder}
+                    minLength={8}
+                    autoComplete="new-password"
+                  />
+                </div>
+              ) : (
+                <AuthField
+                  label={copy.passwordLabel}
+                  type="password"
+                  value={formValues.password}
+                  onChange={(value) => updateField("password", value)}
+                  placeholder={copy.passwordPlaceholder}
+                  minLength={8}
+                  autoComplete="current-password"
+                />
+              )}
+
+              {isRegister ? (
+                <label className="flex items-start gap-3 rounded-[16px] border border-[#ece3d8] bg-[#faf7f2] px-4 py-3 text-[13px] leading-[1.7] text-[#5e5750]">
+                  <input
+                    type="checkbox"
+                    checked={formValues.acceptTerms}
+                    onChange={(event) => updateField("acceptTerms", event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-[#cfc5b8]"
+                  />
+                  <span>{copy.termsLabel}</span>
+                </label>
+              ) : null}
+
+              <button type="submit" disabled={isSubmitting} className={PRIMARY_BUTTON_CLASS_NAME}>
                 {isSubmitting ? copy.submitting : copy.submit}
               </button>
             </form>
 
-            <div className="mt-6 border-t border-[var(--border-light)] pt-5 text-center text-[13px] text-[var(--muted)]">
+            <div className="mt-5 border-t border-[#ece3d8] pt-4 text-[13px] text-[#736c64]">
               <span>{copy.alternatePrompt} </span>
-              <Link href={copy.alternateHref} className="font-medium text-[var(--foreground)]">
+              <Link href={copy.alternateHref} className="font-medium text-[#171412]">
                 {copy.alternateCta}
               </Link>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </main>
   );
 }
 
-type FormFieldProps = {
+type AuthFieldProps = {
+  autoComplete?: string;
+  hint?: string;
   label: string;
+  minLength?: number;
   onChange: (value: string) => void;
   placeholder: string;
   type?: "email" | "password" | "text";
   value: string;
-  minLength?: number;
 };
 
-function FormField({
+function AuthField({
+  autoComplete,
+  hint,
   label,
+  minLength,
   onChange,
   placeholder,
   type = "text",
-  value,
-  minLength
-}: FormFieldProps) {
+  value
+}: AuthFieldProps) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+      <span className="mb-2 block text-[12px] font-medium uppercase tracking-[0.08em] text-[#9a9085]">
         {label}
       </span>
       <input
@@ -228,10 +474,28 @@ function FormField({
         required
         minLength={minLength}
         value={value}
+        autoComplete={autoComplete}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-12 w-full rounded-[16px] border border-[var(--border)] bg-[var(--background-strong)] px-4 text-[14px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)] focus:bg-white"
+        className="h-12 w-full rounded-[16px] border border-[#ded5c8] bg-[#fbf8f3] px-4 text-[14px] text-[#171412] outline-none transition focus:border-[#bfb4a7] focus:bg-white"
       />
+      {hint ? <span className="mt-2 block text-[12px] leading-[1.6] text-[#9b9288]">{hint}</span> : null}
     </label>
   );
+}
+
+function BrandIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px] fill-current">
+      <path d="M5 6.8A2.8 2.8 0 0 1 7.8 4h8.4A2.8 2.8 0 0 1 19 6.8v10.4A2.8 2.8 0 0 1 16.2 20H7.8A2.8 2.8 0 0 1 5 17.2V6.8Zm4.3 1.2v1.8h5.4V8H9.3Zm0 3.6v1.8h5.4v-1.8H9.3Zm0 3.6V17h3.6v-1.8H9.3Z" />
+    </svg>
+  );
+}
+
+function getSafeRedirectPath(redirectTo: string | null) {
+  if (!redirectTo || !redirectTo.startsWith("/") || redirectTo.startsWith("//")) {
+    return "/projects";
+  }
+
+  return redirectTo;
 }

@@ -10,7 +10,7 @@ import {
   type BillingPlanDefinition,
   type BillingPlanId
 } from "@/lib/billing/plans";
-import { createServerSupabaseClient } from "@/lib/supabase/client";
+import { createServerSupabaseClient } from "@/lib/supabase/admin";
 import { getBillingScreenData } from "@/lib/supabase/workspace";
 import {
   ensureStripePrice,

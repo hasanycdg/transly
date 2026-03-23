@@ -1,38 +1,14 @@
-import "server-only";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase/env";
 
-function getSupabaseUrl() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+let browserClient: SupabaseClient | null = null;
 
-  if (!url) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL in the server environment.");
+export function createClient(): SupabaseClient {
+  if (!browserClient) {
+    browserClient = createBrowserClient(getSupabaseUrl(), getSupabasePublishableKey());
   }
 
-  return url;
-}
-
-function getPublishableKey() {
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
-
-  if (!key) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in the server environment.");
-  }
-
-  return key;
-}
-
-function getServerKey() {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY || getPublishableKey();
-}
-
-export function createServerSupabaseClient(): SupabaseClient {
-  return createClient(getSupabaseUrl(), getServerKey(), {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
+  return browserClient;
 }
