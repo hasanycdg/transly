@@ -25,6 +25,16 @@ export function getSupabaseServiceRoleKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
+export function requireSupabaseServiceRoleKey() {
+  const key = getSupabaseServiceRoleKey();
+
+  if (!key) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY in the environment.");
+  }
+
+  return key;
+}
+
 export function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }

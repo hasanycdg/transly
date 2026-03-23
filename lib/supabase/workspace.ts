@@ -13,7 +13,7 @@ import {
 import { DEFAULT_APP_LOCALE, getIntlLocale, normalizeAppLocale } from "@/lib/i18n";
 import { LANGUAGE_OPTIONS } from "@/lib/languages";
 import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
-import { createServerSupabaseClient } from "@/lib/supabase/admin";
+import { createServerSupabaseAdminClient, createServerSupabaseClient } from "@/lib/supabase/admin";
 import { getAppUrl } from "@/lib/supabase/env";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
@@ -1365,7 +1365,8 @@ export async function inviteWorkspaceMember(input: {
 
   const upsertedMember = upsertedMemberData as WorkspaceMemberRow;
   const redirectTo = `${getAppUrl()}/auth/accept-invite?next=${encodeURIComponent("/projects")}`;
-  const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+  const supabaseAdmin = createServerSupabaseAdminClient();
+  const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
     redirectTo,
     data: {
       invited_workspace_id: workspace.id,
