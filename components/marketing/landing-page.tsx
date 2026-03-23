@@ -54,7 +54,7 @@ export function LandingPage() {
             "Translayr verbindet deine Dateien, dein Team und deine Sprachen in einem klaren Workflow. Von Upload bis Export bleibt alles sichtbar, geprüft und startklar.",
           heroPrimary: "Kostenlos starten",
           heroSecondary: "Im Workspace anmelden",
-          trustedBy: "Vertraut von",
+          trustedBy: "Vertraut von mehreren Agenturen und Developern, die ihre Arbeit vereinfachen möchten",
           featuresEyebrow: "Features",
           featuresTitle: "Alles, was dein Localization-Workflow wirklich braucht.",
           featuresBody:
@@ -100,7 +100,6 @@ export function LandingPage() {
           mockLangs: "Sprachen",
           mockStatusActive: "Aktiv",
           mockStatusReview: "Review",
-          brands: ["Shopify", "Notion", "Vercel", "Linear", "Loom", "Pitch"],
           features: [
             {
               title: "Multi-Format Upload",
@@ -151,10 +150,10 @@ export function LandingPage() {
             }
           ] satisfies StepItem[],
           stats: [
-            { value: "2.4M", label: "Übersetzte Strings" },
+            { value: "270K", label: "Übersetzte Strings" },
             { value: "98%", label: "Kundenzufriedenheit" },
-            { value: "140+", label: "Aktive Teams" },
-            { value: "34", label: "Unterstützte Sprachen" }
+            { value: "Mehrere", label: "Aktive Teams" },
+            { value: "90+", label: "Unterstützte Sprachen" }
           ],
           storyMetrics: [
             { value: "3 Tage", label: "Schnellerer Release-Zyklus" },
@@ -181,6 +180,31 @@ export function LandingPage() {
               question: "Bleibt der Export struktursicher?",
               answer:
                 "Ja. Der Fokus des Produkts liegt darauf, Strings und Dateistruktur sauber zu halten, damit du Übersetzungen ohne manuelles Nacharbeiten zurück in deine Pipeline geben kannst."
+            },
+            {
+              question: "Kann ich später auf einen größeren Plan wechseln?",
+              answer:
+                "Ja. Du kannst mit Free oder Starter beginnen und später im Billing-Bereich auf Starter, Pro oder Scale wechseln, wenn dein Volumen steigt."
+            },
+            {
+              question: "Unterstützt Translayr mehrere Zielsprachen gleichzeitig?",
+              answer:
+                "Ja. Projekte sind darauf ausgelegt, mehrere Zielsprachen parallel zu verwalten, damit Fortschritt, Review und Export zentral im selben Ablauf bleiben."
+            },
+            {
+              question: "Kann ich ein Glossar zentral pflegen?",
+              answer:
+                "Ja. Das Produkt enthält einen eigenen Glossar-Bereich, damit Begriffe nicht in einzelnen Projekten verloren gehen und teamweit konsistent bleiben."
+            },
+            {
+              question: "Wo sehe ich den Fortschritt meiner Projekte?",
+              answer:
+                "Die Projektübersicht und die einzelnen Projektseiten zeigen dir Fortschritt, Dateistatus und Review-Zustände direkt im Dashboard an."
+            },
+            {
+              question: "Brauche ich ein langes Setup oder Onboarding?",
+              answer:
+                "Nein. Der Einstieg ist bewusst schlank gehalten: registrieren oder anmelden, Datei hochladen und direkt im Projekt weiterarbeiten."
             }
           ] satisfies FaqItem[],
           plans: [
@@ -247,7 +271,7 @@ export function LandingPage() {
             "Translayr connects your files, your team, and your languages in one clean workflow. From upload to export, everything stays tracked, reviewed, and ready.",
           heroPrimary: "Start for free",
           heroSecondary: "Sign in to your workspace",
-          trustedBy: "Trusted by",
+          trustedBy: "Trusted by agencies and developers who want to make their work easier",
           featuresEyebrow: "Features",
           featuresTitle: "Everything your localization workflow needs.",
           featuresBody:
@@ -293,7 +317,6 @@ export function LandingPage() {
           mockLangs: "Langs",
           mockStatusActive: "Active",
           mockStatusReview: "Review",
-          brands: ["Shopify", "Notion", "Vercel", "Linear", "Loom", "Pitch"],
           features: [
             {
               title: "Multi-format upload",
@@ -344,10 +367,10 @@ export function LandingPage() {
             }
           ] satisfies StepItem[],
           stats: [
-            { value: "2.4M", label: "Strings translated" },
+            { value: "270K", label: "Strings translated" },
             { value: "98%", label: "Customer satisfaction" },
-            { value: "140+", label: "Teams active" },
-            { value: "34", label: "Languages supported" }
+            { value: "Multiple", label: "Active teams" },
+            { value: "90+", label: "Languages supported" }
           ],
           storyMetrics: [
             { value: "3 days", label: "Faster release cycle" },
@@ -374,6 +397,31 @@ export function LandingPage() {
               question: "Will exports stay structure-safe?",
               answer:
                 "Yes. The product is built to keep strings and file structure intact so translations can go back into your pipeline without manual cleanup."
+            },
+            {
+              question: "Can I move to a bigger plan later?",
+              answer:
+                "Yes. You can start on Free or Starter and switch to Starter, Pro, or Scale later from billing as your volume grows."
+            },
+            {
+              question: "Does Translayr support multiple target languages at once?",
+              answer:
+                "Yes. Projects are designed to manage multiple target languages in parallel so progress, review, and export stay in one central workflow."
+            },
+            {
+              question: "Can I manage a glossary centrally?",
+              answer:
+                "Yes. The product includes a dedicated glossary area so important terms do not get scattered across projects and stay consistent across the team."
+            },
+            {
+              question: "Where can I see project progress?",
+              answer:
+                "The project overview and each project workspace show progress, file status, and review states directly inside the dashboard."
+            },
+            {
+              question: "Do I need a long setup or onboarding?",
+              answer:
+                "No. The entry flow is intentionally lightweight: register or sign in, upload a file, and continue working directly inside a project."
             }
           ] satisfies FaqItem[],
           plans: [
@@ -582,15 +630,6 @@ export function LandingPage() {
         <section className="border-b border-[#ece3d8] py-5">
           <div className="flex flex-wrap items-center gap-5 text-[#bbb1a5]">
             <span className="text-[12px] font-medium uppercase tracking-[0.18em]">{copy.trustedBy}</span>
-            <span className="hidden h-5 w-px bg-[#ddd2c5] sm:block" />
-            {copy.brands.map((brand) => (
-              <span
-                key={brand}
-                className="text-[14px] font-semibold uppercase tracking-[0.08em] text-[#c1b8ad] sm:text-[15px]"
-              >
-                {brand}
-              </span>
-            ))}
           </div>
         </section>
 
@@ -630,7 +669,6 @@ export function LandingPage() {
               <HowItWorksCard
                 key={step.title}
                 index={index}
-                isLast={index === copy.steps.length - 1}
                 step={step}
               />
             ))}
@@ -911,20 +949,16 @@ function FeatureCard({ index, feature }: { index: number; feature: FeatureItem }
 
 function HowItWorksCard({
   index,
-  isLast,
   step
 }: {
   index: number;
-  isLast: boolean;
   step: StepItem;
 }) {
   return (
     <article className="relative pt-5">
-      <div className="absolute left-6 top-0 hidden h-px w-[calc(100%-3rem)] bg-[#e7dfd4] lg:block" />
       <div className="relative z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ddd4c9] bg-white text-[18px] font-medium text-[#171412] shadow-[0_8px_22px_rgba(21,18,14,0.04)]">
         {index + 1}
       </div>
-      {!isLast ? <div className="absolute left-10 top-5 hidden h-px w-[calc(100%-2.5rem)] bg-[#e7dfd4] lg:block" /> : null}
       <h3 className="mt-4 text-[22px] font-medium tracking-[-0.045em] text-[#171412]">{step.title}</h3>
       <p className="mt-3 max-w-[320px] text-[14px] leading-[1.75] tracking-[-0.02em] text-[#655d56]">{step.description}</p>
     </article>
