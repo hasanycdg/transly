@@ -1,3 +1,7 @@
+"use client";
+
+import { useMemo, useRef, useState } from "react";
+
 import type { UsageScreenData } from "@/types/workspace";
 
 type UsageScreenProps = {
@@ -5,7 +9,27 @@ type UsageScreenProps = {
 };
 
 export function UsageScreen({ data }: UsageScreenProps) {
-  const chartPoints = buildChartPoints(data.trend, 520, 160);
+  const chartPoints = useMemo(() => buildChartPoints(data.trend, 520, 160), [data.trend]);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [activePointIndex, setActivePointIndex] = useState<number | null>(
+    chartPoints.points.length > 0 ? chartPoints.points.length - 1 : null
+  );
+  const activePoint =
+    activePointIndex !== null ? chartPoints.points[activePointIndex] ?? null : null;
+
+  function handleChartMouseMove(event: React.MouseEvent<SVGSVGElement>) {
+    if (!svgRef.current || chartPoints.points.length === 0) {
+      return;
+    }
+
+    const bounds = svgRef.current.getBoundingClientRect();
+    const relativeX = ((event.clientX - bounds.left) / bounds.width) * 560;
+    setActivePointIndex(getClosestPointIndex(chartPoints.points, relativeX));
+  }
+
+  function handleChartMouseLeave() {
+    setActivePointIndex(null);
+  }
 
   return (
     <div className="min-h-screen">
@@ -51,12 +75,35 @@ export function UsageScreen({ data }: UsageScreenProps) {
             </div>
 
             <div className="px-[18px] py-4">
-              <div className="rounded-[8px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
+              <div className="relative rounded-[8px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
+                {activePoint ? (
+                  <div
+                    className="pointer-events-none absolute z-10 min-w-[128px] -translate-x-1/2 rounded-[8px] border border-[var(--border)] bg-white/96 px-3 py-2 shadow-[0_10px_24px_rgba(17,17,16,0.08)] backdrop-blur"
+                    style={{
+                      left: `${(activePoint.x / 560) * 100}%`,
+                      top: "14px"
+                    }}
+                  >
+                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+                      {activePoint.label}
+                    </p>
+                    <p className="mt-1 text-[15px] font-semibold leading-none text-[var(--foreground)]">
+                      {formatChartValue(activePoint.value)}
+                    </p>
+                    <p className="mt-1 text-[11px] text-[var(--muted)]">
+                      Credits consumed
+                    </p>
+                  </div>
+                ) : null}
+
                 <svg
+                  ref={svgRef}
                   viewBox="0 0 560 200"
                   className="h-[220px] w-full"
                   role="img"
                   aria-label="Usage trend chart"
+                  onMouseMove={handleChartMouseMove}
+                  onMouseLeave={handleChartMouseLeave}
                 >
                   <defs>
                     <linearGradient id="usage-fill" x1="0" x2="0" y1="0" y2="1">
@@ -91,9 +138,39 @@ export function UsageScreen({ data }: UsageScreenProps) {
                     strokeLinejoin="round"
                   />
 
-                  {chartPoints.points.map((point) => (
+                  {activePoint ? (
+                    <line
+                      x1={activePoint.x}
+                      x2={activePoint.x}
+                      y1="20"
+                      y2="176"
+                      stroke="rgba(26,79,175,0.18)"
+                      strokeWidth="1"
+                      strokeDasharray="4 4"
+                    />
+                  ) : null}
+
+                  {chartPoints.points.map((point, index) => (
                     <g key={point.label}>
-                      <circle cx={point.x} cy={point.y} r="3.5" fill="white" stroke="var(--processing)" strokeWidth="1.8" />
+                      <circle
+                        cx={point.x}
+                        cy={point.y}
+                        r={activePointIndex === index ? "5.5" : "3.5"}
+                        fill="white"
+                        stroke="var(--processing)"
+                        strokeWidth={activePointIndex === index ? "2.4" : "1.8"}
+                      />
+                      <circle
+                        cx={point.x}
+                        cy={point.y}
+                        r="14"
+                        fill="transparent"
+                        onMouseEnter={() => setActivePointIndex(index)}
+                      >
+                        <title>
+                          {point.label}: {formatChartValue(point.value)} credits
+                        </title>
+                      </circle>
                     </g>
                   ))}
 
@@ -217,10 +294,18 @@ function buildChartPoints(
   width: number,
   height: number
 ) {
+  if (data.length === 0) {
+    return {
+      fillPath: "",
+      linePath: "",
+      points: []
+    };
+  }
+
   const min = Math.min(...data.map((item) => item.value));
   const max = Math.max(...data.map((item) => item.value));
   const chartHeight = height;
-  const stepX = width / (data.length - 1);
+  const stepX = data.length > 1 ? width / (data.length - 1) : 0;
 
   const points = data.map((item, index) => {
     const normalized = (item.value - min) / (max - min || 1);
@@ -240,4 +325,24 @@ function buildChartPoints(
     linePath,
     points
   };
+}
+
+function getClosestPointIndex(points: Array<{ x: number }>, targetX: number) {
+  let closestIndex = 0;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  for (const [index, point] of points.entries()) {
+    const distance = Math.abs(point.x - targetX);
+
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = index;
+    }
+  }
+
+  return closestIndex;
+}
+
+function formatChartValue(value: number) {
+  return new Intl.NumberFormat("en").format(value);
 }
