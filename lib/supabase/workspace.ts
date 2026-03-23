@@ -1,6 +1,7 @@
 import "server-only";
 
 import { unstable_noStore as noStore } from "next/cache";
+import type { User } from "@supabase/supabase-js";
 
 import { mergeGlossaryTranslations, parseGlossaryCsv } from "@/lib/glossary/csv";
 import {
@@ -13,6 +14,8 @@ import { DEFAULT_APP_LOCALE, getIntlLocale, normalizeAppLocale } from "@/lib/i18
 import { LANGUAGE_OPTIONS } from "@/lib/languages";
 import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
 import { createServerSupabaseClient } from "@/lib/supabase/admin";
+import { getAppUrl } from "@/lib/supabase/env";
+import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
 import { countXliffTranslationWords } from "@/lib/xliff/metrics";
 import type { AppLocale } from "@/types/i18n";
@@ -55,7 +58,12 @@ import type {
   UsageSummaryOverview,
   UsageSnapshotItem,
   UsageTopFileItem,
-  UsageTrendPoint
+  UsageTrendPoint,
+  WorkspaceMemberInviteResult,
+  WorkspaceMemberListItem,
+  WorkspaceMemberRole,
+  WorkspaceMembersResponse,
+  WorkspaceMemberStatus
 } from "@/types/workspace";
 
 type WorkspaceRow = {
@@ -86,6 +94,18 @@ type WorkspaceSettingsRow = {
   auto_export_after_completion: boolean;
   glossary_prompt_injection: boolean;
   metadata: Record<string, unknown> | null;
+};
+
+type WorkspaceMemberRow = {
+  id: string;
+  workspace_id: string;
+  email: string;
+  display_name: string | null;
+  role: WorkspaceMemberRole;
+  status: WorkspaceMemberStatus;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type WorkspaceSettingsMetadata = {
@@ -323,9 +343,13 @@ export async function getDashboardShellData(): Promise<DashboardShellData> {
 export async function getCurrentAppLocale(): Promise<AppLocale> {
   noStore();
 
-  const { settings } = await getWorkspaceContext();
+  try {
+    const { settings } = await getWorkspaceContext();
 
-  return parseWorkspaceSettingsMetadata(settings.metadata).preferredLocale ?? DEFAULT_APP_LOCALE;
+    return parseWorkspaceSettingsMetadata(settings.metadata).preferredLocale ?? DEFAULT_APP_LOCALE;
+  } catch {
+    return DEFAULT_APP_LOCALE;
+  }
 }
 
 export async function getProjectsOverviewRecords(): Promise<ProjectRecord[]> {
@@ -1251,6 +1275,116 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
   };
 }
 
+export async function getWorkspaceMembers(): Promise<WorkspaceMembersResponse> {
+  noStore();
+
+  const { supabase, workspace, member } = await getWorkspaceContext();
+  const { data, error } = await supabase
+    .from("workspace_members")
+    .select("id, workspace_id, email, display_name, role, status, metadata, created_at, updated_at")
+    .eq("workspace_id", workspace.id)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to load workspace members: ${error.message}`);
+  }
+
+  return {
+    members: ((data as WorkspaceMemberRow[] | null) ?? []).map(mapWorkspaceMemberListItem),
+    canInvite: canManageWorkspaceMembers(member.role)
+  };
+}
+
+export async function inviteWorkspaceMember(input: {
+  email: string;
+  role: WorkspaceMemberRole;
+}): Promise<WorkspaceMemberInviteResult> {
+  const { supabase, workspace, member, user } = await getWorkspaceContext();
+  const email = normalizeMemberEmail(input.email);
+
+  if (!canManageWorkspaceMembers(member.role)) {
+    throw new Error("You do not have permission to invite users to this workspace.");
+  }
+
+  if (!email || !isValidEmail(email)) {
+    throw new Error("Enter a valid email address.");
+  }
+
+  if (!isWorkspaceMemberRole(input.role)) {
+    throw new Error("Select a supported workspace role.");
+  }
+
+  if (email === normalizeMemberEmail(user.email)) {
+    throw new Error("You are already part of this workspace.");
+  }
+
+  const { data: existingMemberData, error: existingMemberError } = await supabase
+    .from("workspace_members")
+    .select("id, workspace_id, email, display_name, role, status, metadata, created_at, updated_at")
+    .eq("workspace_id", workspace.id)
+    .eq("email", email)
+    .maybeSingle();
+
+  if (existingMemberError) {
+    throw new Error(`Failed to validate existing workspace access: ${existingMemberError.message}`);
+  }
+
+  const existingMember = existingMemberData as WorkspaceMemberRow | null;
+
+  if (existingMember?.status === "active") {
+    throw new Error("This user already has active access to the workspace.");
+  }
+
+  const previousMemberSnapshot = existingMember ? { ...existingMember } : null;
+  const nextMetadata =
+    existingMember?.metadata && typeof existingMember.metadata === "object" ? { ...existingMember.metadata } : {};
+  const { data: upsertedMemberData, error: upsertMemberError } = await supabase
+    .from("workspace_members")
+    .upsert(
+      {
+        workspace_id: workspace.id,
+        email,
+        display_name: existingMember?.display_name ?? null,
+        role: input.role,
+        status: "invited",
+        metadata: {
+          ...nextMetadata,
+          invited_by_user_id: user.id,
+          invited_by_email: normalizeMemberEmail(user.email),
+          invited_at: new Date().toISOString()
+        }
+      },
+      { onConflict: "workspace_id,email" }
+    )
+    .select("id, workspace_id, email, display_name, role, status, metadata, created_at, updated_at")
+    .single();
+
+  if (upsertMemberError) {
+    throw new Error(`Failed to store workspace invitation: ${upsertMemberError.message}`);
+  }
+
+  const upsertedMember = upsertedMemberData as WorkspaceMemberRow;
+  const redirectTo = `${getAppUrl()}/auth/accept-invite?next=${encodeURIComponent("/projects")}`;
+  const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+    redirectTo,
+    data: {
+      invited_workspace_id: workspace.id,
+      invited_workspace_name: workspace.name,
+      invited_role: input.role
+    }
+  });
+
+  if (inviteError) {
+    await rollbackWorkspaceInvitation(supabase, workspace.id, email, previousMemberSnapshot);
+    throw new Error(`Supabase invite could not be sent: ${inviteError.message}`);
+  }
+
+  return {
+    member: mapWorkspaceMemberListItem(upsertedMember),
+    message: "Invitation sent."
+  };
+}
+
 export async function getTranslationRuntimeSettings(): Promise<TranslationRuntimeSettings> {
   noStore();
 
@@ -1858,60 +1992,44 @@ async function getProjectRecords(): Promise<ProjectRecord[]> {
 }
 
 async function getWorkspaceContext() {
-  const supabase = createServerSupabaseClient();
-  const { data, error } = await selectWorkspace(supabase);
+  const user = await getAuthenticatedUser();
+  const normalizedEmail = normalizeMemberEmail(user?.email);
 
-  if (error) {
-    throw new Error(`Failed to load workspace: ${error.message}`);
+  if (!user || !normalizedEmail) {
+    throw new Error("Authentication required.");
   }
 
-  let workspace = data as WorkspaceRow | null;
+  const supabase = createServerSupabaseClient();
+  let member = await selectWorkspaceMemberForUser(supabase, normalizedEmail);
+
+  if (!member) {
+    member = await bootstrapWorkspaceForUser(supabase, user, normalizedEmail);
+  }
+
+  if (!member) {
+    throw new Error("No workspace access was found for this account.");
+  }
+
+  if (member.status === "disabled") {
+    throw new Error("Workspace access is disabled for this account.");
+  }
+
+  if (member.status === "invited") {
+    member = await activateWorkspaceMember(supabase, member, user);
+  }
+
+  const workspace = await selectWorkspaceById(supabase, member.workspace_id);
 
   if (!workspace) {
-    const { data: insertedWorkspace, error: insertError } = await supabase
-      .from("workspaces")
-      .insert({
-        slug: DEFAULT_WORKSPACE_SLUG,
-        name: DEFAULT_WORKSPACE_NAME,
-        plan_name: DEFAULT_WORKSPACE_PLAN,
-        avatar_label: DEFAULT_WORKSPACE_AVATAR_LABEL,
-        credits_limit: DEFAULT_CREDITS_LIMIT,
-        credits_used: 0
-      })
-      .select("id, slug, name, plan_name, avatar_label, credits_limit, credits_used, quality_score_avg, created_at, updated_at")
-      .single();
-
-    if (insertError) {
-      if (isUniqueViolation(insertError)) {
-        const { data: existingWorkspace, error: reloadError } = await supabase
-          .from("workspaces")
-          .select("id, slug, name, plan_name, avatar_label, credits_limit, credits_used, quality_score_avg, created_at, updated_at")
-          .eq("slug", DEFAULT_WORKSPACE_SLUG)
-          .maybeSingle();
-
-        if (reloadError) {
-          throw new Error(`Failed to reload bootstrapped workspace: ${reloadError.message}`);
-        }
-
-        if (!existingWorkspace) {
-          throw new Error("Workspace bootstrap raced successfully, but the workspace could not be reloaded.");
-        }
-
-        workspace = existingWorkspace as WorkspaceRow;
-      } else {
-        throw new Error(`Failed to bootstrap workspace: ${insertError.message}`);
-      }
-    }
-
-    if (!workspace) {
-      workspace = insertedWorkspace as WorkspaceRow;
-    }
+    throw new Error("Assigned workspace could not be loaded.");
   }
 
   const settings = await ensureWorkspaceSettings(supabase, workspace.id);
 
   return {
     supabase,
+    user,
+    member,
     workspace,
     settings
   };
@@ -1966,10 +2084,161 @@ async function ensureWorkspaceSettings(
 function selectWorkspace(supabase: ReturnType<typeof createServerSupabaseClient>) {
   return supabase
     .from("workspaces")
+    .select("id, slug, name, plan_name, avatar_label, credits_limit, credits_used, quality_score_avg, created_at, updated_at");
+}
+
+async function selectWorkspaceById(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string
+) {
+  const { data, error } = await supabase
+    .from("workspaces")
     .select("id, slug, name, plan_name, avatar_label, credits_limit, credits_used, quality_score_avg, created_at, updated_at")
-    .order("created_at", { ascending: true })
-    .limit(1)
+    .eq("id", workspaceId)
     .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load assigned workspace: ${error.message}`);
+  }
+
+  return data as WorkspaceRow | null;
+}
+
+async function selectWorkspaceMemberForUser(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  email: string
+) {
+  const { data, error } = await supabase
+    .from("workspace_members")
+    .select("id, workspace_id, email, display_name, role, status, metadata, created_at, updated_at")
+    .eq("email", email)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to load workspace access: ${error.message}`);
+  }
+
+  const members = (data as WorkspaceMemberRow[] | null) ?? [];
+  const activeMember = members.find((member) => member.status === "active");
+
+  if (activeMember) {
+    return activeMember;
+  }
+
+  return members.find((member) => member.status === "invited") ?? null;
+}
+
+async function bootstrapWorkspaceForUser(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  user: User,
+  normalizedEmail: string
+) {
+  const requestedWorkspaceName = getRequestedWorkspaceName(user);
+
+  if (!requestedWorkspaceName) {
+    return null;
+  }
+
+  const workspaceSlug = await buildUniqueWorkspaceSlug(supabase, requestedWorkspaceName);
+  const avatarLabel = buildAvatarLabel(requestedWorkspaceName);
+  const { data: insertedWorkspace, error: insertWorkspaceError } = await supabase
+    .from("workspaces")
+    .insert({
+      slug: workspaceSlug,
+      name: requestedWorkspaceName,
+      plan_name: DEFAULT_WORKSPACE_PLAN,
+      avatar_label: avatarLabel || DEFAULT_WORKSPACE_AVATAR_LABEL,
+      credits_limit: DEFAULT_CREDITS_LIMIT,
+      credits_used: 0
+    })
+    .select("id, slug, name, plan_name, avatar_label, credits_limit, credits_used, quality_score_avg, created_at, updated_at")
+    .single();
+
+  if (insertWorkspaceError) {
+    throw new Error(`Failed to bootstrap workspace: ${insertWorkspaceError.message}`);
+  }
+
+  const workspace = insertedWorkspace as WorkspaceRow;
+  const displayName = getUserDisplayName(user) ?? requestedWorkspaceName;
+  const { data: insertedMember, error: insertMemberError } = await supabase
+    .from("workspace_members")
+    .insert({
+      workspace_id: workspace.id,
+      email: normalizedEmail,
+      display_name: displayName,
+      role: "owner",
+      status: "active",
+      metadata: {
+        auth_user_id: user.id,
+        source: "signup"
+      }
+    })
+    .select("id, workspace_id, email, display_name, role, status, metadata, created_at, updated_at")
+    .single();
+
+  if (insertMemberError) {
+    throw new Error(`Failed to create the initial workspace access: ${insertMemberError.message}`);
+  }
+
+  return insertedMember as WorkspaceMemberRow;
+}
+
+async function activateWorkspaceMember(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  member: WorkspaceMemberRow,
+  user: User
+) {
+  const currentMetadata =
+    member.metadata && typeof member.metadata === "object" ? member.metadata : {};
+  const { data, error } = await supabase
+    .from("workspace_members")
+    .update({
+      status: "active",
+      display_name: member.display_name ?? getUserDisplayName(user),
+      metadata: {
+        ...currentMetadata,
+        auth_user_id: user.id,
+        accepted_at: new Date().toISOString()
+      }
+    })
+    .eq("id", member.id)
+    .select("id, workspace_id, email, display_name, role, status, metadata, created_at, updated_at")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to activate workspace access: ${error.message}`);
+  }
+
+  return data as WorkspaceMemberRow;
+}
+
+async function buildUniqueWorkspaceSlug(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceName: string
+) {
+  const baseSlug = slugify(workspaceName || DEFAULT_WORKSPACE_SLUG);
+  const { data, error } = await supabase
+    .from("workspaces")
+    .select("slug")
+    .ilike("slug", `${baseSlug}%`);
+
+  if (error) {
+    throw new Error(`Failed to validate workspace slug: ${error.message}`);
+  }
+
+  const existingSlugs = new Set((((data as { slug: string }[] | null) ?? [])).map((row) => row.slug));
+
+  if (!existingSlugs.has(baseSlug)) {
+    return baseSlug;
+  }
+
+  let suffix = 2;
+
+  while (existingSlugs.has(`${baseSlug}-${suffix}`)) {
+    suffix += 1;
+  }
+
+  return `${baseSlug}-${suffix}`;
 }
 
 function selectWorkspaceSettings(
@@ -3308,6 +3577,73 @@ function buildAvatarLabel(value: string) {
     .join("");
 
   return initials || DEFAULT_WORKSPACE_AVATAR_LABEL;
+}
+
+function normalizeMemberEmail(value: string | null | undefined) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function getRequestedWorkspaceName(user: User) {
+  const metadata = user.user_metadata && typeof user.user_metadata === "object" ? user.user_metadata : {};
+  const value =
+    typeof metadata.workspace_name === "string" && metadata.workspace_name.trim()
+      ? metadata.workspace_name.trim()
+      : "";
+
+  return value || null;
+}
+
+function getUserDisplayName(user: User) {
+  const metadata = user.user_metadata && typeof user.user_metadata === "object" ? user.user_metadata : {};
+  const fullName =
+    typeof metadata.full_name === "string" && metadata.full_name.trim()
+      ? metadata.full_name.trim()
+      : typeof metadata.name === "string" && metadata.name.trim()
+        ? metadata.name.trim()
+        : "";
+
+  return fullName || null;
+}
+
+function mapWorkspaceMemberListItem(member: WorkspaceMemberRow): WorkspaceMemberListItem {
+  return {
+    id: member.id,
+    email: member.email,
+    displayName: member.display_name,
+    role: member.role,
+    status: member.status
+  };
+}
+
+function canManageWorkspaceMembers(role: WorkspaceMemberRole) {
+  return role === "owner" || role === "admin";
+}
+
+function isWorkspaceMemberRole(value: string): value is WorkspaceMemberRole {
+  return value === "owner" || value === "admin" || value === "editor" || value === "reviewer" || value === "viewer";
+}
+
+async function rollbackWorkspaceInvitation(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string,
+  email: string,
+  previousMemberSnapshot: WorkspaceMemberRow | null
+) {
+  if (previousMemberSnapshot) {
+    await supabase
+      .from("workspace_members")
+      .update({
+        display_name: previousMemberSnapshot.display_name,
+        role: previousMemberSnapshot.role,
+        status: previousMemberSnapshot.status,
+        metadata: previousMemberSnapshot.metadata
+      })
+      .eq("id", previousMemberSnapshot.id);
+
+    return;
+  }
+
+  await supabase.from("workspace_members").delete().eq("workspace_id", workspaceId).eq("email", email);
 }
 
 function buildFallbackBillingCycle(

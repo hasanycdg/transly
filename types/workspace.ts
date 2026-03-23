@@ -13,6 +13,28 @@ export interface DashboardShellData {
   projects: DashboardProjectLink[];
 }
 
+export type WorkspaceMemberRole = "owner" | "admin" | "editor" | "reviewer" | "viewer";
+
+export type WorkspaceMemberStatus = "invited" | "active" | "disabled";
+
+export interface WorkspaceMemberListItem {
+  id: string;
+  email: string;
+  displayName: string | null;
+  role: WorkspaceMemberRole;
+  status: WorkspaceMemberStatus;
+}
+
+export interface WorkspaceMembersResponse {
+  members: WorkspaceMemberListItem[];
+  canInvite: boolean;
+}
+
+export interface WorkspaceMemberInviteResult {
+  member: WorkspaceMemberListItem;
+  message: string;
+}
+
 export interface UsageMetricItem {
   value: string;
   label: string;

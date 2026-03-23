@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
+import { WorkspaceMembersPanel } from "@/components/settings/workspace-members-panel";
 import { getAppLocaleOptions } from "@/lib/i18n";
 import { getLanguageOptions } from "@/lib/languages";
 import type {
@@ -461,60 +462,64 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
 
             <div className="mt-5">
               {activeSection === "profile" ? (
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
-                  <SettingsCard
-                    eyebrow="/ Identity"
-                    title="Personal details"
-                    description={
-                      screenLocale === "de"
-                        ? "Halte deine Kontodaten leichtgewichtig und im ganzen Workspace gut lesbar."
-                        : "Keep your account details lightweight and easy to scan across the workspace."
-                    }
-                  >
-                    <div className="space-y-5">
-                      <FieldBlock
-                        label="Name"
-                        description="Shown in internal activity, handoff notes, and review ownership."
-                      >
-                        <input
-                          type="text"
-                          value={draft.profile.name}
-                          onChange={(event) => updateProfile("name", event.target.value)}
-                          className={INPUT_CLASS_NAME}
-                        />
-                      </FieldBlock>
+                <div className="space-y-5">
+                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
+                    <SettingsCard
+                      eyebrow="/ Identity"
+                      title="Personal details"
+                      description={
+                        screenLocale === "de"
+                          ? "Halte deine Kontodaten leichtgewichtig und im ganzen Workspace gut lesbar."
+                          : "Keep your account details lightweight and easy to scan across the workspace."
+                      }
+                    >
+                      <div className="space-y-5">
+                        <FieldBlock
+                          label="Name"
+                          description="Shown in internal activity, handoff notes, and review ownership."
+                        >
+                          <input
+                            type="text"
+                            value={draft.profile.name}
+                            onChange={(event) => updateProfile("name", event.target.value)}
+                            className={INPUT_CLASS_NAME}
+                          />
+                        </FieldBlock>
 
-                      <FieldBlock
-                        label="Email"
-                        description="Primary login address for password recovery and product notifications."
-                      >
-                        <input
-                          type="email"
-                          value={draft.profile.email}
-                          onChange={(event) => updateProfile("email", event.target.value)}
-                          className={INPUT_CLASS_NAME}
-                        />
-                      </FieldBlock>
-                    </div>
-                  </SettingsCard>
+                        <FieldBlock
+                          label="Email"
+                          description="Primary login address for password recovery and product notifications."
+                        >
+                          <input
+                            type="email"
+                            value={draft.profile.email}
+                            onChange={(event) => updateProfile("email", event.target.value)}
+                            className={INPUT_CLASS_NAME}
+                          />
+                        </FieldBlock>
+                      </div>
+                    </SettingsCard>
 
-                  <SettingsCard
-                    eyebrow="/ Security"
-                    title="Password"
-                    description="Simple access controls with no extra noise."
-                  >
-                    <div className="space-y-4">
-                      <p className="text-[12px] leading-6 text-[var(--muted)]">
-                        Change your password from the secure account flow whenever you need to rotate credentials.
-                      </p>
-                      <button
-                        type="button"
-                        className="rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12.5px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
-                      >
-                        {screenLocale === "de" ? "Passwort ändern" : "Change password"}
-                      </button>
-                    </div>
-                  </SettingsCard>
+                    <SettingsCard
+                      eyebrow="/ Security"
+                      title="Password"
+                      description="Simple access controls with no extra noise."
+                    >
+                      <div className="space-y-4">
+                        <p className="text-[12px] leading-6 text-[var(--muted)]">
+                          Change your password from the secure account flow whenever you need to rotate credentials.
+                        </p>
+                        <button
+                          type="button"
+                          className="rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12.5px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
+                        >
+                          {screenLocale === "de" ? "Passwort ändern" : "Change password"}
+                        </button>
+                      </div>
+                    </SettingsCard>
+                  </div>
+
+                  <WorkspaceMembersPanel />
                 </div>
               ) : null}
 
