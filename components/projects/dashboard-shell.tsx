@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
+import { useAppLocale } from "@/components/app-locale-provider";
 import type { DashboardShellData } from "@/types/workspace";
 
 type DashboardShellProps = {
@@ -23,6 +24,7 @@ const utilityNavItems = [
 ];
 
 export function DashboardShell({ children, shellData }: DashboardShellProps) {
+  const locale = useAppLocale();
   const pathname = usePathname();
   const router = useRouter();
   const [hasMounted, setHasMounted] = useState(false);
@@ -30,6 +32,36 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const projects = shellData.projects;
   const shouldPrefetch = process.env.NODE_ENV === "production";
+  const copy =
+    locale === "de"
+      ? {
+          usage: "Nutzung",
+          glossary: "Glossar",
+          billing: "Abrechnung",
+          settings: "Einstellungen",
+          workspace: "Workspace",
+          projects: "Projekte",
+          allProjects: "Alle Projekte",
+          deleteProjectTitle: (projectName: string) => `${projectName} löschen`,
+          deleteProjectConfirm: (projectName: string) =>
+            `„${projectName}“ löschen? Das Projekt wird aus der Datenbank entfernt, archivierte Nutzungsstatistiken bleiben aber verfügbar.`,
+          deleteProjectFailed: "Das Projekt konnte nicht gelöscht werden.",
+          planSuffix: "Tarif"
+        }
+      : {
+          usage: "Usage",
+          glossary: "Glossary",
+          billing: "Billing",
+          settings: "Settings",
+          workspace: "Workspace",
+          projects: "Projects",
+          allProjects: "All projects",
+          deleteProjectTitle: (projectName: string) => `Delete ${projectName}`,
+          deleteProjectConfirm: (projectName: string) =>
+            `Delete "${projectName}"? The project will be removed from the database, but archived usage statistics will stay available.`,
+          deleteProjectFailed: "Project deletion failed.",
+          planSuffix: "plan"
+        };
 
   useEffect(() => {
     setHasMounted(true);
@@ -40,9 +72,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete "${projectName}"? The project will be removed from the database, but archived usage statistics will stay available.`
-    );
+    const confirmed = window.confirm(copy.deleteProjectConfirm(projectName));
 
     if (!confirmed) {
       return;
@@ -57,7 +87,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? "Project deletion failed.");
+        throw new Error(payload?.error ?? copy.deleteProjectFailed);
       }
 
       if (pathname === `/projects/${projectId}`) {
@@ -66,7 +96,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
 
       router.refresh();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Project deletion failed.");
+      window.alert(error instanceof Error ? error.message : copy.deleteProjectFailed);
     } finally {
       setDeletingProjectId(null);
     }
@@ -87,7 +117,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
 
           <div className="px-2 py-[10px]">
             <div className="px-2 pb-1 pt-[10px] text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              Workspace
+              {copy.workspace}
             </div>
             <button
               type="button"
@@ -96,7 +126,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
               className="flex w-full items-center gap-2 rounded-[6px] bg-[var(--background)] px-2 py-1.5 text-left text-[13px] font-medium text-[var(--foreground)]"
             >
               <ProjectsIcon />
-              <span className="flex-1">Projects</span>
+              <span className="flex-1">{copy.projects}</span>
               <ChevronIcon open={projectsOpen} />
             </button>
             {projectsOpen ? (
@@ -112,7 +142,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                         : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                     ].join(" ")}
                   >
-                    All projects
+                    {copy.allProjects}
                   </Link>
 
                   {projects.map((project) => {
@@ -154,7 +184,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                         </Link>
                         <button
                           type="button"
-                          aria-label={`Delete ${project.name}`}
+                          aria-label={copy.deleteProjectTitle(project.name)}
                           disabled={Boolean(deletingProjectId)}
                           onClick={(event) => {
                             event.preventDefault();
@@ -167,7 +197,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                               ? "opacity-100 text-[var(--muted-soft)]"
                               : "opacity-0 text-[rgba(17,17,16,0.34)] group-hover/project:opacity-100 hover:bg-[var(--background)] hover:text-[var(--foreground)] focus:opacity-100"
                           ].join(" ")}
-                          title={`Delete ${project.name}`}
+                          title={copy.deleteProjectTitle(project.name)}
                         >
                           {isDeleting ? "…" : "×"}
                         </button>
@@ -193,7 +223,13 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                 return item.href ? (
                   <Link key={item.label} href={item.href} prefetch={shouldPrefetch} className={className}>
                     <Icon />
-                    <span>{item.label}</span>
+                    <span>
+                      {item.label === "Usage"
+                        ? copy.usage
+                        : item.label === "Glossary"
+                          ? copy.glossary
+                          : item.label}
+                    </span>
                   </Link>
                 ) : (
                   <button key={item.label} type="button" className={className}>
@@ -221,7 +257,13 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                   return (
                     <Link key={item.label} href={item.href} prefetch={shouldPrefetch} className={className}>
                       <Icon />
-                      <span>{item.label}</span>
+                      <span>
+                        {item.label === "Billing"
+                          ? copy.billing
+                          : item.label === "Settings"
+                            ? copy.settings
+                            : item.label}
+                      </span>
                     </Link>
                   );
                 })}
@@ -236,7 +278,9 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                 <p className="truncate text-[12.5px] font-medium text-[var(--foreground)]">
                   {shellData.workspaceName}
                 </p>
-                <p className="text-[11px] text-[var(--muted-soft)]">{shellData.workspacePlanName} plan</p>
+                <p className="text-[11px] text-[var(--muted-soft)]">
+                  {shellData.workspacePlanName} {copy.planSuffix}
+                </p>
               </div>
             </div>
           </div>

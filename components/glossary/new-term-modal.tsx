@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 
-import { LANGUAGE_OPTIONS } from "@/lib/languages";
+import { useAppLocale } from "@/components/app-locale-provider";
+import { translateGlossaryStatus } from "@/lib/i18n";
+import { getLanguageOptions } from "@/lib/languages";
 import type {
   GlossaryCollectionItem,
   GlossaryProjectOption,
@@ -41,6 +43,7 @@ export function NewTermModal({
   mode = "create",
   initialTerm = null
 }: NewTermModalProps) {
+  const locale = useAppLocale();
   const [source, setSource] = useState(initialTerm?.source ?? "");
   const [sourceLanguage, setSourceLanguage] = useState(initialTerm?.sourceLanguage ?? "en");
   const [status, setStatus] = useState<GlossaryStatus>(initialTerm?.status ?? "Draft");
@@ -56,6 +59,63 @@ export function NewTermModal({
       : [{ locale: "de", term: "" }]
   );
   const [localError, setLocalError] = useState<string | null>(null);
+  const languageOptions = getLanguageOptions(locale);
+  const copy =
+    locale === "de"
+      ? {
+          rowError: "Jede Übersetzungszeile braucht sowohl eine Sprache als auch einen Begriff.",
+          eyebrow: mode === "edit" ? "/ Begriff bearbeiten" : "/ Neuer Begriff",
+          heading: mode === "edit" ? "Glossarbegriff bearbeiten" : "Glossarbegriff hinzufügen",
+          intro:
+            mode === "edit"
+              ? "Aktualisiere Übersetzungen, Status, Geltungsbereich und Schutz-Einstellungen."
+              : "Speichere freigegebene Terminologie, geschützte Formulierungen und projektspezifische Sprachpaare.",
+          close: "Schließen",
+          sourceTerm: "Quellbegriff",
+          sourceLanguage: "Quellsprache",
+          status: "Status",
+          collection: "Sammlung",
+          sharedGlossary: "Geteiltes Glossar",
+          projectScope: "Projektumfang",
+          allProjects: "Alle Projekte",
+          protectPhrase: "Begriff schützen",
+          protectPhraseDesc: "Markiere Begriffe, die gesperrt bleiben oder nie übersetzt werden sollen.",
+          translations: "Übersetzungen",
+          translationsDesc: "Lass Zeilen leer, wenn du zuerst nur einen Quell-Entwurf anlegen willst.",
+          addTranslation: "Übersetzung hinzufügen",
+          removeTranslation: "Übersetzung entfernen",
+          cancel: "Abbrechen",
+          saving: "Wird gespeichert...",
+          saveChanges: "Änderungen speichern",
+          saveTerm: "Begriff speichern"
+        }
+      : {
+          rowError: "Each translation row needs both a locale and a term.",
+          eyebrow: mode === "edit" ? "/ Edit Term" : "/ New Term",
+          heading: mode === "edit" ? "Edit glossary term" : "Add glossary term",
+          intro:
+            mode === "edit"
+              ? "Update translations, status, scope, and protection settings."
+              : "Save approved terminology, protected phrases, and project-specific language pairs.",
+          close: "Close",
+          sourceTerm: "Source term",
+          sourceLanguage: "Source language",
+          status: "Status",
+          collection: "Collection",
+          sharedGlossary: "Shared glossary",
+          projectScope: "Project scope",
+          allProjects: "All projects",
+          protectPhrase: "Protect phrase",
+          protectPhraseDesc: "Mark terms that should stay locked or never be translated.",
+          translations: "Translations",
+          translationsDesc: "Leave rows empty if you want to create a source-only draft first.",
+          addTranslation: "Add Translation",
+          removeTranslation: "Remove translation",
+          cancel: "Cancel",
+          saving: "Saving...",
+          saveChanges: "Save Changes",
+          saveTerm: "Save Term"
+        };
 
   if (!open) {
     return null;
@@ -75,7 +135,7 @@ export function NewTermModal({
     );
 
     if (hasPartialTranslation) {
-      setLocalError("Each translation row needs both a locale and a term.");
+      setLocalError(copy.rowError);
       return;
     }
 
@@ -103,15 +163,13 @@ export function NewTermModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              {mode === "edit" ? "/ Edit Term" : "/ New Term"}
+              {copy.eyebrow}
             </p>
             <h2 className="mt-1 text-[18px] font-semibold tracking-[-0.3px] text-[var(--foreground)]">
-              {mode === "edit" ? "Edit glossary term" : "Add glossary term"}
+              {copy.heading}
             </h2>
             <p className="mt-1 text-[12px] text-[var(--muted-soft)]">
-              {mode === "edit"
-                ? "Update translations, status, scope, and protection settings."
-                : "Save approved terminology, protected phrases, and project-specific language pairs."}
+              {copy.intro}
             </p>
           </div>
           <button
@@ -120,7 +178,7 @@ export function NewTermModal({
             disabled={submitting}
             className="rounded-[7px] border border-[var(--border)] px-2 py-1 text-[12px] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
-            Close
+            {copy.close}
           </button>
         </div>
 
@@ -132,7 +190,7 @@ export function NewTermModal({
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <label className="space-y-1 md:col-span-2">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Source term</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.sourceTerm}</span>
             <input
               value={source}
               onChange={(event) => setSource(event.target.value)}
@@ -142,13 +200,13 @@ export function NewTermModal({
           </label>
 
           <label className="space-y-1">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Source language</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.sourceLanguage}</span>
             <select
               value={sourceLanguage}
               onChange={(event) => setSourceLanguage(event.target.value)}
               className="w-full rounded-[7px] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
             >
-              {LANGUAGE_OPTIONS.map((option) => (
+              {languageOptions.map((option) => (
                 <option key={option.code} value={option.code}>
                   {option.label}
                 </option>
@@ -157,7 +215,7 @@ export function NewTermModal({
           </label>
 
           <label className="space-y-1">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Status</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.status}</span>
             <select
               value={status}
               onChange={(event) => setStatus(event.target.value as GlossaryStatus)}
@@ -165,20 +223,20 @@ export function NewTermModal({
             >
               {STATUS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {translateGlossaryStatus(option, locale)}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="space-y-1">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Collection</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.collection}</span>
             <select
               value={collectionId}
               onChange={(event) => setCollectionId(event.target.value)}
               className="w-full rounded-[7px] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
             >
-              <option value="">Shared glossary</option>
+              <option value="">{copy.sharedGlossary}</option>
               {collections.map((collection) => (
                 <option key={collection.id} value={collection.id}>
                   {collection.name}
@@ -188,13 +246,13 @@ export function NewTermModal({
           </label>
 
           <label className="space-y-1">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Project scope</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.projectScope}</span>
             <select
               value={projectSlug}
               onChange={(event) => setProjectSlug(event.target.value)}
               className="w-full rounded-[7px] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
             >
-              <option value="">All projects</option>
+              <option value="">{copy.allProjects}</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.slug}>
                   {project.name}
@@ -211,9 +269,9 @@ export function NewTermModal({
               className="h-4 w-4 rounded border-[var(--border)]"
             />
             <div>
-              <p className="text-[12px] font-medium text-[var(--foreground)]">Protect phrase</p>
+              <p className="text-[12px] font-medium text-[var(--foreground)]">{copy.protectPhrase}</p>
               <p className="text-[11.5px] text-[var(--muted-soft)]">
-                Mark terms that should stay locked or never be translated.
+                {copy.protectPhraseDesc}
               </p>
             </div>
           </label>
@@ -222,9 +280,9 @@ export function NewTermModal({
         <div className="mt-5 rounded-[10px] border border-[var(--border)] bg-[var(--background)] p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[12px] font-medium text-[var(--foreground)]">Translations</p>
+              <p className="text-[12px] font-medium text-[var(--foreground)]">{copy.translations}</p>
               <p className="text-[11.5px] text-[var(--muted-soft)]">
-                Leave rows empty if you want to create a source-only draft first.
+                {copy.translationsDesc}
               </p>
             </div>
             <button
@@ -232,7 +290,7 @@ export function NewTermModal({
               onClick={() => setTranslations((current) => [...current, { locale: "de", term: "" }])}
               className="rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
             >
-              Add Translation
+              {copy.addTranslation}
             </button>
           </div>
 
@@ -252,7 +310,7 @@ export function NewTermModal({
                   }
                   className="w-full rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
                 >
-                  {LANGUAGE_OPTIONS.map((option) => (
+                  {languageOptions.map((option) => (
                     <option key={`${index}-${option.code}`} value={option.code}>
                       {option.label}
                     </option>
@@ -282,7 +340,7 @@ export function NewTermModal({
                     )
                   }
                   className="rounded-[7px] border border-[var(--border)] bg-white px-2 py-2 text-[12px] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
-                  aria-label="Remove translation"
+                  aria-label={copy.removeTranslation}
                 >
                   ×
                 </button>
@@ -298,7 +356,7 @@ export function NewTermModal({
             disabled={submitting}
             className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
-            Cancel
+            {copy.cancel}
           </button>
           <button
             type="button"
@@ -306,7 +364,7 @@ export function NewTermModal({
             disabled={!source.trim() || submitting}
             className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium text-white transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Term"}
+            {submitting ? copy.saving : mode === "edit" ? copy.saveChanges : copy.saveTerm}
           </button>
         </div>
       </div>

@@ -1,7 +1,12 @@
-import { LANGUAGE_OPTIONS } from "@/lib/languages";
+import { getIntlLocale } from "@/lib/i18n";
+import { getLanguageLabelForLocale } from "@/lib/languages";
+import type { AppLocale } from "@/types/i18n";
 
-export function formatProjectDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
+export function formatProjectDate(
+  value: string,
+  locale: AppLocale = "en"
+): string {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -9,8 +14,11 @@ export function formatProjectDate(value: string): string {
   }).format(new Date(value));
 }
 
-export function formatCompactNumber(value: number): string {
-  return new Intl.NumberFormat("en", {
+export function formatCompactNumber(
+  value: number,
+  locale: AppLocale = "en"
+): string {
+  return new Intl.NumberFormat(getIntlLocale(locale), {
     notation: value >= 1000 ? "compact" : "standard",
     maximumFractionDigits: value >= 1000 ? 1 : 0
   }).format(value);
@@ -20,13 +28,20 @@ export function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
 }
 
-export function getLanguageLabel(code: string): string {
-  return LANGUAGE_OPTIONS.find((option) => option.code === code)?.label ?? code.toUpperCase();
+export function getLanguageLabel(
+  code: string,
+  locale: AppLocale = "en"
+): string {
+  return getLanguageLabelForLocale(code, locale);
 }
 
-export function formatLanguagePair(sourceLanguage: string, targetLanguages: string[]): string {
-  const source = getLanguageLabel(sourceLanguage);
-  const targets = targetLanguages.map(getLanguageLabel).join(", ");
+export function formatLanguagePair(
+  sourceLanguage: string,
+  targetLanguages: string[],
+  locale: AppLocale = "en"
+): string {
+  const source = getLanguageLabel(sourceLanguage, locale);
+  const targets = targetLanguages.map((targetLanguage) => getLanguageLabel(targetLanguage, locale)).join(", ");
 
-  return `${source} to ${targets}`;
+  return locale === "de" ? `${source} nach ${targets}` : `${source} to ${targets}`;
 }

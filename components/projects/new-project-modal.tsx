@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import { LANGUAGE_OPTIONS } from "@/lib/languages";
+import { useAppLocale } from "@/components/app-locale-provider";
+import { getLanguageOptions } from "@/lib/languages";
 import type { NewProjectInput } from "@/types/projects";
 import type { SettingsScreenData } from "@/types/workspace";
 
@@ -21,11 +22,45 @@ export function NewProjectModal({
   submitting = false,
   errorMessage = null
 }: NewProjectModalProps) {
+  const locale = useAppLocale();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sourceLanguage, setSourceLanguage] = useState("en");
   const [targetLanguages, setTargetLanguages] = useState<string[]>(["de"]);
   const [targetPickerOpen, setTargetPickerOpen] = useState(false);
+  const languageOptions = getLanguageOptions(locale);
+  const copy =
+    locale === "de"
+      ? {
+          defaultDescription: "Neuer Lokalisierungs-Workspace, bereit für Datei-Uploads und Review.",
+          eyebrowNew: "/ Neues Projekt",
+          heading: "Übersetzungs-Workspace erstellen",
+          intro: "Quell- und Zielsprachen wählen und dann Lokalisierungsdateien hochladen.",
+          close: "Schließen",
+          projectName: "Projektname",
+          description: "Beschreibung",
+          sourceLanguage: "Quellsprache",
+          targetLanguages: "Zielsprachen",
+          selectTargetLanguages: "Zielsprachen auswählen",
+          cancel: "Abbrechen",
+          creating: "Wird erstellt...",
+          createProject: "Projekt erstellen"
+        }
+      : {
+          defaultDescription: "New localization workspace ready for file uploads and review.",
+          eyebrowNew: "/ New Project",
+          heading: "Create translation workspace",
+          intro: "Pick source and target languages, then start uploading localization files.",
+          close: "Close",
+          projectName: "Project name",
+          description: "Description",
+          sourceLanguage: "Source language",
+          targetLanguages: "Target languages",
+          selectTargetLanguages: "Select target languages",
+          cancel: "Cancel",
+          creating: "Creating...",
+          createProject: "Create Project"
+        };
 
   useEffect(() => {
     if (!open) {
@@ -51,7 +86,7 @@ export function NewProjectModal({
         const nextTargetLanguage =
           preferredTargetLanguage !== nextSourceLanguage
             ? preferredTargetLanguage
-            : LANGUAGE_OPTIONS.find((option) => option.code !== nextSourceLanguage)?.code ?? "de";
+            : getLanguageOptions("en").find((option) => option.code !== nextSourceLanguage)?.code ?? "de";
 
         setSourceLanguage(nextSourceLanguage);
         setTargetLanguages(nextTargetLanguage ? [nextTargetLanguage] : []);
@@ -71,7 +106,7 @@ export function NewProjectModal({
     return null;
   }
 
-  const availableTargetLanguages = LANGUAGE_OPTIONS.filter((option) => option.code !== sourceLanguage);
+  const availableTargetLanguages = languageOptions.filter((option) => option.code !== sourceLanguage);
   const selectedTargetLabels = availableTargetLanguages
     .filter((option) => targetLanguages.includes(option.code))
     .map((option) => option.label);
@@ -93,7 +128,7 @@ export function NewProjectModal({
         return nextTargets;
       }
 
-      const fallbackTarget = LANGUAGE_OPTIONS.find((option) => option.code !== nextSourceLanguage);
+      const fallbackTarget = getLanguageOptions("en").find((option) => option.code !== nextSourceLanguage);
 
       return fallbackTarget ? [fallbackTarget.code] : [];
     });
@@ -110,7 +145,7 @@ export function NewProjectModal({
     await onCreate({
       name: trimmedName,
       description:
-        trimmedDescription || "New localization workspace ready for file uploads and review.",
+        trimmedDescription || copy.defaultDescription,
       sourceLanguage,
       targetLanguages
     });
@@ -122,13 +157,13 @@ export function NewProjectModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / New Project
+              {copy.eyebrowNew}
             </p>
             <h2 className="mt-1 text-[18px] font-semibold tracking-[-0.3px] text-[var(--foreground)]">
-              Create translation workspace
+              {copy.heading}
             </h2>
             <p className="mt-1 text-[12px] text-[var(--muted-soft)]">
-              Pick source and target languages, then start uploading localization files.
+              {copy.intro}
             </p>
           </div>
           <button
@@ -137,7 +172,7 @@ export function NewProjectModal({
             disabled={submitting}
             className="rounded-[7px] border border-[var(--border)] px-2 py-1 text-[12px] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
-            Close
+            {copy.close}
           </button>
         </div>
 
@@ -149,7 +184,7 @@ export function NewProjectModal({
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <label className="space-y-1 md:col-span-2">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Project name</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.projectName}</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -159,7 +194,7 @@ export function NewProjectModal({
           </label>
 
           <label className="space-y-1 md:col-span-2">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Description</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.description}</span>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
@@ -170,13 +205,13 @@ export function NewProjectModal({
           </label>
 
           <label className="space-y-1">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Source language</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.sourceLanguage}</span>
             <select
               value={sourceLanguage}
               onChange={(event) => handleSourceLanguageChange(event.target.value)}
               className="w-full rounded-[7px] border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
             >
-              {LANGUAGE_OPTIONS.map((option) => (
+              {languageOptions.map((option) => (
                 <option key={option.code} value={option.code}>
                   {option.label}
                 </option>
@@ -185,7 +220,7 @@ export function NewProjectModal({
           </label>
 
           <div className="relative space-y-1">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Target languages</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.targetLanguages}</span>
             <button
               type="button"
               onClick={() => setTargetPickerOpen((current) => !current)}
@@ -196,7 +231,7 @@ export function NewProjectModal({
                   ? selectedTargetLabels.length <= 2
                     ? selectedTargetLabels.join(", ")
                     : `${selectedTargetLabels.slice(0, 2).join(", ")} +${selectedTargetLabels.length - 2}`
-                  : "Select target languages"}
+                  : copy.selectTargetLanguages}
               </span>
               <ChevronDownIcon open={targetPickerOpen} />
             </button>
@@ -246,7 +281,7 @@ export function NewProjectModal({
             disabled={submitting}
             className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
-            Cancel
+            {copy.cancel}
           </button>
           <button
             type="button"
@@ -254,7 +289,7 @@ export function NewProjectModal({
             disabled={!name.trim() || targetLanguages.length === 0 || submitting}
             className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium text-white transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting ? "Creating..." : "Create Project"}
+            {submitting ? copy.creating : copy.createProject}
           </button>
         </div>
       </div>

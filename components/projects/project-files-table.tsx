@@ -1,3 +1,4 @@
+import { useAppLocale } from "@/components/app-locale-provider";
 import { formatCompactNumber, formatPercent, formatProjectDate } from "@/lib/projects/formatters";
 import { getFileStatusTone } from "@/lib/projects/display";
 import type { ProjectFileRecord } from "@/types/projects";
@@ -16,16 +17,52 @@ export function ProjectFilesTable({
   onReviewFile,
   title = "Project Files"
 }: ProjectFilesTableProps) {
+  const locale = useAppLocale();
+  const copy =
+    locale === "de"
+      ? {
+          defaultTitle: "Projektdateien",
+          filename: "Dateiname",
+          language: "Sprache",
+          status: "Status",
+          progress: "Fortschritt",
+          updated: "Aktualisiert",
+          actions: "Aktionen",
+          words: "Wörter",
+          review: "Prüfen",
+          download: "Herunterladen",
+          retry: "Erneut versuchen",
+          delete: "Löschen",
+          noFiles: "Noch keine Dateien hochgeladen."
+        }
+      : {
+          defaultTitle: "Project Files",
+          filename: "Filename",
+          language: "Language",
+          status: "Status",
+          progress: "Progress",
+          updated: "Updated",
+          actions: "Actions",
+          words: "words",
+          review: "Review",
+          download: "Download",
+          retry: "Retry",
+          delete: "Delete",
+          noFiles: "No files uploaded yet."
+        };
+
   return (
     <section className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-white">
       {title ? (
         <div className="border-b border-[var(--border-light)] px-[18px] py-3">
-          <h3 className="text-[13px] font-medium text-[var(--foreground)]">{title}</h3>
+          <h3 className="text-[13px] font-medium text-[var(--foreground)]">
+            {title === "Project Files" ? copy.defaultTitle : title}
+          </h3>
         </div>
       ) : null}
 
       <div className="grid grid-cols-[minmax(0,2.1fr)_130px_110px_150px_95px_190px] border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]">
-        {["Filename", "Language", "Status", "Progress", "Updated", "Actions"].map((label) => (
+        {[copy.filename, copy.language, copy.status, copy.progress, copy.updated, copy.actions].map((label) => (
           <span
             key={label}
             className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
@@ -44,7 +81,7 @@ export function ProjectFilesTable({
             <div>
               <p className="text-[13px] font-medium text-[var(--foreground)]">{file.name}</p>
               <p className="text-[11.5px] text-[var(--muted-soft)]">
-                {formatCompactNumber(file.words)} words
+                {formatCompactNumber(file.words, locale)} {copy.words}
               </p>
             </div>
 
@@ -66,24 +103,24 @@ export function ProjectFilesTable({
             </div>
 
             <div className="text-[12px] text-[var(--muted-soft)]">
-              {formatProjectDate(file.lastUpdated)}
+              {formatProjectDate(file.lastUpdated, locale)}
             </div>
 
             <div className="flex flex-wrap gap-[6px]">
               <ActionButton
-                label="Review"
+                label={copy.review}
                 disabled={!canReviewFile(file)}
                 onClick={() => onReviewFile?.(file)}
               />
-              <ActionButton label="Download" disabled={file.status !== "Done"} />
-              <ActionButton label="Retry" disabled={file.status !== "Error"} />
-              <ActionButton label="Delete" />
+              <ActionButton label={copy.download} disabled={file.status !== "Done"} />
+              <ActionButton label={copy.retry} disabled={file.status !== "Error"} />
+              <ActionButton label={copy.delete} />
             </div>
           </div>
         ))
       ) : (
         <div className="px-6 py-10 text-center text-[12px] text-[var(--muted-soft)]">
-          No files uploaded yet.
+          {copy.noFiles}
         </div>
       )}
     </section>

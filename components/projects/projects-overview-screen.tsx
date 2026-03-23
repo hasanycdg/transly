@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { startTransition, useMemo, useState } from "react";
 
+import { useAppLocale } from "@/components/app-locale-provider";
+import { translateProjectFilterLabel } from "@/lib/i18n";
 import {
   getOverviewProjectDisplay,
   getOverviewStatsDisplay,
@@ -23,6 +25,7 @@ type ProjectsOverviewScreenProps = {
 };
 
 export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScreenProps) {
+  const locale = useAppLocale();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ProjectFilter>("All");
@@ -47,7 +50,47 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
     });
   }, [filter, projects, search]);
 
-  const stats = useMemo(() => getOverviewStatsDisplay(projects), [projects]);
+  const stats = useMemo(() => getOverviewStatsDisplay(projects, locale), [locale, projects]);
+  const copy =
+    locale === "de"
+      ? {
+          createError: "Das Projekt konnte nicht erstellt werden.",
+          projectsEyebrow: "/ Projekte",
+          heading: "Alle Projekte",
+          newProject: "Neues Projekt",
+          activeProjects: "Aktive Projekte",
+          filesInProgress: "Dateien in Bearbeitung",
+          averageCompletion: "Durchschn. Fortschritt",
+          languagesActive: "Aktive Sprachen",
+          recentProjects: "/ Letzte Projekte",
+          search: "Suchen...",
+          project: "Projekt",
+          languages: "Sprachen",
+          files: "Dateien",
+          progress: "Fortschritt",
+          updated: "Aktualisiert",
+          open: "Öffnen →",
+          noProjects: "Keine Projekte entsprechen der aktuellen Suche oder dem Filter."
+        }
+      : {
+          createError: "Project could not be created.",
+          projectsEyebrow: "/ Projects",
+          heading: "All Projects",
+          newProject: "New Project",
+          activeProjects: "Active projects",
+          filesInProgress: "Files in progress",
+          averageCompletion: "Avg. completion",
+          languagesActive: "Languages active",
+          recentProjects: "/ Recent Projects",
+          search: "Search...",
+          project: "Project",
+          languages: "Languages",
+          files: "Files",
+          progress: "Progress",
+          updated: "Updated",
+          open: "Open →",
+          noProjects: "No projects match the current search or filter."
+        };
 
   async function handleCreateProject(input: NewProjectInput) {
     setCreateError(null);
@@ -65,7 +108,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
       const payload = (await response.json()) as { error?: string };
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Project could not be created.");
+        throw new Error(payload.error ?? copy.createError);
       }
 
       setShowModal(false);
@@ -73,7 +116,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
         router.refresh();
       });
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : "Project could not be created.");
+      setCreateError(error instanceof Error ? error.message : copy.createError);
     } finally {
       setIsCreatingProject(false);
     }
@@ -85,10 +128,10 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)] px-7 py-4">
           <div className="flex flex-col gap-[1px]">
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Projects
+              {copy.projectsEyebrow}
             </span>
             <h1 className="text-[18px] font-semibold tracking-[-0.4px] text-[var(--foreground)]">
-              All Projects
+              {copy.heading}
             </h1>
           </div>
 
@@ -98,7 +141,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
             className="inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--foreground)] px-[15px] py-2 text-[12.5px] font-medium text-white transition hover:opacity-85"
           >
             <PlusIcon />
-            New Project
+            {copy.newProject}
           </button>
         </header>
 
@@ -106,24 +149,24 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
           <section className="grid grid-cols-1 overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 xl:grid-cols-4">
             <StatsCell
               value={stats.activeProjects}
-              label="Active projects"
+              label={copy.activeProjects}
               meta={stats.activeProjectsMeta}
               metaTone="positive"
             />
             <StatsCell
               value={stats.filesInProgress}
-              label="Files in progress"
+              label={copy.filesInProgress}
               meta={stats.filesInProgressMeta}
             />
             <StatsCell
               value={stats.averageCompletion}
-              label="Avg. completion"
+              label={copy.averageCompletion}
               meta={stats.averageCompletionMeta}
               metaTone="positive"
             />
             <StatsCell
               value={stats.languagesActive}
-              label="Languages active"
+              label={copy.languagesActive}
               meta={stats.languagesActiveMeta}
             />
           </section>
@@ -138,7 +181,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
           <section>
             <div className="mb-[10px] flex items-center justify-between gap-3">
               <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                / Recent Projects
+                {copy.recentProjects}
               </span>
 
               <div className="flex items-center gap-[6px]">
@@ -147,7 +190,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
                   <input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search..."
+                    placeholder={copy.search}
                     className="w-[190px] rounded-[7px] border border-[var(--border)] bg-white px-[10px] py-[6px] pl-[27px] text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
                   />
                 </label>
@@ -165,7 +208,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
                           : "hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                       ].join(" ")}
                     >
-                      {item}
+                      {translateProjectFilterLabel(item, locale)}
                     </button>
                   ))}
                 </div>
@@ -174,7 +217,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
 
             <div className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-white">
               <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_55px_140px_75px_80px] border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]">
-                {["Project", "Languages", "Files", "Progress", "Updated", ""].map((label) => (
+                {[copy.project, copy.languages, copy.files, copy.progress, copy.updated, ""].map((label) => (
                   <span
                     key={label || "open"}
                     className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
@@ -236,7 +279,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
                       </div>
 
                       <div className="text-[12px] text-[var(--muted-soft)]">
-                        {formatProjectDate(display.updated)}
+                        {formatProjectDate(display.updated, locale)}
                       </div>
 
                       <div>
@@ -248,7 +291,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
                           }}
                           className="rounded-[6px] border border-[var(--border)] px-[11px] py-[5px] text-[11.5px] font-medium text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--foreground)]"
                         >
-                          Open →
+                          {copy.open}
                         </button>
                       </div>
                     </div>
@@ -256,7 +299,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
                 })
               ) : (
                 <div className="px-6 py-10 text-center text-[12px] text-[var(--muted-soft)]">
-                  No projects match the current search or filter.
+                  {copy.noProjects}
                 </div>
               )}
             </div>

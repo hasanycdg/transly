@@ -9,11 +9,13 @@ import {
   getBillingPlanDefinition,
   type BillingPlanDefinition
 } from "@/lib/billing/plans";
+import { DEFAULT_APP_LOCALE, getIntlLocale, normalizeAppLocale } from "@/lib/i18n";
 import { LANGUAGE_OPTIONS } from "@/lib/languages";
 import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
 import { countXliffTranslationWords } from "@/lib/xliff/metrics";
+import type { AppLocale } from "@/types/i18n";
 import type {
   GlossaryCollectionItem,
   GlossaryMetricItem,
@@ -89,6 +91,7 @@ type WorkspaceSettingsRow = {
 type WorkspaceSettingsMetadata = {
   profileName?: string;
   profileEmail?: string;
+  preferredLocale?: AppLocale;
   preferredSourceLanguage?: string;
   toneStyle?: SettingsToneStyle;
   strictGlossaryMode?: boolean;
@@ -317,6 +320,14 @@ export async function getDashboardShellData(): Promise<DashboardShellData> {
   };
 }
 
+export async function getCurrentAppLocale(): Promise<AppLocale> {
+  noStore();
+
+  const { settings } = await getWorkspaceContext();
+
+  return parseWorkspaceSettingsMetadata(settings.metadata).preferredLocale ?? DEFAULT_APP_LOCALE;
+}
+
 export async function getProjectsOverviewRecords(): Promise<ProjectRecord[]> {
   noStore();
 
@@ -507,7 +518,9 @@ export async function deleteProject(projectSlug: string): Promise<void> {
 export async function getUsageScreenData(): Promise<UsageScreenData> {
   noStore();
 
-  const { supabase, workspace } = await getWorkspaceContext();
+  const { supabase, workspace, settings } = await getWorkspaceContext();
+  const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const locale = metadata.preferredLocale ?? DEFAULT_APP_LOCALE;
   const now = new Date();
 
   const [{ data: billingCycleData, error: billingError }, { data: dailyUsageData, error: usageError }, { data: breakdownData, error: breakdownError }, projects] =
@@ -580,8 +593,8 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
   const today = formatDateKey(now);
   const todayRow = effectiveUsageRows.find((row) => row.usage_date === today);
   const yesterdayRow = effectiveUsageRows.find((row) => row.usage_date !== today) ?? null;
-  const trend = effectiveUsageRows.length > 0 ? effectiveUsageRows.map(mapUsageTrendPoint) : buildEmptyUsageTrend(now);
-  const breakdown = breakdownRows.length > 0 ? mapUsageBreakdownRows(breakdownRows) : buildFallbackUsageBreakdown(totalUploads, totalExports, totalReviews, creditsUsed);
+  const trend = effectiveUsageRows.length > 0 ? effectiveUsageRows.map((row) => mapUsageTrendPoint(row, locale)) : buildEmptyUsageTrend(now, locale);
+  const breakdown = breakdownRows.length > 0 ? mapUsageBreakdownRows(breakdownRows, locale) : buildFallbackUsageBreakdown(totalUploads, totalExports, totalReviews, creditsUsed, locale);
   const projectedSpend = billingCycle ? billingCycle.projected_spend_cents : 0;
   const cycleStart = billingCycle?.period_start
     ? new Date(`${billingCycle.period_start}T00:00:00.000Z`)
@@ -590,75 +603,98 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
     ? new Date(`${billingCycle.period_end}T00:00:00.000Z`)
     : endOfCurrentMonth(now);
   const updatedLabel = derivedUsage.lastUpdatedAt
-    ? `Updated ${formatTimeLabel(derivedUsage.lastUpdatedAt)}`
+    ? formatUpdatedLabel(derivedUsage.lastUpdatedAt, locale)
     : effectiveUsageRows.length > 0
-      ? `Updated ${formatTimeLabel(new Date(`${effectiveUsageRows.at(-1)?.usage_date}T18:00:00.000Z`))}`
-      : `Updated ${formatTimeLabel(now)}`;
-  const planValue = `${formatCompactNumber(creditsUsed)} / ${formatCompactNumber(creditsLimit)} credits`;
-  const planMeta = `${formatCompactNumber(Math.max(creditsLimit - creditsUsed, 0))} credits remaining before ${formatLongDate(
-    cycleEnd
-  )}.`;
+      ? formatUpdatedLabel(new Date(`${effectiveUsageRows.at(-1)?.usage_date}T18:00:00.000Z`), locale)
+      : formatUpdatedLabel(now, locale);
+  const planValue = locale === "de"
+    ? `${formatCompactNumber(creditsUsed, locale)} / ${formatCompactNumber(creditsLimit, locale)} Credits`
+    : `${formatCompactNumber(creditsUsed, locale)} / ${formatCompactNumber(creditsLimit, locale)} credits`;
+  const planMeta =
+    locale === "de"
+      ? `${formatCompactNumber(Math.max(creditsLimit - creditsUsed, 0), locale)} Credits verbleiben bis ${formatLongDate(cycleEnd, locale)}.`
+      : `${formatCompactNumber(Math.max(creditsLimit - creditsUsed, 0), locale)} credits remaining before ${formatLongDate(cycleEnd, locale)}.`;
   const summary: UsageSummaryOverview = {
     wordsUsed: creditsUsed,
     totalWords: creditsLimit,
     creditsUsed,
     remainingUsage: Math.max(creditsLimit - creditsUsed, 0),
     percentConsumed: cycleConsumedPercent,
-    cycleLabel: `${formatShortDate(cycleStart)} - ${formatShortDate(cycleEnd)}`,
-    resetDateLabel: formatLongDate(cycleEnd),
-    resetRelativeLabel: describeResetDate(cycleEnd, now)
+    cycleLabel: `${formatShortDate(cycleStart, locale)} - ${formatShortDate(cycleEnd, locale)}`,
+    resetDateLabel: formatLongDate(cycleEnd, locale),
+    resetRelativeLabel: describeResetDate(cycleEnd, now, locale)
   };
-  const projectUsage = buildUsageProjectInsights(projects, creditsUsed);
-  const languageUsage = buildUsageLanguageInsights(projects, creditsUsed);
-  const topFiles = buildUsageTopFiles(projects);
-  const activity = buildUsageActivityFeed(projects);
+  const projectUsage = buildUsageProjectInsights(projects, creditsUsed, locale);
+  const languageUsage = buildUsageLanguageInsights(projects, creditsUsed, locale);
+  const topFiles = buildUsageTopFiles(projects, locale);
+  const activity = buildUsageActivityFeed(projects, locale);
+  const numberFormat = new Intl.NumberFormat(getIntlLocale(locale));
 
   const metrics: UsageMetricItem[] = [
     {
       value: `${cycleConsumedPercent}%`,
-      label: "Cycle consumed",
-      meta: `${Math.max(100 - cycleConsumedPercent, 0)}% remaining in current cycle`,
+      label: locale === "de" ? "Zyklus verbraucht" : "Cycle consumed",
+      meta:
+        locale === "de"
+          ? `${Math.max(100 - cycleConsumedPercent, 0)}% verbleiben im aktuellen Zyklus`
+          : `${Math.max(100 - cycleConsumedPercent, 0)}% remaining in current cycle`,
       tone: "positive"
     },
     {
-      value: formatCompactNumber(creditsUsed),
-      label: "Credits used",
-      meta: billingCycle ? "Current billing cycle" : "Derived from workspace totals"
+      value: formatCompactNumber(creditsUsed, locale),
+      label: locale === "de" ? "Verbrauchte Credits" : "Credits used",
+      meta: billingCycle
+        ? locale === "de"
+          ? "Aktueller Abrechnungszeitraum"
+          : "Current billing cycle"
+        : locale === "de"
+          ? "Aus Workspace-Summen abgeleitet"
+          : "Derived from workspace totals"
     },
     {
-      value: new Intl.NumberFormat("en").format(totalApiRequests),
-      label: "API requests",
-      meta: `${new Intl.NumberFormat("en").format(totalUploads)} upload sessions`
+      value: numberFormat.format(totalApiRequests),
+      label: locale === "de" ? "API-Anfragen" : "API requests",
+      meta:
+        locale === "de"
+          ? `${numberFormat.format(totalUploads)} Upload-Sitzungen`
+          : `${numberFormat.format(totalUploads)} upload sessions`
     },
     {
-      value: formatCurrency(projectedSpend / 100),
-      label: "Projected spend",
-      meta: "Based on current run-rate"
+      value: formatCurrency(projectedSpend / 100, locale),
+      label: locale === "de" ? "Prognostizierte Kosten" : "Projected spend",
+      meta: locale === "de" ? "Basierend auf der aktuellen Rate" : "Based on current run-rate"
     }
   ];
 
   const snapshots: UsageSnapshotItem[] = [
     {
-      label: "Credits used today",
-      value: new Intl.NumberFormat("en").format(todayRow?.credits_used ?? 0),
-      detail: `Across ${new Intl.NumberFormat("en").format(todayRow?.upload_count ?? 0)} uploads`
+      label: locale === "de" ? "Heute verbrauchte Credits" : "Credits used today",
+      value: numberFormat.format(todayRow?.credits_used ?? 0),
+      detail:
+        locale === "de"
+          ? `Über ${numberFormat.format(todayRow?.upload_count ?? 0)} Uploads`
+          : `Across ${numberFormat.format(todayRow?.upload_count ?? 0)} uploads`
     },
     {
-      label: "API requests",
-      value: new Intl.NumberFormat("en").format(totalApiRequests),
+      label: locale === "de" ? "API-Anfragen" : "API requests",
+      value: numberFormat.format(totalApiRequests),
       detail: yesterdayRow
-        ? `${formatDelta(totalApiRequests - yesterdayRow.api_requests)} vs. previous recorded day`
-        : "No previous usage day available"
+        ? locale === "de"
+          ? `${formatDelta(totalApiRequests - yesterdayRow.api_requests, locale)} gegenüber dem zuvor erfassten Tag`
+          : `${formatDelta(totalApiRequests - yesterdayRow.api_requests, locale)} vs. previous recorded day`
+        : locale === "de"
+          ? "Kein vorheriger Nutzungstag verfügbar"
+          : "No previous usage day available"
     },
     {
-      label: "Active projects",
+      label: locale === "de" ? "Aktive Projekte" : "Active projects",
       value: String(activeProjects),
-      detail: `${reviewProjects} in review`
+      detail: locale === "de" ? `${reviewProjects} in Prüfung` : `${reviewProjects} in review`
     },
     {
-      label: "Current cycle",
-      value: `${formatShortDate(cycleStart)} - ${formatShortDate(cycleEnd)}`,
-      detail: `${cycleConsumedPercent}% consumed`
+      label: locale === "de" ? "Aktueller Zyklus" : "Current cycle",
+      value: `${formatShortDate(cycleStart, locale)} - ${formatShortDate(cycleEnd, locale)}`,
+      detail: locale === "de" ? `${cycleConsumedPercent}% verbraucht` : `${cycleConsumedPercent}% consumed`
     }
   ];
 
@@ -685,6 +721,7 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
   const now = new Date();
   const { supabase, workspace, settings } = await getWorkspaceContext();
   const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const locale = metadata.preferredLocale ?? DEFAULT_APP_LOCALE;
   const currentPlan = getBillingPlanDefinition(workspace.plan_name);
   const [{ data: billingCyclesData, error: billingError }, projects] = await Promise.all([
     supabase
@@ -719,7 +756,7 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
   const billingEmail = metadata.profileEmail ?? `${workspace.slug}@translayr.app`;
   const manageBillingAvailable = Boolean(metadata.stripeCustomerId);
   const subscriptionStatusLabel = metadata.stripeSubscriptionStatus
-    ? formatStripeStatusLabel(metadata.stripeSubscriptionStatus)
+    ? formatStripeStatusLabel(metadata.stripeSubscriptionStatus, locale)
     : null;
   const subscriptionPeriodEnd = metadata.stripeCurrentPeriodEnd
     ? safeParseDate(metadata.stripeCurrentPeriodEnd)
@@ -728,65 +765,108 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
   const metrics: UsageMetricItem[] = [
     {
       value: currentPlan.name,
-      label: "Current plan",
-      meta: `${formatCompactNumber(currentPlan.creditsLimit)} included credits`,
+      label: locale === "de" ? "Aktueller Plan" : "Current plan",
+      meta:
+        locale === "de"
+          ? `${formatCompactNumber(currentPlan.creditsLimit, locale)} enthaltene Credits`
+          : `${formatCompactNumber(currentPlan.creditsLimit, locale)} included credits`,
       tone: "positive"
     },
     {
-      value: formatCompactNumber(creditsRemaining),
-      label: "Credits remaining",
-      meta: `${usagePercent}% of this cycle already consumed`
+      value: formatCompactNumber(creditsRemaining, locale),
+      label: locale === "de" ? "Verbleibende Credits" : "Credits remaining",
+      meta:
+        locale === "de"
+          ? `${usagePercent}% dieses Zyklus bereits verbraucht`
+          : `${usagePercent}% of this cycle already consumed`
     },
     {
       value: String(activeProjects),
-      label: "Active projects",
-      meta: `${reviewProjects} currently in review`
+      label: locale === "de" ? "Aktive Projekte" : "Active projects",
+      meta: locale === "de" ? `${reviewProjects} aktuell in Prüfung` : `${reviewProjects} currently in review`
     },
     {
-      value: formatCurrency(projectedSpendCents / 100),
-      label: "Projected invoice",
-      meta: activeCycle ? "Current cycle projection" : "Base subscription estimate"
+      value: formatCurrency(projectedSpendCents / 100, locale),
+      label: locale === "de" ? "Prognostizierte Rechnung" : "Projected invoice",
+      meta: activeCycle
+        ? locale === "de"
+          ? "Prognose für den aktuellen Zyklus"
+          : "Current cycle projection"
+        : locale === "de"
+          ? "Basis-Schätzung des Abos"
+          : "Base subscription estimate"
     }
   ];
 
   const plans: BillingPlanOption[] = BILLING_PLANS.map((plan) => ({
     id: plan.id,
     name: plan.name,
-    price: formatCurrency(plan.basePriceCents / 100),
-    priceMeta: plan.basePriceCents > 0 ? "per month excl. VAT" : "monthly limit",
-    credits: `${formatCompactNumber(plan.creditsLimit)} credits`,
-    description: plan.description,
-    features: plan.features,
+    price: formatCurrency(plan.basePriceCents / 100, locale),
+    priceMeta: plan.basePriceCents > 0
+      ? locale === "de"
+        ? "pro Monat exkl. USt."
+        : "per month excl. VAT"
+      : locale === "de"
+        ? "monatliches Limit"
+        : "monthly limit",
+    credits:
+      locale === "de"
+        ? `${formatCompactNumber(plan.creditsLimit, locale)} Credits`
+        : `${formatCompactNumber(plan.creditsLimit, locale)} credits`,
+    description: getLocalizedPlanDescription(plan, locale),
+    features: getLocalizedPlanFeatures(plan, locale),
     current: plan.name.toLowerCase() === currentPlan.name.toLowerCase()
   }));
 
   const invoices = (billingCycles.length > 0 ? billingCycles : [buildFallbackBillingCycle(now, currentPlan, creditsUsed)])
-    .map((cycle) => mapBillingInvoiceItem(cycle, currentPlan))
+    .map((cycle) => mapBillingInvoiceItem(cycle, currentPlan, locale))
     .slice(0, 6);
 
   return {
     metrics,
     currentPlanName: currentPlan.name,
-    planDescription: currentPlan.description,
-    cycleLabel: `${formatShortDate(cycleStart)} - ${formatShortDate(cycleEnd)}`,
-    renewalLabel: `Renews on ${formatLongDate(cycleEnd)}`,
-    usageValue: `${formatCompactNumber(creditsUsed)} / ${formatCompactNumber(creditsLimit)} credits`,
-    usageMeta: `${formatCompactNumber(creditsRemaining)} credits remaining in the current cycle.`,
+    planDescription: getLocalizedPlanDescription(currentPlan, locale),
+    cycleLabel: `${formatShortDate(cycleStart, locale)} - ${formatShortDate(cycleEnd, locale)}`,
+    renewalLabel: locale === "de" ? `Verlängert sich am ${formatLongDate(cycleEnd, locale)}` : `Renews on ${formatLongDate(cycleEnd, locale)}`,
+    usageValue:
+      locale === "de"
+        ? `${formatCompactNumber(creditsUsed, locale)} / ${formatCompactNumber(creditsLimit, locale)} Credits`
+        : `${formatCompactNumber(creditsUsed, locale)} / ${formatCompactNumber(creditsLimit, locale)} credits`,
+    usageMeta:
+      locale === "de"
+        ? `${formatCompactNumber(creditsRemaining, locale)} Credits verbleiben im aktuellen Zyklus.`
+        : `${formatCompactNumber(creditsRemaining, locale)} credits remaining in the current cycle.`,
     usagePercent,
-    projectedSpendValue: formatCurrency(projectedSpendCents / 100),
-    creditsRemainingValue: formatCompactNumber(creditsRemaining),
+    projectedSpendValue: formatCurrency(projectedSpendCents / 100, locale),
+    creditsRemainingValue: formatCompactNumber(creditsRemaining, locale),
     billingEmail,
-    paymentMethodLabel: manageBillingAvailable ? "Managed in Stripe" : "No Stripe billing session yet",
+    paymentMethodLabel: manageBillingAvailable
+      ? locale === "de"
+        ? "In Stripe verwaltet"
+        : "Managed in Stripe"
+      : locale === "de"
+        ? "Noch keine Stripe-Abrechnung"
+        : "No Stripe billing session yet",
     paymentMethodMeta: manageBillingAvailable
       ? subscriptionStatusLabel && subscriptionPeriodEnd
-        ? `${subscriptionStatusLabel} until ${formatLongDate(subscriptionPeriodEnd)}.`
+        ? locale === "de"
+          ? `${subscriptionStatusLabel} bis ${formatLongDate(subscriptionPeriodEnd, locale)}.`
+          : `${subscriptionStatusLabel} until ${formatLongDate(subscriptionPeriodEnd, locale)}.`
         : subscriptionStatusLabel
           ? `${subscriptionStatusLabel}.`
-          : `Billing is linked to ${billingEmail}.`
-      : `Selecting a paid plan opens Stripe Checkout for ${billingEmail}.`,
+          : locale === "de"
+            ? `Die Abrechnung ist mit ${billingEmail} verknüpft.`
+            : `Billing is linked to ${billingEmail}.`
+      : locale === "de"
+        ? `Die Auswahl eines kostenpflichtigen Plans öffnet Stripe Checkout für ${billingEmail}.`
+        : `Selecting a paid plan opens Stripe Checkout for ${billingEmail}.`,
     paymentNotice: manageBillingAvailable
-      ? "Use the Stripe customer portal for invoices, payment methods, and cancellations."
-      : "Prices are billed monthly and shown excl. VAT.",
+      ? locale === "de"
+        ? "Nutze das Stripe-Kundenportal für Rechnungen, Zahlungsmethoden und Kündigungen."
+        : "Use the Stripe customer portal for invoices, payment methods, and cancellations."
+      : locale === "de"
+        ? "Preise werden monatlich berechnet und exkl. USt. angezeigt."
+        : "Prices are billed monthly and shown excl. VAT.",
     manageBillingAvailable,
     plans,
     invoices
@@ -847,7 +927,8 @@ export async function updateBillingPlan(planId: string): Promise<BillingScreenDa
 export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
   noStore();
 
-  const { supabase, workspace } = await getWorkspaceContext();
+  const { supabase, workspace, settings } = await getWorkspaceContext();
+  const locale = parseWorkspaceSettingsMetadata(settings.metadata).preferredLocale ?? DEFAULT_APP_LOCALE;
 
   const [
     { data: collectionsData, error: collectionsError },
@@ -931,24 +1012,28 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
   );
   const metrics: GlossaryMetricItem[] = [
     {
-      label: "Total terms",
+      label: locale === "de" ? "Begriffe gesamt" : "Total terms",
       value: String(termRows.length),
-      meta: "Across all synced collections"
+      meta: locale === "de" ? "Über alle synchronisierten Sammlungen" : "Across all synced collections"
     },
     {
-      label: "Protected phrases",
+      label: locale === "de" ? "Geschützte Begriffe" : "Protected phrases",
       value: String(termRows.filter((term) => term.is_protected).length),
-      meta: "Never translate"
+      meta: locale === "de" ? "Niemals übersetzen" : "Never translate"
     },
     {
-      label: "Locales covered",
+      label: locale === "de" ? "Abgedeckte Sprachen" : "Locales covered",
       value: String(distinctLocales.size),
-      meta: distinctLocales.size > 0 ? formatLocaleSummary(Array.from(distinctLocales)) : "No locale translations yet"
+      meta: distinctLocales.size > 0
+        ? formatLocaleSummary(Array.from(distinctLocales))
+        : locale === "de"
+          ? "Noch keine Sprachübersetzungen"
+          : "No locale translations yet"
     },
     {
-      label: "Pending reviews",
+      label: locale === "de" ? "Offene Prüfungen" : "Pending reviews",
       value: String(termRows.filter((term) => term.status === "review").length),
-      meta: "Needs approval"
+      meta: locale === "de" ? "Benötigt Freigabe" : "Needs approval"
     }
   ];
 
@@ -975,9 +1060,15 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
           ? translations
               .map((translation) => `${translation.locale.toUpperCase()} ${translation.term}`)
               .join(" · ")
-          : "No translations yet",
+          : locale === "de"
+            ? "Noch keine Übersetzungen"
+            : "No translations yet",
       status: mapGlossaryStatus(term.status),
-      project: linkedProjects.length > 0 ? linkedProjects.map((project) => project.name).join(", ") : "Shared",
+      project: linkedProjects.length > 0
+        ? linkedProjects.map((project) => project.name).join(", ")
+        : locale === "de"
+          ? "Geteilt"
+          : "Shared",
       projectSlugs: linkedProjects.map((project) => project.slug),
       collectionId: collection?.id ?? null,
       collectionName: collection?.name ?? null,
@@ -995,8 +1086,11 @@ export async function getGlossaryScreenData(): Promise<GlossaryScreenData> {
   const collections: GlossaryCollectionItem[] = collectionRows.map((collection) => ({
     id: collection.id,
     name: collection.name,
-    count: `${termCountByCollectionId.get(collection.id) ?? 0} terms`,
-    detail: collection.description ?? "No collection description yet."
+    count:
+      locale === "de"
+        ? `${termCountByCollectionId.get(collection.id) ?? 0} Begriffe`
+        : `${termCountByCollectionId.get(collection.id) ?? 0} terms`,
+    detail: collection.description ?? (locale === "de" ? "Noch keine Beschreibung für diese Sammlung." : "No collection description yet.")
   }));
 
   const projects: GlossaryProjectOption[] = projectRows.map((project) => ({
@@ -1018,6 +1112,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData> {
 
   const { workspace, settings } = await getWorkspaceContext();
   const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const locale = metadata.preferredLocale ?? DEFAULT_APP_LOCALE;
 
   return {
     profile: {
@@ -1036,13 +1131,16 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData> {
       aiBehavior: metadata.aiBehavior ?? getAiBehaviorFromSettings(settings)
     },
     preferences: {
+      locale,
       autoDownloadAfterTranslation: settings.auto_export_after_completion,
       defaultFilenameFormat: metadata.defaultFilenameFormat ?? "Original + target locale"
     },
     dangerZone: {
-      title: "Delete account",
-      description: "Permanently remove your Translayr account, workspace access, and personal settings.",
-      actionLabel: "Delete account"
+      title: locale === "de" ? "Konto löschen" : "Delete account",
+      description: locale === "de"
+        ? "Entferne dein Translayr-Konto, den Workspace-Zugriff und persönliche Einstellungen dauerhaft."
+        : "Permanently remove your Translayr account, workspace access, and personal settings.",
+      actionLabel: locale === "de" ? "Konto löschen" : "Delete account"
     }
   };
 }
@@ -1075,6 +1173,7 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
   const toneStyle = normalizeToneStyle(input.translation.toneStyle);
   const aiBehavior = normalizeAiBehavior(input.translation.aiBehavior);
   const defaultFilenameFormat = normalizeFilenameFormat(input.preferences.defaultFilenameFormat);
+  const preferredLocale = normalizeAppLocale(input.preferences.locale);
   const translationBatchSize = getBatchSizeForAiBehavior(aiBehavior);
   const inlineTagValidationMode = input.translation.strictTagProtection ? "strict" : "warn";
 
@@ -1083,6 +1182,7 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
     ...currentMetadata,
     profileName,
     profileEmail,
+    preferredLocale,
     preferredSourceLanguage: sourceLanguage,
     toneStyle,
     strictGlossaryMode: Boolean(input.translation.strictGlossaryMode),
@@ -1139,6 +1239,7 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
       aiBehavior
     },
     preferences: {
+      locale: preferredLocale,
       autoDownloadAfterTranslation: Boolean(input.preferences.autoDownloadAfterTranslation),
       defaultFilenameFormat
     },
@@ -2139,9 +2240,12 @@ function mapGlossaryStatusToDatabase(status: GlossaryStatus): GlossaryTermRow["s
   }
 }
 
-function mapUsageTrendPoint(row: DailyUsageRow): UsageTrendPoint {
+function mapUsageTrendPoint(
+  row: DailyUsageRow,
+  locale: AppLocale = DEFAULT_APP_LOCALE
+): UsageTrendPoint {
   return {
-    label: formatShortDate(new Date(`${row.usage_date}T00:00:00.000Z`)),
+    label: formatShortDate(new Date(`${row.usage_date}T00:00:00.000Z`), locale),
     value: row.credits_used
   };
 }
@@ -2590,10 +2694,13 @@ function getOrCreateArchivedDailyUsageRow(
   return nextRow;
 }
 
-function mapUsageBreakdownRows(rows: UsageBreakdownRow[]): UsageBreakdownItem[] {
+function mapUsageBreakdownRows(
+  rows: UsageBreakdownRow[],
+  locale: AppLocale = DEFAULT_APP_LOCALE
+): UsageBreakdownItem[] {
   return rows.map((row) => ({
-    label: row.metric_label,
-    value: formatCompactNumber(row.metric_value),
+    label: translateUsageBreakdownLabel(row.metric_label, locale),
+    value: formatCompactNumber(row.metric_value, locale),
     percent: Math.max(0, Math.min(100, Math.round(row.share_percent ?? 0)))
   }));
 }
@@ -2602,41 +2709,42 @@ function buildFallbackUsageBreakdown(
   totalUploads: number,
   totalExports: number,
   totalReviews: number,
-  creditsUsed: number
+  creditsUsed: number,
+  locale: AppLocale
 ): UsageBreakdownItem[] {
   const maxValue = Math.max(totalUploads, totalExports, totalReviews, creditsUsed, 1);
 
   return [
     {
-      label: "Credits consumed",
-      value: formatCompactNumber(creditsUsed),
+      label: locale === "de" ? "Verbrauchte Credits" : "Credits consumed",
+      value: formatCompactNumber(creditsUsed, locale),
       percent: Math.round((creditsUsed / maxValue) * 100)
     },
     {
-      label: "Uploads",
-      value: formatCompactNumber(totalUploads),
+      label: locale === "de" ? "Uploads" : "Uploads",
+      value: formatCompactNumber(totalUploads, locale),
       percent: Math.round((totalUploads / maxValue) * 100)
     },
     {
-      label: "Exports generated",
-      value: formatCompactNumber(totalExports),
+      label: locale === "de" ? "Erstellte Exporte" : "Exports generated",
+      value: formatCompactNumber(totalExports, locale),
       percent: Math.round((totalExports / maxValue) * 100)
     },
     {
-      label: "Review sessions",
-      value: formatCompactNumber(totalReviews),
+      label: locale === "de" ? "Prüf-Sitzungen" : "Review sessions",
+      value: formatCompactNumber(totalReviews, locale),
       percent: Math.round((totalReviews / maxValue) * 100)
     }
   ];
 }
 
-function buildEmptyUsageTrend(now: Date): UsageTrendPoint[] {
+function buildEmptyUsageTrend(now: Date, locale: AppLocale): UsageTrendPoint[] {
   return Array.from({ length: 10 }, (_, index) => {
     const date = new Date(now);
     date.setDate(now.getDate() - (9 - index));
 
     return {
-      label: formatShortDate(date),
+      label: formatShortDate(date, locale),
       value: 0
     };
   });
@@ -2644,7 +2752,8 @@ function buildEmptyUsageTrend(now: Date): UsageTrendPoint[] {
 
 function buildUsageProjectInsights(
   projects: ProjectRecord[],
-  totalUsed: number
+  totalUsed: number,
+  locale: AppLocale
 ): UsageProjectInsightItem[] {
   return projects
     .map((project) => {
@@ -2654,7 +2763,7 @@ function buildUsageProjectInsights(
       return {
         id: project.id,
         name: project.name,
-        languages: project.targetLanguages.map(getLanguageLabel).join(", "),
+        languages: project.targetLanguages.map((targetLanguage) => getLanguageLabel(targetLanguage, locale)).join(", "),
         fileCount: translatedFiles.length,
         wordsUsed,
         sharePercent: totalUsed > 0 ? Math.round((wordsUsed / totalUsed) * 100) : 0,
@@ -2667,7 +2776,8 @@ function buildUsageProjectInsights(
 
 function buildUsageLanguageInsights(
   projects: ProjectRecord[],
-  totalUsed: number
+  totalUsed: number,
+  locale: AppLocale
 ): UsageLanguageInsightItem[] {
   const aggregated = new Map<string, UsageLanguageInsightItem>();
 
@@ -2679,7 +2789,7 @@ function buildUsageLanguageInsights(
 
       const existing = aggregated.get(file.targetLanguage) ?? {
         code: file.targetLanguage,
-        label: getLanguageLabel(file.targetLanguage),
+        label: getLanguageLabel(file.targetLanguage, locale),
         fileCount: 0,
         wordsUsed: 0,
         sharePercent: 0
@@ -2699,7 +2809,7 @@ function buildUsageLanguageInsights(
     .sort((left, right) => right.wordsUsed - left.wordsUsed);
 }
 
-function buildUsageTopFiles(projects: ProjectRecord[]): UsageTopFileItem[] {
+function buildUsageTopFiles(projects: ProjectRecord[], locale: AppLocale): UsageTopFileItem[] {
   return projects
     .flatMap((project) =>
       project.files
@@ -2708,17 +2818,17 @@ function buildUsageTopFiles(projects: ProjectRecord[]): UsageTopFileItem[] {
           id: file.id,
           name: file.name,
           projectName: project.name,
-          languagePair: `${getLanguageLabel(file.sourceLanguage)} -> ${getLanguageLabel(file.targetLanguage)}`,
+          languagePair: `${getLanguageLabel(file.sourceLanguage, locale)} -> ${getLanguageLabel(file.targetLanguage, locale)}`,
           wordsUsed: file.words,
           status: file.status,
-          updatedLabel: formatShortDate(new Date(file.lastUpdated))
+          updatedLabel: formatShortDate(new Date(file.lastUpdated), locale)
         }))
     )
     .sort((left, right) => right.wordsUsed - left.wordsUsed)
     .slice(0, 8);
 }
 
-function buildUsageActivityFeed(projects: ProjectRecord[]): UsageActivityFeedItem[] {
+function buildUsageActivityFeed(projects: ProjectRecord[], locale: AppLocale): UsageActivityFeedItem[] {
   return projects
     .flatMap((project) =>
       project.recentActivity.map((activity) => ({
@@ -2727,7 +2837,7 @@ function buildUsageActivityFeed(projects: ProjectRecord[]): UsageActivityFeedIte
         title: activity.title,
         detail: activity.detail,
         projectName: project.name,
-        timestampLabel: formatActivityTimestamp(new Date(activity.timestamp)),
+        timestampLabel: formatActivityTimestamp(new Date(activity.timestamp), locale),
         timestamp: activity.timestamp
       }))
     )
@@ -2756,22 +2866,22 @@ function formatDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function formatShortDate(date: Date) {
-  return new Intl.DateTimeFormat("en", {
+function formatShortDate(date: Date, locale: AppLocale = DEFAULT_APP_LOCALE) {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     month: "short",
     day: "numeric"
   }).format(date);
 }
 
-function formatLongDate(date: Date) {
-  return new Intl.DateTimeFormat("en", {
+function formatLongDate(date: Date, locale: AppLocale = DEFAULT_APP_LOCALE) {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     month: "long",
     day: "numeric"
   }).format(date);
 }
 
-function formatActivityTimestamp(date: Date) {
-  return new Intl.DateTimeFormat("en", {
+function formatActivityTimestamp(date: Date, locale: AppLocale = DEFAULT_APP_LOCALE) {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -2780,43 +2890,43 @@ function formatActivityTimestamp(date: Date) {
   }).format(date);
 }
 
-function formatTimeLabel(date: Date) {
-  return new Intl.DateTimeFormat("en", {
+function formatTimeLabel(date: Date, locale: AppLocale = DEFAULT_APP_LOCALE) {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false
   }).format(date);
 }
 
-function describeResetDate(resetDate: Date, now: Date) {
+function describeResetDate(resetDate: Date, now: Date, locale: AppLocale = DEFAULT_APP_LOCALE) {
   const millisecondsPerDay = 1000 * 60 * 60 * 24;
   const normalizedNow = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const normalizedReset = Date.UTC(resetDate.getUTCFullYear(), resetDate.getUTCMonth(), resetDate.getUTCDate());
   const dayDiff = Math.max(0, Math.ceil((normalizedReset - normalizedNow) / millisecondsPerDay));
 
   if (dayDiff === 0) {
-    return "Resets today";
+    return locale === "de" ? "Wird heute zurückgesetzt" : "Resets today";
   }
 
   if (dayDiff === 1) {
-    return "Resets in 1 day";
+    return locale === "de" ? "Reset in 1 Tag" : "Resets in 1 day";
   }
 
-  return `Resets in ${dayDiff} days`;
+  return locale === "de" ? `Reset in ${dayDiff} Tagen` : `Resets in ${dayDiff} days`;
 }
 
-function formatDelta(value: number) {
+function formatDelta(value: number, locale: AppLocale = DEFAULT_APP_LOCALE) {
   if (value === 0) {
-    return "No change";
+    return locale === "de" ? "Keine Änderung" : "No change";
   }
 
-  const formatted = new Intl.NumberFormat("en").format(Math.abs(value));
+  const formatted = new Intl.NumberFormat(getIntlLocale(locale)).format(Math.abs(value));
 
   return value > 0 ? `+${formatted}` : `-${formatted}`;
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en", {
+function formatCurrency(value: number, locale: AppLocale = DEFAULT_APP_LOCALE) {
+  return new Intl.NumberFormat(getIntlLocale(locale), {
     style: "currency",
     currency: "EUR",
     maximumFractionDigits: 0
@@ -3085,6 +3195,7 @@ function parseWorkspaceSettingsMetadata(value: Record<string, unknown> | null | 
   return {
     profileName: typeof metadata.profileName === "string" ? metadata.profileName : undefined,
     profileEmail: typeof metadata.profileEmail === "string" ? metadata.profileEmail : undefined,
+    preferredLocale: normalizeAppLocale(typeof metadata.preferredLocale === "string" ? metadata.preferredLocale : undefined),
     preferredSourceLanguage:
       typeof metadata.preferredSourceLanguage === "string" &&
       SUPPORTED_LANGUAGE_CODES.has(metadata.preferredSourceLanguage)
@@ -3217,7 +3328,8 @@ function buildFallbackBillingCycle(
 
 function mapBillingInvoiceItem(
   cycle: BillingCycleRow,
-  currentPlan: BillingPlanDefinition
+  currentPlan: BillingPlanDefinition,
+  locale: AppLocale
 ): BillingInvoiceItem {
   const periodStart = new Date(`${cycle.period_start}T00:00:00.000Z`);
   const periodEnd = new Date(`${cycle.period_end}T00:00:00.000Z`);
@@ -3225,20 +3337,113 @@ function mapBillingInvoiceItem(
 
   return {
     id: cycle.id,
-    periodLabel: `${formatShortDate(periodStart)} - ${formatShortDate(periodEnd)}`,
-    issuedOnLabel: formatLongDate(periodEnd),
-    amountLabel: formatCurrency(amountCents / 100),
-    statusLabel: cycle.status === "active" ? "Open" : cycle.status === "closed" ? "Paid" : "Projected",
-    creditsLabel: `${formatCompactNumber(cycle.credits_used)} / ${formatCompactNumber(cycle.credits_limit)}`
+    periodLabel: `${formatShortDate(periodStart, locale)} - ${formatShortDate(periodEnd, locale)}`,
+    issuedOnLabel: formatLongDate(periodEnd, locale),
+    amountLabel: formatCurrency(amountCents / 100, locale),
+    statusLabel:
+      cycle.status === "active"
+        ? locale === "de"
+          ? "Offen"
+          : "Open"
+        : cycle.status === "closed"
+          ? locale === "de"
+            ? "Bezahlt"
+            : "Paid"
+          : locale === "de"
+            ? "Prognose"
+            : "Projected",
+    creditsLabel: `${formatCompactNumber(cycle.credits_used, locale)} / ${formatCompactNumber(cycle.credits_limit, locale)}`
   };
 }
 
-function formatStripeStatusLabel(status: string) {
-  return status
+function formatStripeStatusLabel(status: string, locale: AppLocale) {
+  const label = status
     .split("_")
     .filter(Boolean)
     .map((segment) => segment[0]?.toUpperCase() + segment.slice(1))
     .join(" ");
+
+  if (locale !== "de") {
+    return label;
+  }
+
+  switch (status) {
+    case "active":
+      return "Aktiv";
+    case "trialing":
+      return "Testphase";
+    case "past_due":
+      return "Überfällig";
+    case "canceled":
+      return "Gekündigt";
+    case "unpaid":
+      return "Unbezahlt";
+    case "incomplete":
+      return "Unvollständig";
+    default:
+      return label;
+  }
+}
+
+function formatUpdatedLabel(date: Date, locale: AppLocale) {
+  return locale === "de" ? `Aktualisiert ${formatTimeLabel(date, locale)}` : `Updated ${formatTimeLabel(date, locale)}`;
+}
+
+function getLocalizedPlanDescription(plan: BillingPlanDefinition, locale: AppLocale) {
+  if (locale !== "de") {
+    return plan.description;
+  }
+
+  switch (plan.id) {
+    case "free":
+      return "Zum Ausprobieren des Produkts, für kleinere Dateipakete und geringes Lokalisierungsvolumen.";
+    case "starter":
+      return "Für kleinere Lokalisierungs-Workloads und leichte wöchentliche Release-Zyklen.";
+    case "pro":
+      return "Für Produktteams, die kontinuierlich in mehreren Sprachen ausliefern.";
+    case "scale":
+      return "Für größere Teams, die Launches, QA und Exporte in höherem Volumen koordinieren.";
+    default:
+      return plan.description;
+  }
+}
+
+function getLocalizedPlanFeatures(plan: BillingPlanDefinition, locale: AppLocale) {
+  if (locale !== "de") {
+    return plan.features;
+  }
+
+  switch (plan.id) {
+    case "free":
+      return ["1k Wörter pro Monat", "XLIFF-Kernübersetzung", "Glossar-Basisfunktionen"];
+    case "starter":
+      return ["25k Wörter pro Monat", "Projekt-Workspaces", "Glossar-Unterstützung"];
+    case "pro":
+      return ["150k Wörter pro Monat", "Review-Workflow", "Priorisierte Glossar-Injektion"];
+    case "scale":
+      return ["400k Wörter pro Monat", "Höherer Durchsatz", "Geteilte Team-Abläufe"];
+    default:
+      return plan.features;
+  }
+}
+
+function translateUsageBreakdownLabel(label: string, locale: AppLocale) {
+  if (locale !== "de") {
+    return label;
+  }
+
+  switch (label.trim().toLowerCase()) {
+    case "credits consumed":
+      return "Verbrauchte Credits";
+    case "uploads":
+      return "Uploads";
+    case "exports generated":
+      return "Erstellte Exporte";
+    case "review sessions":
+      return "Prüf-Sitzungen";
+    default:
+      return label;
+  }
 }
 
 function safeParseDate(value: string) {

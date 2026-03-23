@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
 
+import { useAppLocale } from "@/components/app-locale-provider";
 import type { BillingInvoiceItem, BillingPlanOption, BillingScreenData, UsageMetricItem } from "@/types/workspace";
 
 type BillingScreenProps = {
@@ -17,11 +18,68 @@ type BillingMutationResponse = {
 };
 
 export function BillingScreen({ data }: BillingScreenProps) {
+  const locale = useAppLocale();
   const router = useRouter();
   const [isUpdatingPlanId, setIsUpdatingPlanId] = useState<string | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const copy =
+    locale === "de"
+      ? {
+          updateFailed: "Der Abrechnungsplan konnte nicht aktualisiert werden.",
+          updated: "Abo aktualisiert.",
+          portalFailed: "Das Billing-Portal konnte nicht geöffnet werden.",
+          eyebrow: "/ Abrechnung",
+          heading: "Abo & Abrechnung",
+          intro: "Verwalte deinen Plan, beobachte den aktuellen Abrechnungszyklus und prüfe letzte Rechnungen an einem Ort.",
+          planSuffix: "Tarif",
+          plans: "/ Pläne",
+          choosePlan: "Abo auswählen",
+          paidPlans: "Bezahlte Pläne werden monatlich exkl. USt. berechnet. Neue kostenpflichtige Abos öffnen in Stripe Checkout.",
+          invoices: "/ Rechnungen",
+          history: "Abrechnungsverlauf",
+          invoiceHeaders: ["Zeitraum", "Ausgestellt", "Betrag", "Status", "Credits"],
+          currentCycle: "/ Aktueller Zyklus",
+          nextRenewal: "Nächste Verlängerung",
+          projectedSpend: "Prognostizierte Kosten",
+          creditsRemaining: "Verbleibende Credits",
+          payment: "/ Zahlung",
+          billingEmail: "Abrechnungs-E-Mail",
+          openingStripe: "Stripe wird geöffnet...",
+          manageStripe: "In Stripe verwalten",
+          current: "Aktuell",
+          currentPlan: "Aktueller Plan",
+          updating: "Wird aktualisiert...",
+          switchTo: (planName: string) => `Zu ${planName} wechseln`
+        }
+      : {
+          updateFailed: "Billing plan could not be updated.",
+          updated: "Subscription updated.",
+          portalFailed: "Billing portal could not be opened.",
+          eyebrow: "/ Billing",
+          heading: "Billing",
+          intro: "Manage your subscription plan, monitor the current billing cycle, and review recent invoices in one focused space.",
+          planSuffix: "plan",
+          plans: "/ Plans",
+          choosePlan: "Choose your subscription",
+          paidPlans: "Paid plans are billed monthly excl. VAT. New paid subscriptions open in Stripe Checkout.",
+          invoices: "/ Invoices",
+          history: "Billing history",
+          invoiceHeaders: ["Period", "Issued", "Amount", "Status", "Credits"],
+          currentCycle: "/ Current Cycle",
+          nextRenewal: "Next renewal",
+          projectedSpend: "Projected spend",
+          creditsRemaining: "Credits remaining",
+          payment: "/ Payment",
+          billingEmail: "Billing email",
+          openingStripe: "Opening Stripe...",
+          manageStripe: "Manage in Stripe",
+          current: "Current",
+          currentPlan: "Current plan",
+          updating: "Updating...",
+          switchTo: (planName: string) => `Switch to ${planName}`
+        };
 
   useEffect(() => {
     if (!successMessage) {
@@ -54,7 +112,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
       const payload = (await response.json().catch(() => null)) as BillingMutationResponse | null;
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? "Billing plan could not be updated.");
+        throw new Error(payload?.error ?? copy.updateFailed);
       }
 
       if (payload?.redirectUrl) {
@@ -62,12 +120,12 @@ export function BillingScreen({ data }: BillingScreenProps) {
         return;
       }
 
-      setSuccessMessage("Subscription updated.");
+      setSuccessMessage(copy.updated);
       startTransition(() => {
         router.refresh();
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Billing plan could not be updated.");
+      setErrorMessage(error instanceof Error ? error.message : copy.updateFailed);
     } finally {
       setIsUpdatingPlanId(null);
     }
@@ -88,12 +146,12 @@ export function BillingScreen({ data }: BillingScreenProps) {
       const payload = (await response.json().catch(() => null)) as BillingMutationResponse | null;
 
       if (!response.ok || !payload?.redirectUrl) {
-        throw new Error(payload?.error ?? "Billing portal could not be opened.");
+        throw new Error(payload?.error ?? copy.portalFailed);
       }
 
       window.location.assign(payload.redirectUrl);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Billing portal could not be opened.");
+      setErrorMessage(error instanceof Error ? error.message : copy.portalFailed);
     } finally {
       setIsOpeningPortal(false);
     }
@@ -105,20 +163,19 @@ export function BillingScreen({ data }: BillingScreenProps) {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-[720px]">
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Billing
+              {copy.eyebrow}
             </span>
             <h1 className="mt-2 text-[27px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">
-              Abo &amp; Billing
+              {copy.heading}
             </h1>
             <p className="mt-2 text-[12.5px] leading-6 text-[var(--muted)]">
-              Manage your subscription plan, monitor the current billing cycle, and review recent invoices in one
-              focused space.
+              {copy.intro}
             </p>
           </div>
 
           <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-3 py-2 text-[11.5px] text-[var(--muted)]">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--foreground)]" />
-            {data.currentPlanName} plan
+            {data.currentPlanName} {copy.planSuffix}
           </div>
         </div>
       </header>
@@ -147,13 +204,13 @@ export function BillingScreen({ data }: BillingScreenProps) {
             <div className="rounded-[14px] border border-[var(--border)] bg-white">
               <div className="border-b border-[var(--border-light)] px-5 py-4">
                 <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  / Plans
+                  {copy.plans}
                 </p>
                 <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-                  Choose your subscription
+                  {copy.choosePlan}
                 </h2>
                 <p className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
-                  Paid plans are billed monthly excl. VAT. New paid subscriptions open in Stripe Checkout.
+                  {copy.paidPlans}
                 </p>
               </div>
 
@@ -175,16 +232,16 @@ export function BillingScreen({ data }: BillingScreenProps) {
             <div className="rounded-[14px] border border-[var(--border)] bg-white">
               <div className="border-b border-[var(--border-light)] px-5 py-4">
                 <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  / Invoices
+                  {copy.invoices}
                 </p>
                 <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-                  Billing history
+                  {copy.history}
                 </h2>
               </div>
 
               <div className="overflow-hidden">
                 <div className="grid grid-cols-[minmax(0,1.2fr)_120px_120px_90px_120px] border-b border-[var(--border-light)] bg-[var(--background)] px-5 py-3">
-                  {["Period", "Issued", "Amount", "Status", "Credits"].map((label) => (
+                  {copy.invoiceHeaders.map((label) => (
                     <span key={label} className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]">
                       {label}
                     </span>
@@ -202,7 +259,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
             <div className="rounded-[14px] border border-[var(--border)] bg-white">
               <div className="border-b border-[var(--border-light)] px-5 py-4">
                 <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  / Current Cycle
+                  {copy.currentCycle}
                 </p>
               </div>
 
@@ -227,9 +284,9 @@ export function BillingScreen({ data }: BillingScreenProps) {
                 </div>
 
                 <div className="space-y-3">
-                  <DetailRow label="Next renewal" value={data.renewalLabel} />
-                  <DetailRow label="Projected spend" value={data.projectedSpendValue} />
-                  <DetailRow label="Credits remaining" value={data.creditsRemainingValue} />
+                  <DetailRow label={copy.nextRenewal} value={data.renewalLabel} />
+                  <DetailRow label={copy.projectedSpend} value={data.projectedSpendValue} />
+                  <DetailRow label={copy.creditsRemaining} value={data.creditsRemainingValue} />
                 </div>
               </div>
             </div>
@@ -237,7 +294,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
             <div className="rounded-[14px] border border-[var(--border)] bg-white">
               <div className="border-b border-[var(--border-light)] px-5 py-4">
                 <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  / Payment
+                  {copy.payment}
                 </p>
               </div>
 
@@ -247,7 +304,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
                   <p className="mt-1 text-[12px] leading-6 text-[var(--muted)]">{data.paymentMethodMeta}</p>
                 </div>
                 <div className="rounded-[12px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
-                  <DetailRow label="Billing email" value={data.billingEmail} />
+                  <DetailRow label={copy.billingEmail} value={data.billingEmail} />
                   {data.manageBillingAvailable ? (
                     <button
                       type="button"
@@ -257,7 +314,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
                       disabled={isOpeningPortal}
                       className="mt-3 rounded-[10px] border border-[var(--border)] bg-white px-3 py-2 text-[12px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      {isOpeningPortal ? "Opening Stripe..." : "Manage in Stripe"}
+                      {isOpeningPortal ? copy.openingStripe : copy.manageStripe}
                     </button>
                   ) : null}
                   <div className="mt-3 border-t border-[var(--border-light)] pt-3 text-[11.5px] leading-5 text-[var(--muted)]">
@@ -303,6 +360,21 @@ function BillingPlanCard({
   disabled: boolean;
   onSelect: () => void;
 }) {
+  const locale = useAppLocale();
+  const copy =
+    locale === "de"
+      ? {
+          current: "Aktuell",
+          currentPlan: "Aktueller Plan",
+          updating: "Wird aktualisiert...",
+          switchTo: (planName: string) => `Zu ${planName} wechseln`
+        }
+      : {
+          current: "Current",
+          currentPlan: "Current plan",
+          updating: "Updating...",
+          switchTo: (planName: string) => `Switch to ${planName}`
+        };
   return (
     <div
       className={[
@@ -317,7 +389,7 @@ function BillingPlanCard({
         </div>
         {plan.current ? (
           <span className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--foreground)]">
-            Current
+            {copy.current}
           </span>
         ) : null}
       </div>
@@ -351,7 +423,7 @@ function BillingPlanCard({
             : "bg-[var(--foreground)] text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
         ].join(" ")}
       >
-        {plan.current ? "Current plan" : updating ? "Updating..." : `Switch to ${plan.name}`}
+        {plan.current ? copy.currentPlan : updating ? copy.updating : copy.switchTo(plan.name)}
       </button>
     </div>
   );

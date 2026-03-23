@@ -1,13 +1,15 @@
 import type { FileStatus, ProjectStatus } from "@/types/projects";
 import { getStatusLabel } from "@/lib/projects/display";
+import { useAppLocale } from "@/components/app-locale-provider";
 
 type StatusBadgeProps = {
   status: ProjectStatus | FileStatus;
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {
+  const locale = useAppLocale();
   const styles = getBadgeStyles(status);
-  const label = getStatusLabel(status);
+  const label = getStatusLabel(status, locale);
 
   return (
     <span

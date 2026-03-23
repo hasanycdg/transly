@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useMemo, useState } from "react";
 
+import { useAppLocale } from "@/components/app-locale-provider";
+import { translateGlossaryStatus } from "@/lib/i18n";
 import { getLanguageLabel } from "@/lib/projects/formatters";
 import type {
   GlossaryScreenData,
@@ -27,6 +29,7 @@ const TERMS_TABLE_GRID_CLASS =
   "grid grid-cols-[minmax(0,1.55fr)_72px_96px_minmax(0,1fr)_minmax(0,0.9fr)_76px] items-center gap-x-3";
 
 export function GlossaryScreen({ data }: GlossaryScreenProps) {
+  const locale = useAppLocale();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<GlossaryStatus | "All">("All");
@@ -45,6 +48,110 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [deletingTermId, setDeletingTermId] = useState<string | null>(null);
+  const copy =
+    locale === "de"
+      ? {
+          saveError: "Der Glossarbegriff konnte nicht gespeichert werden.",
+          updateFlash: (source: string) => `Glossarbegriff „${source}“ aktualisiert.`,
+          saveFlash: (source: string) => `Glossarbegriff „${source}“ gespeichert.`,
+          createCollectionError: "Die Glossarsammlung konnte nicht erstellt werden.",
+          createCollectionFlash: (name: string) => `Sammlung „${name}“ erstellt.`,
+          importFailed: "Der Glossar-CSV-Import ist fehlgeschlagen.",
+          importFlash: (count: number, collectionCount?: number) =>
+            collectionCount
+              ? `${count} Begriffe importiert und ${collectionCount} Sammlungen erstellt.`
+              : `${count} Glossarbegriffe importiert.`,
+          deleteConfirm: (term: string) => `Glossarbegriff „${term}“ löschen?`,
+          deleteFailed: "Der Glossarbegriff konnte nicht gelöscht werden.",
+          deleteFlash: (term: string) => `Glossarbegriff „${term}“ gelöscht.`,
+          eyebrow: "/ Glossar",
+          heading: "Glossar",
+          importCsv: "CSV importieren",
+          newTerm: "Neuer Begriff",
+          terms: "/ Begriffe",
+          sharedTerms: "Geteilte Lokalisierungsbegriffe",
+          termsCount: (filtered: number, total: number) => `${filtered} von ${total} Begriffen`,
+          searchPlaceholder: "Begriffe, Übersetzungen, Sammlungen suchen...",
+          allStatuses: "Alle Status",
+          allCollections: "Alle Sammlungen",
+          sharedGlossary: "Geteiltes Glossar",
+          allProjects: "Alle Projekte",
+          source: "Quelle",
+          translations: "Übersetzungen",
+          status: "Status",
+          collection: "Sammlung",
+          project: "Projekt",
+          protected: "Geschützt",
+          noLocales: "Keine Sprachen",
+          shared: "Geteilt",
+          edit: "Bearbeiten",
+          deleting: "...",
+          delete: "Löschen",
+          noTermsFiltered: "Keine Glossarbegriffe entsprechen den aktuellen Filtern.",
+          noTerms: "Es wurden noch keine Glossarbegriffe hinzugefügt.",
+          collections: "/ Sammlungen",
+          newCollection: "Neue Sammlung",
+          collectionsNote: "Sammlungen sind optional. Nutze sie nur, wenn du Begriffe nach Feature, Marke oder Kunde gruppieren willst.",
+          noCollections: "Noch keine Glossarsammlungen.",
+          guidance: "/ Hinweise",
+          guidanceLines: [
+            "Nutze geschützte Begriffe für Markennamen, Produktlabels und Formulierungen, die gesperrt bleiben müssen.",
+            "Freigegebene Einträge sollten Übersetzungen für jede Zielsprache enthalten, die du ausliefern willst.",
+            "Sammlungen sind optionale Ordner. Wenn du keine Gruppierung brauchst, lass Begriffe im geteilten Glossar.",
+            "Der CSV-Import akzeptiert `source`, optionale Metadaten-Spalten und sprachbasierte Übersetzungsspalten."
+          ]
+        }
+      : {
+          saveError: "Glossary term could not be saved.",
+          updateFlash: (source: string) => `Updated glossary term "${source}".`,
+          saveFlash: (source: string) => `Saved glossary term "${source}".`,
+          createCollectionError: "Glossary collection could not be created.",
+          createCollectionFlash: (name: string) => `Created collection "${name}".`,
+          importFailed: "Glossary CSV import failed.",
+          importFlash: (count: number, collectionCount?: number) =>
+            collectionCount
+              ? `Imported ${count} terms and created ${collectionCount} collections.`
+              : `Imported ${count} glossary terms.`,
+          deleteConfirm: (term: string) => `Delete glossary term "${term}"?`,
+          deleteFailed: "Glossary term could not be deleted.",
+          deleteFlash: (term: string) => `Deleted glossary term "${term}".`,
+          eyebrow: "/ Glossary",
+          heading: "Glossary",
+          importCsv: "Import CSV",
+          newTerm: "New Term",
+          terms: "/ Terms",
+          sharedTerms: "Shared localization terms",
+          termsCount: (filtered: number, total: number) => `${filtered} of ${total} terms`,
+          searchPlaceholder: "Search terms, translations, collections...",
+          allStatuses: "All statuses",
+          allCollections: "All collections",
+          sharedGlossary: "Shared glossary",
+          allProjects: "All projects",
+          source: "Source",
+          translations: "Translations",
+          status: "Status",
+          collection: "Collection",
+          project: "Project",
+          protected: "Protected",
+          noLocales: "No locales",
+          shared: "Shared",
+          edit: "Edit",
+          deleting: "...",
+          delete: "Delete",
+          noTermsFiltered: "No glossary terms match the current filters.",
+          noTerms: "No glossary terms have been added yet.",
+          collections: "/ Collections",
+          newCollection: "New Collection",
+          collectionsNote: "Collections are optional. Use them only if you want to group terms by feature, brand, or client.",
+          noCollections: "No glossary collections yet.",
+          guidance: "/ Guidance",
+          guidanceLines: [
+            "Use protected terms for brand names, product labels, and phrases that must stay locked.",
+            "Approved entries should contain translations for every target locale you expect to ship.",
+            "Collections are optional folders. If you do not need grouping, keep terms in the shared glossary.",
+            "CSV import accepts `source`, optional metadata columns, and locale-based translation columns."
+          ]
+        };
 
   useEffect(() => {
     setIsHydrated(true);
@@ -112,19 +219,17 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? "Glossary term could not be saved.");
+        throw new Error(payload?.error ?? copy.saveError);
       }
 
       setShowNewTermModal(false);
       setEditingTerm(null);
-      setFlashMessage(
-        isEditing ? `Updated glossary term "${input.source}".` : `Saved glossary term "${input.source}".`
-      );
+      setFlashMessage(isEditing ? copy.updateFlash(input.source) : copy.saveFlash(input.source));
       startTransition(() => {
         router.refresh();
       });
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : "Glossary term could not be saved.");
+      setCreateError(error instanceof Error ? error.message : copy.saveError);
     } finally {
       setIsCreatingTerm(false);
     }
@@ -146,17 +251,17 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? "Glossary collection could not be created.");
+        throw new Error(payload?.error ?? copy.createCollectionError);
       }
 
       setShowCollectionModal(false);
-      setFlashMessage(`Created collection "${input.name}".`);
+      setFlashMessage(copy.createCollectionFlash(input.name));
       startTransition(() => {
         router.refresh();
       });
     } catch (error) {
       setCollectionError(
-        error instanceof Error ? error.message : "Glossary collection could not be created."
+        error instanceof Error ? error.message : copy.createCollectionError
       );
     } finally {
       setIsCreatingCollection(false);
@@ -185,20 +290,16 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
         | null;
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? "Glossary CSV import failed.");
+        throw new Error(payload?.error ?? copy.importFailed);
       }
 
       setShowImportModal(false);
-      setFlashMessage(
-        payload?.collectionCount
-          ? `Imported ${payload.importedCount ?? 0} terms and created ${payload.collectionCount} collections.`
-          : `Imported ${payload?.importedCount ?? 0} glossary terms.`
-      );
+      setFlashMessage(copy.importFlash(payload?.importedCount ?? 0, payload?.collectionCount));
       startTransition(() => {
         router.refresh();
       });
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "Glossary CSV import failed.");
+      setImportError(error instanceof Error ? error.message : copy.importFailed);
     } finally {
       setIsImportingCsv(false);
     }
@@ -209,7 +310,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
       return;
     }
 
-    const confirmed = window.confirm(`Delete glossary term "${term.source}"?`);
+    const confirmed = window.confirm(copy.deleteConfirm(term.source));
 
     if (!confirmed) {
       return;
@@ -225,15 +326,15 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? "Glossary term could not be deleted.");
+        throw new Error(payload?.error ?? copy.deleteFailed);
       }
 
-      setFlashMessage(`Deleted glossary term "${term.source}".`);
+      setFlashMessage(copy.deleteFlash(term.source));
       startTransition(() => {
         router.refresh();
       });
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Glossary term could not be deleted.");
+      window.alert(error instanceof Error ? error.message : copy.deleteFailed);
     } finally {
       setDeletingTermId(null);
     }
@@ -245,10 +346,10 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)] px-7 py-4">
           <div className="flex flex-col gap-[1px]">
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Glossary
+              {copy.eyebrow}
             </span>
             <h1 className="text-[18px] font-semibold tracking-[-0.4px] text-[var(--foreground)]">
-              Glossary
+              {copy.heading}
             </h1>
           </div>
 
@@ -261,7 +362,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
               }}
               className="rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
             >
-              Import CSV
+              {copy.importCsv}
             </button>
             <button
               type="button"
@@ -272,7 +373,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
               }}
               className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12px] font-medium text-white transition hover:opacity-85"
             >
-              New Term
+              {copy.newTerm}
             </button>
           </div>
         </header>
@@ -296,14 +397,14 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                      / Terms
+                      {copy.terms}
                     </p>
                     <h2 className="mt-1 text-[13px] font-medium text-[var(--foreground)]">
-                      Shared localization terms
+                      {copy.sharedTerms}
                     </h2>
                   </div>
                   <div className="text-right text-[11.5px] text-[var(--muted-soft)]">
-                    {filteredTerms.length} of {data.terms.length} terms
+                    {copy.termsCount(filteredTerms.length, data.terms.length)}
                   </div>
                 </div>
 
@@ -313,7 +414,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                     <input
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Search terms, translations, collections..."
+                      placeholder={copy.searchPlaceholder}
                       className="w-full rounded-[7px] border border-[var(--border)] bg-white px-[10px] py-[8px] pl-[30px] text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
                     />
                   </label>
@@ -325,7 +426,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                   >
                     {STATUS_FILTERS.map((status) => (
                       <option key={status} value={status}>
-                        {status === "All" ? "All statuses" : status}
+                        {status === "All" ? copy.allStatuses : translateGlossaryStatus(status, locale)}
                       </option>
                     ))}
                   </select>
@@ -335,8 +436,8 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                     onChange={(event) => setCollectionFilter(event.target.value)}
                     className="min-w-0 w-full rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
                   >
-                    <option value="all">All collections</option>
-                    <option value="shared">Shared glossary</option>
+                    <option value="all">{copy.allCollections}</option>
+                    <option value="shared">{copy.sharedGlossary}</option>
                     {data.collections.map((collection) => (
                       <option key={collection.id} value={collection.id}>
                         {collection.name}
@@ -349,7 +450,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                     onChange={(event) => setProjectFilter(event.target.value)}
                     className="min-w-0 w-full rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12.5px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]"
                   >
-                    <option value="all">All projects</option>
+                    <option value="all">{copy.allProjects}</option>
                     {data.projects.map((project) => (
                       <option key={project.id} value={project.slug}>
                         {project.name}
@@ -365,7 +466,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                   "border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]"
                 ].join(" ")}
               >
-                {["Source", "Translations", "Status", "Collection", "Project", ""].map((label) => (
+                {[copy.source, copy.translations, copy.status, copy.collection, copy.project, ""].map((label) => (
                   <span
                     key={label || "actions"}
                     className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
@@ -394,30 +495,30 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                         </span>
                         {term.isProtected ? (
                           <span className="rounded-[5px] border border-[var(--review-border)] bg-[var(--review-bg)] px-2 py-[2px] text-[10.5px] font-medium text-[var(--review)]">
-                            Protected
+                            {copy.protected}
                           </span>
                         ) : null}
                       </div>
                       <div className="mt-1 truncate text-[11.5px] text-[var(--muted-soft)]">
-                        {getLanguageLabel(term.sourceLanguage)}
+                        {getLanguageLabel(term.sourceLanguage, locale)}
                       </div>
                     </div>
 
                     <div className="truncate text-[11.5px] text-[var(--muted)]" title={term.translationsLabel}>
                       {term.translations.length > 0
                         ? term.translations.map((translation) => translation.locale.toUpperCase()).join(", ")
-                        : "No locales"}
+                        : copy.noLocales}
                     </div>
 
                     <div>
-                      <span className={getStatusClassName(term.status)}>{term.status}</span>
+                      <span className={getStatusClassName(term.status)}>{translateGlossaryStatus(term.status, locale)}</span>
                     </div>
 
                     <div
                       className="truncate text-[11.5px] text-[var(--muted-soft)]"
-                      title={term.collectionName ?? "Shared glossary"}
+                      title={term.collectionName ?? copy.sharedGlossary}
                     >
-                      {term.collectionName ?? "Shared"}
+                      {term.collectionName ?? copy.shared}
                     </div>
 
                     <div className="truncate text-[11.5px] text-[var(--muted-soft)]" title={term.project}>
@@ -434,7 +535,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                         }}
                         className="rounded-[6px] border border-[var(--border)] px-[8px] py-[5px] text-[11px] font-medium text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--foreground)]"
                       >
-                        Edit
+                        {copy.edit}
                       </button>
                       <button
                         type="button"
@@ -442,7 +543,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                         onClick={() => void handleDeleteTerm(term)}
                         className="rounded-[6px] border border-[var(--error-border)] px-[8px] py-[5px] text-[11px] font-medium text-[var(--error)] transition hover:bg-[var(--error-bg)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {deletingTermId === term.id ? "..." : "Delete"}
+                        {deletingTermId === term.id ? copy.deleting : copy.delete}
                       </button>
                     </div>
                   </div>
@@ -450,8 +551,8 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
               ) : (
                 <div className="px-6 py-10 text-center text-[12px] text-[var(--muted-soft)]">
                   {data.terms.length > 0
-                    ? "No glossary terms match the current filters."
-                    : "No glossary terms have been added yet."}
+                    ? copy.noTermsFiltered
+                    : copy.noTerms}
                 </div>
               )}
             </div>
@@ -460,7 +561,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
               <div className="rounded-[10px] border border-[var(--border)] bg-white">
                 <div className="flex items-center justify-between gap-3 border-b border-[var(--border-light)] px-[18px] py-3">
                   <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                    / Collections
+                    {copy.collections}
                   </p>
                   <button
                     type="button"
@@ -470,12 +571,12 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                     }}
                     className="rounded-[7px] border border-[var(--border)] bg-white px-3 py-2 text-[12px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
                   >
-                    New Collection
+                    {copy.newCollection}
                   </button>
                 </div>
                 <div className="space-y-4 px-[18px] py-4">
                   <p className="text-[11.5px] text-[var(--muted-soft)]">
-                    Collections are optional. Use them only if you want to group terms by feature, brand, or client.
+                    {copy.collectionsNote}
                   </p>
                   {data.collections.length > 0 ? (
                     data.collections.map((collection) => (
@@ -493,7 +594,7 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
                       </div>
                     ))
                   ) : (
-                    <p className="text-[11.5px] text-[var(--muted-soft)]">No glossary collections yet.</p>
+                    <p className="text-[11.5px] text-[var(--muted-soft)]">{copy.noCollections}</p>
                   )}
                 </div>
               </div>
@@ -501,14 +602,13 @@ export function GlossaryScreen({ data }: GlossaryScreenProps) {
               <div className="rounded-[10px] border border-[var(--border)] bg-white">
                 <div className="border-b border-[var(--border-light)] px-[18px] py-3">
                   <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                    / Guidance
+                    {copy.guidance}
                   </p>
                 </div>
                 <div className="space-y-3 px-[18px] py-4 text-[11.5px] text-[var(--muted)]">
-                  <p>Use protected terms for brand names, product labels, and phrases that must stay locked.</p>
-                  <p>Approved entries should contain translations for every target locale you expect to ship.</p>
-                  <p>Collections are optional folders. If you do not need grouping, keep terms in the shared glossary.</p>
-                  <p>CSV import accepts `source`, optional metadata columns, and locale-based translation columns.</p>
+                  {copy.guidanceLines.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
                 </div>
               </div>
             </div>
@@ -588,15 +688,47 @@ function MetricCell({
 }
 
 function GlossaryScreenFallback({ data }: GlossaryScreenProps) {
+  const locale = useAppLocale();
+  const copy =
+    locale === "de"
+      ? {
+          eyebrow: "/ Glossar",
+          heading: "Glossar",
+          terms: "/ Begriffe",
+          sharedTerms: "Geteilte Lokalisierungsbegriffe",
+          termCount: (count: number) => `${count} Begriffe`,
+          source: "Quelle",
+          translations: "Übersetzungen",
+          status: "Status",
+          collection: "Sammlung",
+          project: "Projekt",
+          collections: "/ Sammlungen",
+          guidance: "/ Hinweise"
+        }
+      : {
+          eyebrow: "/ Glossary",
+          heading: "Glossary",
+          terms: "/ Terms",
+          sharedTerms: "Shared localization terms",
+          termCount: (count: number) => `${count} terms`,
+          source: "Source",
+          translations: "Translations",
+          status: "Status",
+          collection: "Collection",
+          project: "Project",
+          collections: "/ Collections",
+          guidance: "/ Guidance"
+        };
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)] px-7 py-4">
         <div className="flex flex-col gap-[1px]">
           <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-            / Glossary
+            {copy.eyebrow}
           </span>
           <h1 className="text-[18px] font-semibold tracking-[-0.4px] text-[var(--foreground)]">
-            Glossary
+            {copy.heading}
           </h1>
         </div>
 
@@ -619,14 +751,14 @@ function GlossaryScreenFallback({ data }: GlossaryScreenProps) {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                    / Terms
+                    {copy.terms}
                   </p>
                   <h2 className="mt-1 text-[13px] font-medium text-[var(--foreground)]">
-                    Shared localization terms
+                    {copy.sharedTerms}
                   </h2>
                 </div>
                 <div className="text-right text-[11.5px] text-[var(--muted-soft)]">
-                  {data.terms.length} terms
+                  {copy.termCount(data.terms.length)}
                 </div>
               </div>
 
@@ -646,7 +778,7 @@ function GlossaryScreenFallback({ data }: GlossaryScreenProps) {
                     "border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]"
                   ].join(" ")}
                 >
-                  {["Source", "Translations", "Status", "Collection", "Project", ""].map((label) => (
+                  {[copy.source, copy.translations, copy.status, copy.collection, copy.project, ""].map((label) => (
                     <span
                       key={label || "actions"}
                       className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
@@ -686,7 +818,7 @@ function GlossaryScreenFallback({ data }: GlossaryScreenProps) {
             <div className="rounded-[10px] border border-[var(--border)] bg-white">
               <div className="flex items-center justify-between gap-3 border-b border-[var(--border-light)] px-[18px] py-3">
                 <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  / Collections
+                  {copy.collections}
                 </p>
                 <div className="h-[40px] w-[124px] rounded-[7px] border border-[var(--border)] bg-white" />
               </div>
@@ -699,7 +831,7 @@ function GlossaryScreenFallback({ data }: GlossaryScreenProps) {
             <div className="rounded-[10px] border border-[var(--border)] bg-white">
               <div className="border-b border-[var(--border-light)] px-[18px] py-3">
                 <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  / Guidance
+                  {copy.guidance}
                 </p>
               </div>
               <div className="space-y-3 px-[18px] py-4">

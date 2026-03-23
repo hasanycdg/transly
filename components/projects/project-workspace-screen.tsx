@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useAppLocale } from "@/components/app-locale-provider";
 import { getProjectStatusTone } from "@/lib/projects/display";
 import { formatCompactNumber, formatPercent, formatProjectDate, getLanguageLabel } from "@/lib/projects/formatters";
 import { getProjectSummary } from "@/lib/projects/mock-data";
@@ -55,6 +56,7 @@ type SelectedUploadFile = Pick<UploadedSourceFile, "file" | "name" | "sourceArch
 };
 
 export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps) {
+  const locale = useAppLocale();
   const [hasMounted, setHasMounted] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<SelectedUploadFile[]>([]);
   const [uploadedSourceFiles, setUploadedSourceFiles] = useState<UploadedSourceFile[]>([]);
@@ -73,6 +75,174 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
   const [translationFailures, setTranslationFailures] = useState<ProjectTranslationFailure[]>([]);
   const autoDownloadedOutputIdsRef = useRef<Set<string>>(new Set());
   const uploadInputId = `project-upload-${project?.id ?? "unknown"}`;
+  const copy =
+    locale === "de"
+      ? {
+          notFoundTitle: "Projekt nicht gefunden",
+          notFoundDesc: "Das angeforderte Projekt konnte in diesem Workspace nicht gefunden werden.",
+          backToProjects: "Zurück zu Projekten",
+          uploadFiles: "Dateien hochladen",
+          startTranslation: "Übersetzung starten",
+          translating: "Übersetzt...",
+          preparing: "Wird vorbereitet...",
+          exportAll: "Alle exportieren",
+          exportZip: "ZIP exportieren",
+          buildingZip: "ZIP wird erstellt...",
+          summary: {
+            totalFiles: "Dateien gesamt",
+            completed: "Abgeschlossen",
+            inReview: "In Prüfung",
+            failed: "Fehlgeschlagen",
+            totalWords: "Wörter gesamt",
+            qualityScore: "Qualität"
+          },
+          overallProgress: "Gesamtfortschritt",
+          translationRun: "/ Übersetzungslauf",
+          preparingUploadedFiles: "Hochgeladene Dateien werden vorbereitet",
+          translationInProgress: "Übersetzung läuft",
+          translationOutputsReady: "Übersetzungsausgaben bereit",
+          readyToTranslate: "Bereit zur Übersetzung",
+          zipAnalyzing: "ZIP-Inhalte werden entpackt und analysiert.",
+          preparingJobs: "Übersetzungsjobs werden vorbereitet...",
+          readyOutputs: (count: number) =>
+            `${count} übersetzte Ausgabe${count === 1 ? "" : "n"} bereit für Download oder ZIP-Export.`,
+          defaultRunDesc: "Hochgeladene XLIFF-Dateien werden einmal pro Projekt-Zielsprache übersetzt.",
+          complete: "Fertig",
+          idle: "Leerlauf",
+          output: "Ausgabe",
+          target: "Ziel",
+          units: "Einheiten",
+          warningLabel: (count: number) => `${count} Warnung${count === 1 ? "" : "en"}`,
+          download: "Herunterladen",
+          files: "/ Dateien",
+          review: "/ Prüfung",
+          close: "Schließen",
+          languagePair: "Sprachpaar",
+          status: "Status",
+          progress: "Fortschritt",
+          words: "Wörter",
+          updated: "Aktualisiert",
+          reviewSideBySide: "Nebeneinander prüfen",
+          reviewDesc: "Vergleiche die Originaldatei parallel mit der übersetzten Ausgabe.",
+          downloadOutput: "Ausgabe herunterladen",
+          original: "Original",
+          originalLoaded: "Quelldatei ist aktuell in dieser Sitzung geladen.",
+          originalUnavailableHelper:
+            "Originalinhalt ist erst verfügbar, nachdem diese Datei in der aktuellen Sitzung hochgeladen wurde.",
+          originalUnavailable: "Original nicht verfügbar",
+          originalUnavailableDesc:
+            "Lade diese Datei in der aktuellen Sitzung hoch oder wähle sie erneut aus, um den Originalinhalt hier zu prüfen.",
+          translated: "Übersetzt",
+          translatedHelper: (targetLanguage: string) => `Erzeugte Ausgabe für ${targetLanguage.toUpperCase()}.`,
+          translatedUnavailableHelper: "Übersetzter Inhalt ist nach einem erfolgreichen Übersetzungslauf verfügbar.",
+          translatedUnavailable: "Übersetzung nicht verfügbar",
+          translatedUnavailableDesc:
+            "Starte die Übersetzung für diese Datei in der aktuellen Sitzung, um die übersetzte Ausgabe hier zu prüfen.",
+          workspaceStats: "/ Workspace-Statistiken",
+          glossaryEnabled: "Glossar aktiv",
+          yes: "Ja",
+          no: "Nein",
+          creditsUsed: "Verbrauchte Credits",
+          qualityScoreAverage: "Durchschnittliche Qualität",
+          pending: "Ausstehend",
+          latestExport: "Letzter Export",
+          noExport: "Noch kein Export",
+          lastUpdated: "Zuletzt aktualisiert",
+          recentActivity: "/ Letzte Aktivität",
+          noSupportedFiles: "In den ausgewählten ZIP-Archiven wurden keine unterstützten Übersetzungsdateien gefunden.",
+          uploadNotice: (extractedCount: number, archiveCount: number, ignoredCount: number) =>
+            `Es wurden ${extractedCount} Datei${extractedCount === 1 ? "" : "en"} aus ${archiveCount} ZIP-Archiv${archiveCount === 1 ? "" : "en"} extrahiert${ignoredCount > 0 ? ` und ${ignoredCount} nicht unterstützte oder System-Einträge ignoriert` : ""}.`,
+          prepareError: "Die ausgewählten Dateien konnten nicht vorbereitet werden.",
+          selectFiles: "Wähle in Upload Files eine oder mehrere XLIFF-Dateien aus, bevor du einen Übersetzungslauf startest.",
+          filesStillPreparing: "Dateien werden noch vorbereitet. Bitte in einem Moment erneut versuchen.",
+          unsupportedFiles: (names: string) =>
+            `Phase 1 übersetzt aktuell nur .xliff- und .xlf-Dateien. Nicht unterstützte Dateien: ${names}.`,
+          noTargets: "Für dieses Projekt sind noch keine Zielsprachen konfiguriert.",
+          translationFailed: "Übersetzung fehlgeschlagen.",
+          translationSummary: (failed: number, succeeded: number) =>
+            `${failed} Übersetzungsjob${failed === 1 ? "" : "s"} fehlgeschlagen, während ${succeeded} erfolgreich waren.`
+        }
+      : {
+          notFoundTitle: "Project not found",
+          notFoundDesc: "The requested project could not be found in this workspace.",
+          backToProjects: "Back to Projects",
+          uploadFiles: "Upload Files",
+          startTranslation: "Start Translation",
+          translating: "Translating...",
+          preparing: "Preparing...",
+          exportAll: "Export All",
+          exportZip: "Export ZIP",
+          buildingZip: "Building ZIP...",
+          summary: {
+            totalFiles: "Total files",
+            completed: "Completed",
+            inReview: "In review",
+            failed: "Failed",
+            totalWords: "Total words",
+            qualityScore: "Quality score"
+          },
+          overallProgress: "Overall progress",
+          translationRun: "/ Translation Run",
+          preparingUploadedFiles: "Preparing uploaded files",
+          translationInProgress: "Translation in progress",
+          translationOutputsReady: "Translation outputs ready",
+          readyToTranslate: "Ready to translate",
+          zipAnalyzing: "ZIP contents are being unpacked and analyzed.",
+          preparingJobs: "Preparing translation jobs...",
+          readyOutputs: (count: number) => `${count} translated output${count === 1 ? "" : "s"} ready for download or ZIP export.`,
+          defaultRunDesc: "Uploaded XLIFF files will be translated once for each project target language.",
+          complete: "Complete",
+          idle: "Idle",
+          output: "Output",
+          target: "Target",
+          units: "Units",
+          warningLabel: (count: number) => `${count} warning${count === 1 ? "" : "s"}`,
+          download: "Download",
+          files: "/ Files",
+          review: "/ Review",
+          close: "Close",
+          languagePair: "Language pair",
+          status: "Status",
+          progress: "Progress",
+          words: "Words",
+          updated: "Updated",
+          reviewSideBySide: "Review side by side",
+          reviewDesc: "Compare the original file with the translated output in parallel.",
+          downloadOutput: "Download output",
+          original: "Original",
+          originalLoaded: "Source file currently loaded in this session.",
+          originalUnavailableHelper: "Original content is only available after uploading this file in the current session.",
+          originalUnavailable: "Original unavailable",
+          originalUnavailableDesc: "Upload or re-select this file in the current session to inspect the original source content here.",
+          translated: "Translated",
+          translatedHelper: (targetLanguage: string) => `Generated output for ${targetLanguage.toUpperCase()}.`,
+          translatedUnavailableHelper: "Translated content is available after a successful translation run.",
+          translatedUnavailable: "Translation unavailable",
+          translatedUnavailableDesc: "Run the translation for this file in the current session to inspect the translated output here.",
+          workspaceStats: "/ Workspace Stats",
+          glossaryEnabled: "Glossary enabled",
+          yes: "Yes",
+          no: "No",
+          creditsUsed: "Credits used",
+          qualityScoreAverage: "Quality score average",
+          pending: "Pending",
+          latestExport: "Latest export",
+          noExport: "No export yet",
+          lastUpdated: "Last updated",
+          recentActivity: "/ Recent Activity",
+          noSupportedFiles: "No supported translation files were found in the selected ZIP archives.",
+          uploadNotice: (extractedCount: number, archiveCount: number, ignoredCount: number) =>
+            `Extracted ${extractedCount} file${extractedCount === 1 ? "" : "s"} from ${archiveCount} ZIP archive${archiveCount === 1 ? "" : "s"}${ignoredCount > 0 ? ` and ignored ${ignoredCount} unsupported or system entr${ignoredCount === 1 ? "y" : "ies"}` : ""}.`,
+          prepareError: "The selected files could not be prepared.",
+          selectFiles: "Select one or more XLIFF files in Upload Files before starting a translation run.",
+          filesStillPreparing: "Files are still being prepared. Try again in a second.",
+          unsupportedFiles: (names: string) =>
+            `Phase 1 currently translates only .xliff and .xlf files. Unsupported files: ${names}.`,
+          noTargets: "This project has no target languages configured yet.",
+          translationFailed: "Translation failed.",
+          translationSummary: (failed: number, succeeded: number) =>
+            `${failed} translation ${failed === 1 ? "job failed" : "jobs failed"} while ${succeeded} succeeded.`
+        };
 
   useEffect(() => {
     setHasMounted(true);
@@ -118,7 +288,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
       if (expandedSelection.files.length === 0) {
         setSelectedFiles([]);
         setUploadedSourceFiles([]);
-        setUploadError("No supported translation files were found in the selected ZIP archives.");
+        setUploadError(copy.noSupportedFiles);
         return;
       }
 
@@ -158,14 +328,12 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
       );
 
       if (expandedSelection.archives.length > 0) {
-        setUploadNotice(
-          `Extracted ${extractedCount} file${extractedCount === 1 ? "" : "s"} from ${expandedSelection.archives.length} ZIP archive${expandedSelection.archives.length === 1 ? "" : "s"}${ignoredCount > 0 ? ` and ignored ${ignoredCount} unsupported or system entr${ignoredCount === 1 ? "y" : "ies"}` : ""}.`
-        );
+        setUploadNotice(copy.uploadNotice(extractedCount, expandedSelection.archives.length, ignoredCount));
       }
     } catch (error) {
       setSelectedFiles([]);
       setUploadedSourceFiles([]);
-      setUploadError(error instanceof Error ? error.message : "The selected files could not be prepared.");
+      setUploadError(error instanceof Error ? error.message : copy.prepareError);
     } finally {
       setIsPreparingUploads(false);
     }
@@ -282,10 +450,10 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
         <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--background)] px-7 py-4">
           <div className="flex flex-col gap-[1px]">
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Projects
+              {locale === "de" ? "/ Projekte" : "/ Projects"}
             </span>
             <h1 className="text-[18px] font-semibold tracking-[-0.4px] text-[var(--foreground)]">
-              Project not found
+              {copy.notFoundTitle}
             </h1>
           </div>
         </header>
@@ -293,13 +461,13 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
         <div className="px-7 py-6">
           <div className="rounded-[10px] border border-[var(--border)] bg-white p-6">
             <p className="text-[12px] text-[var(--muted)]">
-              This workspace is not available in the current mock dataset or local browser storage.
+              {copy.notFoundDesc}
             </p>
             <Link
               href="/projects"
               className="mt-4 inline-flex rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
             >
-              Back to Projects
+              {copy.backToProjects}
             </Link>
           </div>
         </div>
@@ -311,14 +479,14 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
 
   async function handleStartTranslation() {
     if (selectedFiles.length === 0) {
-      setTranslationError("Select one or more XLIFF files in Upload Files before starting a translation run.");
+      setTranslationError(copy.selectFiles);
       setTranslationOutputs([]);
       setTranslationFailures([]);
       return;
     }
 
     if (isPreparingUploads) {
-      setTranslationError("Files are still being prepared. Try again in a second.");
+      setTranslationError(copy.filesStillPreparing);
       return;
     }
 
@@ -326,9 +494,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
 
     if (unsupportedFiles.length > 0) {
       setTranslationError(
-        `Phase 1 currently translates only .xliff and .xlf files. Unsupported files: ${unsupportedFiles
-          .map((file) => file.name)
-          .join(", ")}.`
+        copy.unsupportedFiles(unsupportedFiles.map((file) => file.name).join(", "))
       );
       setTranslationOutputs([]);
       setTranslationFailures([]);
@@ -336,7 +502,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
     }
 
     if (uploadedSourceFiles.length !== selectedFiles.length) {
-      setTranslationError("Files are still being prepared. Try again in a second.");
+      setTranslationError(copy.filesStillPreparing);
       return;
     }
 
@@ -352,7 +518,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
     );
 
     if (jobs.length === 0) {
-      setTranslationError("This project has no target languages configured yet.");
+      setTranslationError(copy.noTargets);
       setTranslationOutputs([]);
       setTranslationFailures([]);
       return;
@@ -415,7 +581,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
             id: `${job.sourceFileName}-${job.targetLanguage}-${index}`,
             sourceFileName: job.sourceFileName,
             targetLanguage: job.targetLanguage,
-            message: "error" in payload ? payload.error.message : "Translation failed."
+            message: "error" in payload ? payload.error.message : copy.translationFailed
           });
           setRuntimeFileStates((current) => ({
             ...current,
@@ -455,7 +621,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           id: `${job.sourceFileName}-${job.targetLanguage}-${index}`,
           sourceFileName: job.sourceFileName,
           targetLanguage: job.targetLanguage,
-            message: error instanceof Error ? error.message : "Translation failed."
+            message: error instanceof Error ? error.message : copy.translationFailed
           });
         finalRuntimeStates[job.id] = {
           status: "Error",
@@ -500,7 +666,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
 
     if (nextFailures.length > 0) {
       setTranslationError(
-        `${nextFailures.length} translation ${nextFailures.length === 1 ? "job failed" : "jobs failed"} while ${nextOutputs.length} succeeded.`
+        copy.translationSummary(nextFailures.length, nextOutputs.length)
       );
     }
   }
@@ -549,10 +715,10 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           <div className="min-w-0">
             <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
               <Link href="/projects" className="transition hover:text-[var(--muted)]">
-                / Projects
+                {locale === "de" ? "/ Projekte" : "/ Projects"}
               </Link>
               <span>/</span>
-              <span>Workspace</span>
+              <span>{locale === "de" ? "Workspace" : "Workspace"}</span>
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -576,7 +742,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               }}
               className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
             >
-              Upload Files
+              {copy.uploadFiles}
             </button>
             <button
               type="button"
@@ -584,7 +750,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               disabled={hasMounted ? isTranslating || isPreparingUploads || selectedFiles.length === 0 : undefined}
               className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium text-white transition hover:opacity-85"
             >
-              {hasMounted && isTranslating ? "Translating..." : isPreparingUploads ? "Preparing..." : "Start Translation"}
+              {hasMounted && isTranslating ? copy.translating : isPreparingUploads ? copy.preparing : copy.startTranslation}
             </button>
             <button
               type="button"
@@ -592,7 +758,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               disabled={hasMounted ? translationOutputs.length === 0 : undefined}
               className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
             >
-              Export All
+              {copy.exportAll}
             </button>
             <button
               type="button"
@@ -600,7 +766,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               disabled={hasMounted ? translationOutputs.length === 0 || isExportingZip : undefined}
               className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
             >
-              {isExportingZip ? "Building ZIP..." : "Export ZIP"}
+              {isExportingZip ? copy.buildingZip : copy.exportZip}
             </button>
           </div>
         </div>
@@ -609,17 +775,17 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
       <div className="flex flex-col gap-6 px-7 py-6">
         <section className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-white">
           <div className="grid grid-cols-2 bg-[var(--border)] md:grid-cols-3 xl:grid-cols-6">
-            <SummaryCell label="Total files" value={String(summary.totalFiles)} />
-            <SummaryCell label="Completed" value={String(summary.completedFiles)} />
-            <SummaryCell label="In review" value={String(summary.reviewFiles)} />
-            <SummaryCell label="Failed" value={String(summary.failedFiles)} />
-            <SummaryCell label="Total words" value={formatCompactNumber(summary.totalWords)} />
-            <SummaryCell label="Quality score" value={project.qualityScore > 0 ? `${project.qualityScore}` : "0"} />
+            <SummaryCell label={copy.summary.totalFiles} value={String(summary.totalFiles)} />
+            <SummaryCell label={copy.summary.completed} value={String(summary.completedFiles)} />
+            <SummaryCell label={copy.summary.inReview} value={String(summary.reviewFiles)} />
+            <SummaryCell label={copy.summary.failed} value={String(summary.failedFiles)} />
+            <SummaryCell label={copy.summary.totalWords} value={formatCompactNumber(summary.totalWords, locale)} />
+            <SummaryCell label={copy.summary.qualityScore} value={project.qualityScore > 0 ? `${project.qualityScore}` : "0"} />
           </div>
 
           <div className="border-t border-[var(--border-light)] px-[18px] py-4">
             <div className="mb-[6px] flex items-center justify-between gap-3">
-              <span className="text-[12px] text-[var(--muted)]">Overall progress</span>
+              <span className="text-[12px] text-[var(--muted)]">{copy.overallProgress}</span>
               <span className="text-[11.5px] font-medium text-[var(--muted)]">
                 {formatPercent(summary.overallProgress)}
               </span>
@@ -655,7 +821,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           <section className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-white">
             <div className="border-b border-[var(--border-light)] px-[18px] py-3">
               <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                / Translation Run
+                {copy.translationRun}
               </span>
             </div>
 
@@ -664,27 +830,27 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                 <div>
                   <p className="text-[13px] font-medium text-[var(--foreground)]">
                     {isPreparingUploads
-                      ? "Preparing uploaded files"
+                      ? copy.preparingUploadedFiles
                       : isTranslating
-                      ? "Translation in progress"
+                      ? copy.translationInProgress
                       : translationOutputs.length > 0
-                        ? "Translation outputs ready"
-                        : "Ready to translate"}
+                        ? copy.translationOutputsReady
+                        : copy.readyToTranslate}
                   </p>
                   <p className="mt-1 text-[12px] text-[var(--muted-soft)]">
                     {isPreparingUploads
-                      ? "ZIP contents are being unpacked and analyzed."
+                      ? copy.zipAnalyzing
                       : isTranslating
-                      ? currentTaskLabel ?? "Preparing translation jobs..."
+                      ? currentTaskLabel ?? copy.preparingJobs
                       : translationOutputs.length > 0
-                        ? `${translationOutputs.length} translated output${translationOutputs.length === 1 ? "" : "s"} ready for download or ZIP export.`
-                        : "Uploaded XLIFF files will be translated once for each project target language."}
+                        ? copy.readyOutputs(translationOutputs.length)
+                        : copy.defaultRunDesc}
                   </p>
                 </div>
 
                 <div className="min-w-[120px] text-right">
                   <p className="text-[11.5px] font-medium text-[var(--muted)]">
-                    {isPreparingUploads ? "Preparing" : isTranslating ? `${translationProgress}%` : translationOutputs.length > 0 ? "Complete" : "Idle"}
+                    {isPreparingUploads ? copy.preparing : isTranslating ? `${translationProgress}%` : translationOutputs.length > 0 ? copy.complete : copy.idle}
                   </p>
                 </div>
               </div>
@@ -712,7 +878,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
               {translationOutputs.length > 0 ? (
                 <div className="overflow-hidden rounded-[8px] border border-[var(--border)]">
                   <div className="grid grid-cols-[minmax(0,1.8fr)_110px_90px_110px] border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]">
-                    {["Output", "Target", "Units", ""].map((label) => (
+                    {[copy.output, copy.target, copy.units, ""].map((label) => (
                       <span
                         key={label || "download"}
                         className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
@@ -733,7 +899,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                         </p>
                         <p className="mt-0.5 truncate text-[11.5px] text-[var(--muted-soft)]">
                           {output.sourceFileName}
-                          {output.warnings.length > 0 ? ` · ${output.warnings.length} warning${output.warnings.length === 1 ? "" : "s"}` : ""}
+                          {output.warnings.length > 0 ? ` · ${copy.warningLabel(output.warnings.length)}` : ""}
                         </p>
                       </div>
                       <div className="text-[12px] text-[var(--muted)]">
@@ -748,7 +914,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                           onClick={() => handleDownloadOutput(output)}
                           className="rounded-[6px] border border-[var(--border)] px-[11px] py-[5px] text-[11.5px] font-medium text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--foreground)]"
                         >
-                          Download
+                          {copy.download}
                         </button>
                       </div>
                     </div>
@@ -778,11 +944,12 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
         <section>
           <div className="mb-[10px] flex items-center justify-between gap-3">
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Files
+              {copy.files}
             </span>
             <div className="text-[12px] text-[var(--muted-soft)]">
-              Source {getLanguageLabel(project.sourceLanguage)} · Targets{" "}
-              {project.targetLanguages.map(getLanguageLabel).join(", ")}
+              {locale === "de" ? "Quelle" : "Source"} {getLanguageLabel(project.sourceLanguage, locale)} ·{" "}
+              {locale === "de" ? "Ziele" : "Targets"}{" "}
+              {project.targetLanguages.map((targetLanguage) => getLanguageLabel(targetLanguage, locale)).join(", ")}
             </div>
           </div>
           <ProjectFilesTable files={displayFiles} title={null} onReviewFile={(file) => setReviewFileId(file.id)} />
@@ -793,7 +960,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
             <div className="flex items-center justify-between gap-4 border-b border-[var(--border-light)] px-[18px] py-3">
               <div>
                 <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  / Review
+                  {copy.review}
                 </span>
                 <h3 className="mt-1 text-[13px] font-medium text-[var(--foreground)]">
                   {reviewFile.name}
@@ -804,17 +971,17 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                 onClick={() => setReviewFileId(null)}
                 className="rounded-[7px] border border-[var(--border)] px-2.5 py-1.5 text-[12px] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
               >
-                Close
+                {copy.close}
               </button>
             </div>
 
             <div className="grid gap-6 px-[18px] py-4 xl:grid-cols-[220px_minmax(0,1fr)]">
               <div className="space-y-3">
-                <ReviewMetaRow label="Language pair" value={`${reviewFile.sourceLanguage.toUpperCase()} → ${reviewFile.targetLanguage.toUpperCase()}`} />
-                <ReviewMetaRow label="Status" value={reviewFile.status} />
-                <ReviewMetaRow label="Progress" value={formatPercent(reviewFile.progress)} />
-                <ReviewMetaRow label="Words" value={formatCompactNumber(reviewFile.words)} />
-                <ReviewMetaRow label="Updated" value={formatProjectDate(reviewFile.lastUpdated)} />
+                <ReviewMetaRow label={copy.languagePair} value={`${reviewFile.sourceLanguage.toUpperCase()} → ${reviewFile.targetLanguage.toUpperCase()}`} />
+                <ReviewMetaRow label={copy.status} value={reviewFile.status} />
+                <ReviewMetaRow label={copy.progress} value={formatPercent(reviewFile.progress)} />
+                <ReviewMetaRow label={copy.words} value={formatCompactNumber(reviewFile.words, locale)} />
+                <ReviewMetaRow label={copy.updated} value={formatProjectDate(reviewFile.lastUpdated, locale)} />
               </div>
 
               <div className="min-w-0">
@@ -822,10 +989,10 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-[13px] font-medium text-[var(--foreground)]">
-                        Review side by side
+                        {copy.reviewSideBySide}
                       </p>
                       <p className="mt-1 text-[12px] text-[var(--muted-soft)]">
-                        Compare the original file with the translated output in parallel.
+                        {copy.reviewDesc}
                       </p>
                     </div>
                     {reviewOutput ? (
@@ -834,34 +1001,34 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                         onClick={() => handleDownloadOutput(reviewOutput)}
                         className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
                       >
-                        Download output
+                        {copy.downloadOutput}
                       </button>
                     ) : null}
                   </div>
 
                   <div className="grid gap-4 xl:grid-cols-2">
                     <ReviewContentPanel
-                      label="Original"
+                      label={copy.original}
                       helperText={
                         reviewSourceFile
-                          ? "Source file currently loaded in this session."
-                          : "Original content is only available after uploading this file in the current session."
+                          ? copy.originalLoaded
+                          : copy.originalUnavailableHelper
                       }
                       content={reviewSourceFile?.content ?? null}
-                      emptyTitle="Original unavailable"
-                      emptyText="Upload or re-select this file in the current session to inspect the original source content here."
+                      emptyTitle={copy.originalUnavailable}
+                      emptyText={copy.originalUnavailableDesc}
                     />
 
                     <ReviewContentPanel
-                      label="Translated"
+                      label={copy.translated}
                       helperText={
                         reviewOutput
-                          ? `Generated output for ${reviewFile.targetLanguage.toUpperCase()}.`
-                          : "Translated content is available after a successful translation run."
+                          ? copy.translatedHelper(reviewFile.targetLanguage)
+                          : copy.translatedUnavailableHelper
                       }
                       content={reviewOutput?.translatedContent ?? null}
-                      emptyTitle="Translation unavailable"
-                      emptyText="Run the translation for this file in the current session to inspect the translated output here."
+                      emptyTitle={copy.translatedUnavailable}
+                      emptyText={copy.translatedUnavailableDesc}
                     />
                   </div>
                 </div>
@@ -874,32 +1041,32 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           <div className="rounded-[10px] border border-[var(--border)] bg-white">
             <div className="border-b border-[var(--border-light)] px-[18px] py-3">
               <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                / Workspace Stats
+                {copy.workspaceStats}
               </span>
             </div>
             <div className="space-y-3 px-[18px] py-4">
-              <StatRow label="Glossary enabled" value={project.glossaryEnabled ? "Yes" : "No"} />
-              <StatRow label="Credits used" value={formatCompactNumber(project.creditsUsed)} />
+              <StatRow label={copy.glossaryEnabled} value={project.glossaryEnabled ? copy.yes : copy.no} />
+              <StatRow label={copy.creditsUsed} value={formatCompactNumber(project.creditsUsed, locale)} />
               <StatRow
-                label="Quality score average"
-                value={project.qualityScore > 0 ? `${project.qualityScore}/100` : "Pending"}
+                label={copy.qualityScoreAverage}
+                value={project.qualityScore > 0 ? `${project.qualityScore}/100` : copy.pending}
               />
               <StatRow
-                label="Latest export"
+                label={copy.latestExport}
                 value={
                   project.latestExport
                     ? `${project.latestExport.label} · ${project.latestExport.format}`
-                    : "No export yet"
+                    : copy.noExport
                 }
               />
-              <StatRow label="Last updated" value={formatProjectDate(project.lastUpdated)} />
+              <StatRow label={copy.lastUpdated} value={formatProjectDate(project.lastUpdated, locale)} />
             </div>
           </div>
 
           <div className="rounded-[10px] border border-[var(--border)] bg-white">
             <div className="border-b border-[var(--border-light)] px-[18px] py-3">
               <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                / Recent Activity
+                {copy.recentActivity}
               </span>
             </div>
             <div className="px-[18px] py-4">
@@ -915,7 +1082,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                     {activity.detail}
                   </p>
                   <p className="mt-2 text-[11px] text-[var(--muted-soft)]">
-                    {formatProjectDate(activity.timestamp)}
+                    {formatProjectDate(activity.timestamp, locale)}
                   </p>
                 </div>
               ))}

@@ -1,4 +1,6 @@
 import { getProjectSummary } from "@/lib/projects/mock-data";
+import { translateProjectOrFileStatus } from "@/lib/i18n";
+import type { AppLocale } from "@/types/i18n";
 import type { FileStatus, ProjectFilter, ProjectRecord, ProjectStatus } from "@/types/projects";
 
 export type ProgressTone = "neutral" | "success" | "review" | "danger" | "processing";
@@ -107,15 +109,18 @@ export function matchesOverviewProjectFilter(
   return status === filter;
 }
 
-export function getOverviewStatsDisplay(projects: ProjectRecord[]): OverviewStatsDisplay {
+export function getOverviewStatsDisplay(
+  projects: ProjectRecord[],
+  locale: AppLocale = "en"
+): OverviewStatsDisplay {
   if (usesReferenceOverviewStats(projects)) {
     return {
       activeProjects: "4",
-      activeProjectsMeta: "↑ 2 this month",
+      activeProjectsMeta: locale === "de" ? "↑ 2 diesen Monat" : "↑ 2 this month",
       averageCompletion: "78%",
-      averageCompletionMeta: "↑ 12% this week",
+      averageCompletionMeta: locale === "de" ? "↑ 12% diese Woche" : "↑ 12% this week",
       filesInProgress: "18",
-      filesInProgressMeta: "Across all languages",
+      filesInProgressMeta: locale === "de" ? "Über alle Sprachen" : "Across all languages",
       languagesActive: "6",
       languagesActiveMeta: "DE, FR, NL, ES +2"
     };
@@ -140,22 +145,24 @@ export function getOverviewStatsDisplay(projects: ProjectRecord[]): OverviewStat
 
   return {
     activeProjects: String(projects.length),
-    activeProjectsMeta: `${projects.filter((project) => project.origin === "custom").length} custom`,
+    activeProjectsMeta:
+      locale === "de"
+        ? `${projects.filter((project) => project.origin === "custom").length} benutzerdefiniert`
+        : `${projects.filter((project) => project.origin === "custom").length} custom`,
     averageCompletion: `${overallProgress}%`,
-    averageCompletionMeta: "Across visible projects",
+    averageCompletionMeta: locale === "de" ? "Über sichtbare Projekte" : "Across visible projects",
     filesInProgress: String(inProgressFiles),
-    filesInProgressMeta: "Across all languages",
+    filesInProgressMeta: locale === "de" ? "Über alle Sprachen" : "Across all languages",
     languagesActive: String(activeLanguages.length),
     languagesActiveMeta: formatLanguageMeta(activeLanguages)
   };
 }
 
-export function getStatusLabel(status: ProjectStatus | FileStatus) {
-  if (status === "Completed") {
-    return "Done";
-  }
-
-  return status;
+export function getStatusLabel(
+  status: ProjectStatus | FileStatus,
+  locale: AppLocale = "en"
+) {
+  return translateProjectOrFileStatus(status, locale);
 }
 
 export function getProjectStatusTone(status: ProjectStatus): ProgressTone {

@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 
-import { LANGUAGE_OPTIONS } from "@/lib/languages";
+import { useAppLocale } from "@/components/app-locale-provider";
+import { getAppLocaleOptions } from "@/lib/i18n";
+import { getLanguageOptions } from "@/lib/languages";
 import type {
   SettingsFilenameFormat,
   SettingsPreferencesData,
@@ -106,6 +108,7 @@ const INPUT_CLASS_NAME =
   "h-11 w-full rounded-[12px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]";
 
 export function SettingsScreen({ data }: SettingsScreenProps) {
+  const providerLocale = useAppLocale();
   const router = useRouter();
   const [draft, setDraft] = useState(data);
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("translation");
@@ -113,7 +116,146 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const activeSectionMeta = SECTION_ITEMS.find((section) => section.id === activeSection) ?? SECTION_ITEMS[0];
+  const screenLocale = draft.preferences.locale ?? providerLocale;
+  const languageOptions = getLanguageOptions(screenLocale);
+  const localeOptions = getAppLocaleOptions(screenLocale);
+  const toneOptions =
+    screenLocale === "de"
+      ? TONE_OPTIONS.map((option) => ({
+          ...option,
+          description:
+            option.value === "Neutral"
+              ? "Ausgewogen und klar für allgemeine Produkttexte."
+              : option.value === "Formal"
+                ? "Strukturiertere Sprache mit zurückhaltendem Ton."
+                : option.value === "Informal"
+                  ? "Leichte, direkte Formulierungen für konversationelle Flows."
+                  : option.value === "Marketing"
+                    ? "Schärfere Formulierungen für Launch-, Growth- und Kampagnen-Texte."
+                    : "Präzise Sprache für Doku, UI-Texte und Spezifikationen."
+        }))
+      : TONE_OPTIONS;
+  const aiBehaviorOptions =
+    screenLocale === "de"
+      ? AI_BEHAVIOR_OPTIONS.map((option) => ({
+          ...option,
+          description:
+            option.value === "Fast"
+              ? "Niedrige Latenz für schnelle Iteration und Vorschauen priorisieren."
+              : option.value === "Balanced"
+                ? "Ein ruhiger Mittelweg für die meisten SaaS-Übersetzungsaufgaben."
+                : "Bessere Formulierungen und Nuancen statt maximaler Geschwindigkeit."
+        }))
+      : AI_BEHAVIOR_OPTIONS;
+  const filenameOptions =
+    screenLocale === "de"
+      ? FILENAME_OPTIONS.map((option) => ({
+          ...option,
+          description:
+            option.value === "Original + target locale"
+              ? "Beispiel: homepage.de.xlf"
+              : option.value === "Original + source + target"
+                ? "Beispiel: homepage.en-de.xlf"
+                : "Beispiel: translayr-web.de.xlf"
+        }))
+      : FILENAME_OPTIONS;
+  const sectionItems =
+    screenLocale === "de"
+      ? SECTION_ITEMS.map((section) => ({
+          ...section,
+          label:
+            section.id === "profile"
+              ? "Profil"
+              : section.id === "translation"
+                ? "Übersetzung"
+                : section.id === "preferences"
+                  ? "Präferenzen"
+                  : section.id === "support"
+                    ? "Support"
+                    : "Gefahrenzone",
+          eyebrow:
+            section.id === "profile"
+              ? "/ Profil"
+              : section.id === "translation"
+                ? "/ Übersetzung"
+                : section.id === "preferences"
+                  ? "/ Präferenzen"
+                  : section.id === "support"
+                    ? "/ Support"
+                    : "/ Gefahrenzone",
+          sidebarDescription:
+            section.id === "profile"
+              ? "Name, E-Mail und Passwortzugang."
+              : section.id === "translation"
+                ? "Sprache, Ton, Tags, Glossar und KI-Standards."
+                : section.id === "preferences"
+                  ? "Liefer- und Export-Standards."
+                  : section.id === "support"
+                    ? "Hilfe, Kontakt, Doku und Service-Status."
+                    : "Dauerhafte Kontoaktionen.",
+          heading:
+            section.id === "profile"
+              ? "Profil"
+              : section.id === "translation"
+                ? "Übersetzungseinstellungen"
+                : section.id === "preferences"
+                  ? "Präferenzen"
+                  : section.id === "support"
+                    ? "Support"
+                    : "Gefahrenzone",
+          description:
+            section.id === "profile"
+              ? "Halte deine Kontodaten einfach, klar und leicht aktualisierbar."
+              : section.id === "translation"
+                ? "Lege die Standards fest, die Translayr anwenden soll, bevor ein Projekt oder eine Datei eigene Regeln mitbringt."
+                : section.id === "preferences"
+                  ? "Kleine Liefer-Standards, die wiederholtes Setup nach jeder Übersetzung reduzieren."
+                  : section.id === "support"
+                    ? "Hol dir schnell Hilfe, erreiche den richtigen Kanal und halte operative Links an einem verlässlichen Ort."
+                    : "Sensible Aktionen bleiben visuell vom Rest der Workspace-Einstellungen getrennt."
+        }))
+      : SECTION_ITEMS;
+  const activeSectionMeta = sectionItems.find((section) => section.id === activeSection) ?? sectionItems[0];
+  const copy =
+    screenLocale === "de"
+      ? {
+          saveSuccess: "Einstellungen gespeichert.",
+          saveError: "Einstellungen konnten nicht gespeichert werden.",
+          settingsEyebrow: "/ Einstellungen",
+          heading: "Einstellungen",
+          intro:
+            "Eine fokussierte Oberfläche für Kontodaten, Übersetzungsstandards, Liefer-Präferenzen, Support und sensible Workspace-Aktionen.",
+          reset: "Zurücksetzen",
+          saving: "Speichert...",
+          saveChanges: "Änderungen speichern",
+          sections: "/ Bereiche",
+          sectionsIntro: "Minimale Kontrollen, gruppiert in fünf klare Einstellungsbereiche.",
+          language: "Sprache",
+          appLanguage: "App-Sprache",
+          appLanguageDesc: "Lege fest, ob die Oberfläche standardmäßig auf Englisch oder Deutsch erscheinen soll.",
+          keepSimple: "Einfach halten",
+          supportWindow: "Mo-Fr, 09:00-17:00 CET",
+          criticalIssues: "Mit Prioritäts-Triage behandelt"
+        }
+      : {
+          saveSuccess: "Settings saved.",
+          saveError: "Settings could not be saved.",
+          settingsEyebrow: "/ Settings",
+          heading: "Settings",
+          intro:
+            "A focused control surface for account details, translation defaults, delivery preferences, support, and sensitive workspace actions.",
+          reset: "Reset",
+          saving: "Saving...",
+          saveChanges: "Save changes",
+          sections: "/ Sections",
+          sectionsIntro: "Minimal controls, grouped into five clear settings areas.",
+          language: "Language",
+          appLanguage: "App language",
+          appLanguageDesc: "Choose whether the interface should default to English or German.",
+          keepSimple: "Keep it simple",
+          supportWindow: "Mon-Fri, 09:00-17:00 CET",
+          criticalIssues: "Handled with priority triage"
+        };
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(data);
 
   useEffect(() => {
@@ -155,10 +297,10 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
       }
 
       setDraft(payload);
-      setSaveMessage("Settings saved.");
+      setSaveMessage(copy.saveSuccess);
       router.refresh();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Settings could not be saved.");
+      setErrorMessage(error instanceof Error ? error.message : copy.saveError);
     } finally {
       setIsSaving(false);
     }
@@ -206,14 +348,13 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
         <div className="flex flex-col gap-4 px-7 py-5 md:flex-row md:items-end md:justify-between">
           <div className="max-w-[680px]">
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Settings
+              {copy.settingsEyebrow}
             </span>
             <h1 className="mt-2 text-[27px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">
-              Settings
+              {copy.heading}
             </h1>
             <p className="mt-2 text-[12.5px] leading-6 text-[var(--muted)]">
-              A focused control surface for account details, translation defaults, delivery preferences, support, and
-              sensitive workspace actions.
+              {copy.intro}
             </p>
           </div>
 
@@ -232,7 +373,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
               disabled={!hasChanges || isSaving}
               className="rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-45"
             >
-              Reset
+              {copy.reset}
             </button>
             <button
               type="button"
@@ -242,7 +383,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
               disabled={!hasChanges || isSaving}
               className="rounded-[12px] bg-[var(--foreground)] px-4 py-2.5 text-[12px] font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {isSaving ? "Saving..." : "Save changes"}
+              {isSaving ? copy.saving : copy.saveChanges}
             </button>
           </div>
         </div>
@@ -265,16 +406,12 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
           <aside className="self-start xl:sticky xl:top-[102px]">
             <div className="rounded-[18px] border border-[var(--border)] bg-white p-3">
               <div className="border-b border-[var(--border-light)] px-3 pb-3">
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  / Sections
-                </p>
-                <p className="mt-2 text-[12px] leading-5 text-[var(--muted)]">
-                  Minimal controls, grouped into five clear settings areas.
-                </p>
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">{copy.sections}</p>
+                <p className="mt-2 text-[12px] leading-5 text-[var(--muted)]">{copy.sectionsIntro}</p>
               </div>
 
               <div className="space-y-1 pt-3">
-                {SECTION_ITEMS.map((section) => {
+                {sectionItems.map((section) => {
                   const Icon = section.icon;
                   const active = section.id === activeSection;
 
@@ -328,7 +465,11 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                   <SettingsCard
                     eyebrow="/ Identity"
                     title="Personal details"
-                    description="Keep your account details lightweight and easy to scan across the workspace."
+                    description={
+                      screenLocale === "de"
+                        ? "Halte deine Kontodaten leichtgewichtig und im ganzen Workspace gut lesbar."
+                        : "Keep your account details lightweight and easy to scan across the workspace."
+                    }
                   >
                     <div className="space-y-5">
                       <FieldBlock
@@ -370,7 +511,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                         type="button"
                         className="rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12.5px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
                       >
-                        Change password
+                        {screenLocale === "de" ? "Passwort ändern" : "Change password"}
                       </button>
                     </div>
                   </SettingsCard>
@@ -408,7 +549,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                             <SelectField
                               value={draft.translation.sourceLanguage}
                               onChange={(value) => updateTranslation("sourceLanguage", value)}
-                              options={LANGUAGE_OPTIONS}
+                              options={languageOptions}
                               disabled={draft.translation.sourceLanguageMode === "auto"}
                             />
                           }
@@ -421,7 +562,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                             <SelectField
                               value={draft.translation.targetLanguage}
                               onChange={(value) => updateTranslation("targetLanguage", value)}
-                              options={LANGUAGE_OPTIONS}
+                              options={languageOptions}
                             />
                           }
                         />
@@ -438,7 +579,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                         description="Choose the tone Translayr should bias toward in product copy, docs, and review suggestions."
                       >
                         <div className="flex flex-wrap gap-2">
-                          {TONE_OPTIONS.map((option) => {
+                          {toneOptions.map((option) => {
                             const active = option.value === draft.translation.toneStyle;
 
                             return (
@@ -453,7 +594,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                                     : "border-[var(--border)] bg-white text-[var(--muted)] hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
                                 ].join(" ")}
                               >
-                                {option.value}
+                                {translateSettingsText(option.value, screenLocale)}
                               </button>
                             );
                           })}
@@ -462,7 +603,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
 
                       <div className="mt-5 rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-3">
                         <p className="text-[11.5px] leading-5 text-[var(--muted)]">
-                          {TONE_OPTIONS.find((option) => option.value === draft.translation.toneStyle)?.description}
+                          {toneOptions.find((option) => option.value === draft.translation.toneStyle)?.description}
                         </p>
                       </div>
                     </SettingsCard>
@@ -559,7 +700,7 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                       description="A higher quality setting can improve nuance, while faster settings keep iteration tight."
                     >
                       <div className="grid gap-3 md:grid-cols-3">
-                        {AI_BEHAVIOR_OPTIONS.map((option) => {
+                        {aiBehaviorOptions.map((option) => {
                           const active = option.value === draft.translation.aiBehavior;
 
                           return (
@@ -574,7 +715,9 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                                   : "border-[var(--border)] bg-white hover:border-[var(--border-strong)]"
                               ].join(" ")}
                             >
-                              <span className="block text-[13px] font-medium">{option.value}</span>
+                              <span className="block text-[13px] font-medium">
+                                {translateSettingsText(option.value, screenLocale)}
+                              </span>
                               <span
                                 className={[
                                   "mt-2 block text-[11.5px] leading-5",
@@ -595,14 +738,40 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
               {activeSection === "preferences" ? (
                 <div className="grid gap-5 xl:grid-cols-[minmax(0,1.06fr)_minmax(280px,0.94fr)]">
                   <SettingsCard
-                    eyebrow="/ Preferences"
-                    title="Delivery defaults"
-                    description="Keep exports predictable without crowding the page with low-value controls."
+                    eyebrow={screenLocale === "de" ? "/ Präferenzen" : "/ Preferences"}
+                    title={screenLocale === "de" ? "Liefer-Standards" : "Delivery defaults"}
+                    description={
+                      screenLocale === "de"
+                        ? "Halte Exporte vorhersehbar, ohne die Seite mit wenig hilfreichen Optionen zu überladen."
+                        : "Keep exports predictable without crowding the page with low-value controls."
+                    }
                   >
                     <div className="space-y-5">
                       <SettingRow
-                        label="Auto-download after translation"
-                        description="Download the finished file automatically as soon as a translation job completes."
+                        label={copy.appLanguage}
+                        description={copy.appLanguageDesc}
+                        control={
+                          <SelectField
+                            value={draft.preferences.locale}
+                            onChange={(value) =>
+                              updatePreferences("locale", value as SettingsPreferencesData["locale"])
+                            }
+                            options={localeOptions}
+                          />
+                        }
+                      />
+
+                      <SettingRow
+                        label={
+                          screenLocale === "de"
+                            ? "Nach Übersetzung automatisch herunterladen"
+                            : "Auto-download after translation"
+                        }
+                        description={
+                          screenLocale === "de"
+                            ? "Lade die fertige Datei automatisch herunter, sobald ein Übersetzungsjob abgeschlossen ist."
+                            : "Download the finished file automatically as soon as a translation job completes."
+                        }
                         control={
                           <div className="flex justify-start xl:justify-end">
                             <Toggle
@@ -619,17 +788,21 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                       />
 
                       <SettingRow
-                        label="Default filename format"
-                        description="Choose how exported files should be named for translators, reviewers, and handoff."
+                        label={screenLocale === "de" ? "Standard-Dateinamensformat" : "Default filename format"}
+                        description={
+                          screenLocale === "de"
+                            ? "Lege fest, wie exportierte Dateien für Übersetzer, Reviewer und Übergaben benannt werden sollen."
+                            : "Choose how exported files should be named for translators, reviewers, and handoff."
+                        }
                         control={
                           <SelectField
                             value={draft.preferences.defaultFilenameFormat}
                             onChange={(value) =>
                               updatePreferences("defaultFilenameFormat", value as SettingsFilenameFormat)
                             }
-                            options={FILENAME_OPTIONS.map((option) => ({
+                            options={filenameOptions.map((option) => ({
                               code: option.value,
-                              label: option.value
+                              label: translateSettingsText(option.value, screenLocale)
                             }))}
                           />
                         }
@@ -638,20 +811,32 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                   </SettingsCard>
 
                   <SettingsCard
-                    eyebrow="/ Notes"
-                    title="Keep it simple"
-                    description="Only the defaults you are likely to touch often belong here."
+                    eyebrow={screenLocale === "de" ? "/ Hinweise" : "/ Notes"}
+                    title={copy.keepSimple}
+                    description={
+                      screenLocale === "de"
+                        ? "Hier gehören nur die Standards hin, die du voraussichtlich oft anfasst."
+                        : "Only the defaults you are likely to touch often belong here."
+                    }
                   >
                     <div className="space-y-4 text-[12px] leading-6 text-[var(--muted)]">
-                      <p>Auto-download is useful for quick QA loops and repetitive file-based review flows.</p>
                       <p>
-                        Filename formatting stays intentionally narrow so exports remain recognizable across projects
-                        without adding unnecessary complexity.
+                        {screenLocale === "de"
+                          ? "Auto-Download ist nützlich für schnelle QA-Schleifen und wiederkehrende dateibasierte Review-Flows."
+                          : "Auto-download is useful for quick QA loops and repetitive file-based review flows."}
+                      </p>
+                      <p>
+                        {screenLocale === "de"
+                          ? "Die Dateinamenslogik bleibt bewusst schmal, damit Exporte projektübergreifend erkennbar bleiben, ohne unnötige Komplexität einzuführen."
+                          : "Filename formatting stays intentionally narrow so exports remain recognizable across projects without adding unnecessary complexity."}
                       </p>
                       <div className="rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-3">
                         <p className="text-[11.5px] leading-5 text-[var(--muted)]">
-                          {FILENAME_OPTIONS.find((option) => option.value === draft.preferences.defaultFilenameFormat)
-                            ?.description ?? "Choose a predictable export naming style."}
+                          {filenameOptions.find((option) => option.value === draft.preferences.defaultFilenameFormat)
+                            ?.description ??
+                            (screenLocale === "de"
+                              ? "Wähle einen vorhersehbaren Export-Namensstil."
+                              : "Choose a predictable export naming style.")}
                         </p>
                       </div>
                     </div>
@@ -730,8 +915,14 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
 
                         <div className="space-y-3">
                           <DetailRow label="Workspace contact" value={draft.profile.email} />
-                          <DetailRow label="Support window" value="Mon-Fri, 09:00-17:00 CET" />
-                          <DetailRow label="Critical issues" value="Handled with priority triage" />
+                          <DetailRow
+                            label={screenLocale === "de" ? "Support-Fenster" : "Support window"}
+                            value={copy.supportWindow}
+                          />
+                          <DetailRow
+                            label={screenLocale === "de" ? "Kritische Probleme" : "Critical issues"}
+                            value={copy.criticalIssues}
+                          />
                         </div>
                       </div>
                     </SettingsCard>
@@ -791,11 +982,18 @@ function SectionIntroCard({
   title: string;
   description: string;
 }) {
+  const locale = useAppLocale();
   return (
     <section className="rounded-[18px] border border-[var(--border)] bg-white px-6 py-5">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">{eyebrow}</p>
-      <h2 className="mt-3 text-[24px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">{title}</h2>
-      <p className="mt-2 max-w-[720px] text-[12.5px] leading-6 text-[var(--muted)]">{description}</p>
+      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+        {translateSettingsText(eyebrow, locale)}
+      </p>
+      <h2 className="mt-3 text-[24px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">
+        {translateSettingsText(title, locale)}
+      </h2>
+      <p className="mt-2 max-w-[720px] text-[12.5px] leading-6 text-[var(--muted)]">
+        {translateSettingsText(description, locale)}
+      </p>
     </section>
   );
 }
@@ -813,11 +1011,18 @@ function SettingsCard({
   children: ReactNode;
   className?: string;
 }) {
+  const locale = useAppLocale();
   return (
     <section className={["rounded-[18px] border border-[var(--border)] bg-white px-5 py-5 sm:px-6", className].join(" ")}>
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">{eyebrow}</p>
-      <h3 className="mt-3 text-[19px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">{title}</h3>
-      <p className="mt-2 max-w-[680px] text-[12px] leading-6 text-[var(--muted)]">{description}</p>
+      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+        {translateSettingsText(eyebrow, locale)}
+      </p>
+      <h3 className="mt-3 text-[19px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">
+        {translateSettingsText(title, locale)}
+      </h3>
+      <p className="mt-2 max-w-[680px] text-[12px] leading-6 text-[var(--muted)]">
+        {translateSettingsText(description, locale)}
+      </p>
       <div className="mt-6">{children}</div>
     </section>
   );
@@ -832,10 +1037,13 @@ function FieldBlock({
   description: string;
   children: ReactNode;
 }) {
+  const locale = useAppLocale();
   return (
     <div>
-      <p className="text-[13px] font-medium text-[var(--foreground)]">{label}</p>
-      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{description}</p>
+      <p className="text-[13px] font-medium text-[var(--foreground)]">{translateSettingsText(label, locale)}</p>
+      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">
+        {translateSettingsText(description, locale)}
+      </p>
       <div className="mt-3">{children}</div>
     </div>
   );
@@ -850,11 +1058,14 @@ function SettingRow({
   description: string;
   control: ReactNode;
 }) {
+  const locale = useAppLocale();
   return (
     <div className="flex flex-col gap-3 border-t border-[var(--border-light)] pt-5 first:border-t-0 first:pt-0 xl:flex-row xl:items-center xl:justify-between">
       <div className="max-w-[560px]">
-        <p className="text-[13px] font-medium text-[var(--foreground)]">{label}</p>
-        <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{description}</p>
+        <p className="text-[13px] font-medium text-[var(--foreground)]">{translateSettingsText(label, locale)}</p>
+        <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">
+          {translateSettingsText(description, locale)}
+        </p>
       </div>
       <div className="w-full xl:w-[280px]">{control}</div>
     </div>
@@ -868,9 +1079,10 @@ function DetailRow({
   label: string;
   value: string;
 }) {
+  const locale = useAppLocale();
   return (
     <div className="flex items-center justify-between gap-4 text-[12px]">
-      <span className="text-[var(--muted-soft)]">{label}</span>
+      <span className="text-[var(--muted-soft)]">{translateSettingsText(label, locale)}</span>
       <span className="text-right font-medium text-[var(--foreground)]">{value}</span>
     </div>
   );
@@ -885,6 +1097,7 @@ function SegmentedControl({
   options: Array<{ value: "auto" | "manual"; label: string }>;
   onChange: (value: "auto" | "manual") => void;
 }) {
+  const locale = useAppLocale();
   return (
     <div className="inline-flex w-full rounded-[12px] border border-[var(--border)] bg-[var(--background)] p-1">
       {options.map((option) => {
@@ -900,7 +1113,7 @@ function SegmentedControl({
               active ? "bg-white text-[var(--foreground)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
             ].join(" ")}
           >
-            {option.label}
+            {translateSettingsText(option.label, locale)}
           </button>
         );
       })}
@@ -1037,21 +1250,24 @@ function SupportCard({
   actionLabel: string;
   href?: string;
 }) {
+  const locale = useAppLocale();
   const className =
     "inline-flex items-center justify-center rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]";
 
   return (
     <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
-      <p className="text-[13px] font-medium text-[var(--foreground)]">{title}</p>
-      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{description}</p>
+      <p className="text-[13px] font-medium text-[var(--foreground)]">{translateSettingsText(title, locale)}</p>
+      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">
+        {translateSettingsText(description, locale)}
+      </p>
       <p className="mt-4 text-[14px] font-medium text-[var(--foreground)]">{value}</p>
-      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{meta}</p>
+      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{translateSettingsText(meta, locale)}</p>
       {href ? (
         <a href={href} className={["mt-4", className].join(" ")}>
-          {actionLabel}
+          {translateSettingsText(actionLabel, locale)}
         </a>
       ) : (
-        <div className={["mt-4", className].join(" ")}>{actionLabel}</div>
+        <div className={["mt-4", className].join(" ")}>{translateSettingsText(actionLabel, locale)}</div>
       )}
     </div>
   );
@@ -1064,12 +1280,147 @@ function ResourceCard({
   title: string;
   description: string;
 }) {
+  const locale = useAppLocale();
   return (
     <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
-      <p className="text-[13px] font-medium text-[var(--foreground)]">{title}</p>
-      <p className="mt-2 text-[11.5px] leading-5 text-[var(--muted)]">{description}</p>
+      <p className="text-[13px] font-medium text-[var(--foreground)]">{translateSettingsText(title, locale)}</p>
+      <p className="mt-2 text-[11.5px] leading-5 text-[var(--muted)]">
+        {translateSettingsText(description, locale)}
+      </p>
     </div>
   );
+}
+
+function translateSettingsText(value: string, locale: string) {
+  if (locale !== "de") {
+    return value;
+  }
+
+  const translations: Record<string, string> = {
+    "/ Identity": "/ Identität",
+    "Personal details": "Persönliche Daten",
+    "Keep your account details lightweight and easy to scan across the workspace.":
+      "Halte deine Kontodaten leichtgewichtig und im ganzen Workspace gut lesbar.",
+    Name: "Name",
+    "Shown in internal activity, handoff notes, and review ownership.":
+      "Wird in internen Aktivitäten, Übergabenotizen und Review-Zuständigkeiten angezeigt.",
+    Email: "E-Mail",
+    "Primary login address for password recovery and product notifications.":
+      "Primäre Login-Adresse für Passwort-Wiederherstellung und Produktbenachrichtigungen.",
+    "/ Security": "/ Sicherheit",
+    Password: "Passwort",
+    "Simple access controls with no extra noise.": "Einfache Zugriffskontrollen ohne unnötigen Ballast.",
+    "Change your password from the secure account flow whenever you need to rotate credentials.":
+      "Ändere dein Passwort im sicheren Kontofluss, sobald du deine Zugangsdaten rotieren musst.",
+    "/ Language": "/ Sprache",
+    "Language defaults": "Sprach-Standards",
+    "Choose how new translation runs should detect source content and where they should land by default.":
+      "Lege fest, wie neue Übersetzungsläufe Quellinhalte erkennen und wohin sie standardmäßig gehen sollen.",
+    "Default source language": "Standard-Quellsprache",
+    "Keep Translayr on auto-detect, or lock in a manual fallback for predictable imports.":
+      "Lass Translayr bei der Auto-Erkennung oder setze eine manuelle Fallback-Sprache für berechenbare Importe.",
+    "Auto detect": "Automatisch erkennen",
+    Manual: "Manuell",
+    "Manual source language": "Manuelle Quellsprache",
+    "Only used when source detection is switched from automatic to manual.":
+      "Wird nur verwendet, wenn die Quellerkennung von automatisch auf manuell umgestellt wird.",
+    "Default target language": "Standard-Zielsprache",
+    "Applied to new files when no project-level destination locale is already defined.":
+      "Wird auf neue Dateien angewendet, wenn keine Ziel-Sprache auf Projektebene festgelegt ist.",
+    "/ Tone & Style": "/ Ton & Stil",
+    "Tone profile": "Ton-Profil",
+    "Set a default voice for AI output whenever a project does not provide a tone override.":
+      "Lege eine Standard-Stimme für KI-Ausgaben fest, wenn ein Projekt keinen eigenen Ton vorgibt.",
+    "Default tone": "Standard-Ton",
+    "Choose the tone Translayr should bias toward in product copy, docs, and review suggestions.":
+      "Wähle den Ton, den Translayr bei Produkttexten, Doku und Review-Vorschlägen bevorzugen soll.",
+    Neutral: "Neutral",
+    Formal: "Formal",
+    Informal: "Informell",
+    Marketing: "Marketing",
+    Technical: "Technisch",
+    "/ Tag Safety": "/ Tag-Sicherheit",
+    "Markup protection": "Markup-Schutz",
+    "Guard placeholders and inline markup before translated files leave the pipeline.":
+      "Schütze Platzhalter und Inline-Markup, bevor übersetzte Dateien die Pipeline verlassen.",
+    "Strict tag protection": "Strikter Tag-Schutz",
+    "Preserve placeholders, inline tags, and protected variables during generation.":
+      "Erhält Platzhalter, Inline-Tags und geschützte Variablen während der Generierung.",
+    "Fail on tag mismatch": "Bei Tag-Abweichung abbrechen",
+    "Stop a translation from continuing when source and target markup drift apart.":
+      "Stoppt eine Übersetzung, wenn Quell- und Ziel-Markup auseinanderlaufen.",
+    "/ Glossary Behavior": "/ Glossar-Verhalten",
+    "Terminology defaults": "Terminologie-Standards",
+    "Control how aggressively approved glossary terms should guide AI output.":
+      "Lege fest, wie stark freigegebene Glossarbegriffe die KI-Ausgabe steuern sollen.",
+    "Use glossary automatically": "Glossar automatisch verwenden",
+    "Inject approved terms whenever source content matches a glossary entry.":
+      "Fügt freigegebene Begriffe ein, sobald der Quellinhalt zu einem Glossareintrag passt.",
+    "Strict glossary mode": "Strikter Glossar-Modus",
+    "Prefer glossary-approved wording even when the model suggests softer alternatives.":
+      "Bevorzugt Glossar-Formulierungen, auch wenn das Modell weichere Alternativen vorschlägt.",
+    "/ AI Behavior": "/ KI-Verhalten",
+    "Speed vs quality": "Geschwindigkeit vs. Qualität",
+    "Choose how aggressively Translayr should trade response time for more refined output.":
+      "Lege fest, wie stark Translayr Reaktionszeit gegen verfeinerte Ausgabe eintauschen soll.",
+    "Translation behavior": "Übersetzungsverhalten",
+    "A higher quality setting can improve nuance, while faster settings keep iteration tight.":
+      "Eine höhere Qualitätsstufe kann Nuancen verbessern, schnellere Stufen halten die Iteration eng.",
+    Fast: "Schnell",
+    Balanced: "Ausgewogen",
+    "High Quality": "Hohe Qualität",
+    "/ Contact": "/ Kontakt",
+    "Support channels": "Support-Kanäle",
+    "Use the fastest path depending on whether you need product help, operational clarity, or account assistance.":
+      "Nutze den schnellsten Weg, je nachdem ob du Produkthilfe, operative Klarheit oder Konto-Unterstützung brauchst.",
+    "Email support": "Support per E-Mail",
+    "Best for account questions, product issues, and workflow guidance.":
+      "Am besten für Kontofragen, Produktprobleme und Workflow-Hilfe.",
+    "Typical response within one business day.": "Übliche Antwort innerhalb eines Werktags.",
+    "Priority channel": "Prioritätskanal",
+    "For plan-specific escalations and critical production blockers.":
+      "Für planspezifische Eskalationen und kritische Produktions-Blocker.",
+    "Requests are routed through your workspace contact email.":
+      "Anfragen werden über deine Workspace-Kontakt-E-Mail geroutet.",
+    "Use account email": "Konto-E-Mail verwenden",
+    "/ Help": "/ Hilfe",
+    "Guides and documentation": "Guides und Dokumentation",
+    "A compact support surface for the material users typically need before opening a ticket.":
+      "Eine kompakte Support-Fläche für Material, das Nutzer typischerweise vor einem Ticket brauchen.",
+    "Getting started": "Erste Schritte",
+    "Project setup, language defaults, and first translation workflow.":
+      "Projekt-Setup, Sprach-Standards und erster Übersetzungs-Workflow.",
+    "Glossary guide": "Glossar-Guide",
+    "How shared terms, strict glossary mode, and term review work.":
+      "Wie geteilte Begriffe, strikter Glossar-Modus und Begriffsprüfung funktionieren.",
+    "File handling": "Dateiverarbeitung",
+    "XLIFF imports, tag protection behavior, and export defaults.":
+      "XLIFF-Importe, Tag-Schutz-Verhalten und Export-Standards.",
+    "/ Service": "/ Service",
+    "Operational status": "Betriebsstatus",
+    "Keep the most relevant service information visible without turning settings into a dashboard.":
+      "Halte die wichtigsten Service-Infos sichtbar, ohne die Einstellungen in ein Dashboard zu verwandeln.",
+    "API and translation queue": "API und Übersetzungswarteschlange",
+    "No current incidents. Core translation services are operating normally.":
+      "Aktuell keine Vorfälle. Die Kern-Übersetzungsdienste laufen normal.",
+    Healthy: "Stabil",
+    "Workspace contact": "Workspace-Kontakt",
+    "/ Best Practice": "/ Best Practice",
+    "Before you contact support": "Bevor du den Support kontaktierst",
+    "A short checklist that removes the usual back-and-forth for translation issues.":
+      "Eine kurze Checkliste, die das übliche Hin und Her bei Übersetzungsproblemen reduziert.",
+    "Include the project name, source language, target language, and the exact step where the issue happened.":
+      "Nenne Projektnamen, Quellsprache, Zielsprache und den exakten Schritt, an dem das Problem aufgetreten ist.",
+    "For file issues, mention whether the problem came from import, translation output, glossary enforcement, or export.":
+      "Bei Dateiproblemen gib an, ob das Problem aus Import, Übersetzungsausgabe, Glossar-Regeln oder Export stammt.",
+    "If the issue is blocking delivery, say that explicitly so it can be triaged correctly.":
+      "Wenn das Problem die Auslieferung blockiert, sag das explizit, damit es korrekt triagiert werden kann.",
+    "Permanent action": "Dauerhafte Aktion",
+    "This removes your personal account access and clears your settings footprint from Translayr.":
+      "Dadurch wird dein persönlicher Kontozugriff entfernt und dein Einstellungs-Footprint aus Translayr gelöscht."
+  };
+
+  return translations[value] ?? value;
 }
 
 function ChevronDownIcon({ className = "h-4 w-4" }: IconProps) {

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { useAppLocale } from "@/components/app-locale-provider";
+
 type ProjectUploadZoneProps = {
   files: Array<Pick<File, "name" | "size">>;
   inputId: string;
@@ -15,7 +17,26 @@ export function ProjectUploadZone({
   onFilesSelected,
   variant = "strip"
 }: ProjectUploadZoneProps) {
+  const locale = useAppLocale();
   const [isDragging, setIsDragging] = useState(false);
+  const copy =
+    locale === "de"
+      ? {
+          dropFiles: "Dateien zum Hochladen ablegen",
+          uploadFiles: "Übersetzungsdateien hochladen",
+          fileTypes: "XLIFF, .po, .strings, .resx oder .zip",
+          upload: "/ Upload",
+          translationFiles: "Übersetzungsdateien",
+          noneSelected: "Noch keine Dateien ausgewählt."
+        }
+      : {
+          dropFiles: "Drop files to upload",
+          uploadFiles: "Upload translation files",
+          fileTypes: "XLIFF, .po, .strings, .resx, or .zip",
+          upload: "/ Upload",
+          translationFiles: "Translation files",
+          noneSelected: "No files selected yet."
+        };
 
   function handleFiles(fileList: FileList | null) {
     if (!fileList) {
@@ -62,10 +83,10 @@ export function ProjectUploadZone({
           </div>
           <div>
             <p className="text-[13px] font-medium text-[var(--foreground)]">
-              Drop files to upload
+              {copy.dropFiles}
             </p>
             <p className="mt-0.5 text-[12px] text-[var(--muted-soft)]">
-              XLIFF, .po, .strings, .resx, or .zip
+              {copy.fileTypes}
             </p>
           </div>
         </div>
@@ -101,10 +122,10 @@ export function ProjectUploadZone({
     <section className="rounded-[10px] border border-[var(--border)] bg-white p-5">
       <div className="mb-3">
         <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-          / Upload
+          {copy.upload}
         </p>
         <h3 className="mt-1 text-[16px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
-          Translation files
+          {copy.translationFiles}
         </h3>
       </div>
 
@@ -143,7 +164,7 @@ export function ProjectUploadZone({
           </div>
           <div>
             <p className="text-[13px] font-medium text-[var(--foreground)]">
-              Upload translation files
+              {copy.uploadFiles}
             </p>
             <p className="mt-0.5 text-[12px] text-[var(--muted-soft)]">
               .xliff, .po, .strings, .resx, .zip
@@ -174,7 +195,7 @@ export function ProjectUploadZone({
             </span>
           ))
         ) : (
-          <p className="text-[12px] text-[var(--muted-soft)]">No files selected yet.</p>
+          <p className="text-[12px] text-[var(--muted-soft)]">{copy.noneSelected}</p>
         )}
       </div>
     </section>

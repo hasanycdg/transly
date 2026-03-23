@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useAppLocale } from "@/components/app-locale-provider";
 import type { NewGlossaryCollectionInput } from "@/types/glossary";
 
 type NewCollectionModalProps = {
@@ -19,8 +20,33 @@ export function NewCollectionModal({
   submitting = false,
   errorMessage = null
 }: NewCollectionModalProps) {
+  const locale = useAppLocale();
   const [name, setName] = useState("");
   const [detail, setDetail] = useState("");
+  const copy =
+    locale === "de"
+      ? {
+          eyebrow: "/ Neue Sammlung",
+          heading: "Glossarsammlung erstellen",
+          intro: "Sammlungen sind optionale Gruppen für marken-, feature- oder projektspezifische Terminologie.",
+          close: "Schließen",
+          collectionName: "Sammlungsname",
+          description: "Beschreibung",
+          cancel: "Abbrechen",
+          creating: "Wird erstellt...",
+          createCollection: "Sammlung erstellen"
+        }
+      : {
+          eyebrow: "/ New Collection",
+          heading: "Create glossary collection",
+          intro: "Collections are optional groups for brand-, feature-, or project-specific terminology.",
+          close: "Close",
+          collectionName: "Collection name",
+          description: "Description",
+          cancel: "Cancel",
+          creating: "Creating...",
+          createCollection: "Create Collection"
+        };
 
   if (!open) {
     return null;
@@ -45,13 +71,13 @@ export function NewCollectionModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / New Collection
+              {copy.eyebrow}
             </p>
             <h2 className="mt-1 text-[18px] font-semibold tracking-[-0.3px] text-[var(--foreground)]">
-              Create glossary collection
+              {copy.heading}
             </h2>
             <p className="mt-1 text-[12px] text-[var(--muted-soft)]">
-              Collections are optional groups for brand-, feature-, or project-specific terminology.
+              {copy.intro}
             </p>
           </div>
           <button
@@ -60,7 +86,7 @@ export function NewCollectionModal({
             disabled={submitting}
             className="rounded-[7px] border border-[var(--border)] px-2 py-1 text-[12px] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
-            Close
+            {copy.close}
           </button>
         </div>
 
@@ -72,7 +98,7 @@ export function NewCollectionModal({
 
         <div className="mt-5 space-y-4">
           <label className="space-y-1">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Collection name</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.collectionName}</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -82,7 +108,7 @@ export function NewCollectionModal({
           </label>
 
           <label className="space-y-1">
-            <span className="text-[12px] font-medium text-[var(--foreground)]">Description</span>
+            <span className="text-[12px] font-medium text-[var(--foreground)]">{copy.description}</span>
             <textarea
               value={detail}
               onChange={(event) => setDetail(event.target.value)}
@@ -100,7 +126,7 @@ export function NewCollectionModal({
             disabled={submitting}
             className="rounded-[7px] border border-[var(--border)] px-3 py-2 text-[12.5px] font-medium text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           >
-            Cancel
+            {copy.cancel}
           </button>
           <button
             type="button"
@@ -108,7 +134,7 @@ export function NewCollectionModal({
             disabled={!name.trim() || submitting}
             className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium text-white transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting ? "Creating..." : "Create Collection"}
+            {submitting ? copy.creating : copy.createCollection}
           </button>
         </div>
       </div>

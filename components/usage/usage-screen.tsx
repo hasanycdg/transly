@@ -8,6 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent
 } from "react";
 
+import { useAppLocale } from "@/components/app-locale-provider";
 import { formatCompactNumber, formatPercent } from "@/lib/projects/formatters";
 import { StatusBadge } from "@/components/projects/status-badge";
 import type {
@@ -32,33 +33,104 @@ const USAGE_TABS: Array<{ id: UsageTabId; label: string }> = [
 ];
 
 export function UsageScreen({ data }: UsageScreenProps) {
+  const locale = useAppLocale();
   const [activeTab, setActiveTab] = useState<UsageTabId>("overview");
   const summary = data.summary;
   const usagePercentClamped = clamp(summary.percentConsumed, 0, 100);
   const showUpgradeWarning = summary.percentConsumed >= 80;
+  const copy =
+    locale === "de"
+      ? {
+          usage: "/ Nutzung",
+          heading: "Nutzung",
+          intro: "Sieh, was dein Workspace in diesem Zyklus verbraucht hat, wohin es geflossen ist und was als Nächstes Aufmerksamkeit braucht.",
+          tabs: {
+            overview: "Überblick",
+            breakdown: "Aufschlüsselung",
+            activity: "Aktivität"
+          },
+          wordsUsedTotal: "Verbrauchte Wörter vs. Gesamt",
+          creditsUsed: "Verbrauchte Credits",
+          percentageConsumed: "Verbrauchter Anteil",
+          remainingUsage: "Verbleibende Nutzung",
+          resetDate: "Reset-Datum",
+          creditsConsumedSoFar: "Bisher verbrauchte Credits",
+          currentAllowance: "Deines aktuellen Kontingents",
+          stillAvailable: "In diesem Zyklus noch verfügbar",
+          currentCycle: "/ Aktueller Zyklus",
+          wordsUsedThisCycle: "In diesem Zyklus verbrauchte Wörter",
+          consumed: "Verbraucht",
+          remaining: "verbleibend",
+          cycle: "Zyklus",
+          reset: "Reset",
+          upgrade: "/ Upgrade",
+          nearLimit: "Die Nutzung nähert sich dem Limit",
+          keepRoom: "Lass Platz für den nächsten Launch",
+          healthyRange:
+            "Dein Workspace liegt aktuell in einem gesunden Bereich. Wenn ein größerer Release ansteht, kannst du den Plan vor dem nächsten Zyklus erweitern.",
+          remainingUsageLow: "Verbleibende Nutzung liegt bei",
+          upgradePlan: "Plan upgraden",
+          buyCredits: "Credits kaufen",
+          everythingInside: "Alles bleibt innerhalb der Nutzungsseite.",
+          words: "Wörter"
+        }
+      : {
+          usage: "/ Usage",
+          heading: "Usage",
+          intro: "See what your workspace has used this cycle, where it went, and what needs attention next.",
+          tabs: {
+            overview: "Overview",
+            breakdown: "Breakdown",
+            activity: "Activity"
+          },
+          wordsUsedTotal: "Words used vs total",
+          creditsUsed: "Credits used",
+          percentageConsumed: "Percentage consumed",
+          remainingUsage: "Remaining usage",
+          resetDate: "Reset date",
+          creditsConsumedSoFar: "Credits consumed so far",
+          currentAllowance: "Of your current allowance",
+          stillAvailable: "Still available this cycle",
+          currentCycle: "/ Current cycle",
+          wordsUsedThisCycle: "Words used this cycle",
+          consumed: "Consumed",
+          remaining: "remaining",
+          cycle: "Cycle",
+          reset: "Reset",
+          upgrade: "/ Upgrade",
+          nearLimit: "Usage is getting close to the limit",
+          keepRoom: "Keep room for the next launch",
+          healthyRange:
+            "Your workspace is in a healthy range right now. If a larger release is coming up, you can expand your plan before the next cycle fills up.",
+          remainingUsageLow: "Remaining usage is down to",
+          upgradePlan: "Upgrade plan",
+          buyCredits: "Buy credits",
+          everythingInside: "Everything stays inside the Usage page.",
+          words: "words"
+        };
   const overviewMetrics = [
     {
-      label: "Words used vs total",
-      value: `${formatCompactNumber(summary.wordsUsed)} / ${formatCompactNumber(summary.totalWords)}`,
+      label: copy.wordsUsedTotal,
+      value: `${formatCompactNumber(summary.wordsUsed, locale)} / ${formatCompactNumber(summary.totalWords, locale)}`,
       meta: summary.cycleLabel
     },
     {
-      label: "Credits used",
-      value: formatCompactNumber(summary.creditsUsed),
-      meta: "Credits consumed so far"
+      label: copy.creditsUsed,
+      value: formatCompactNumber(summary.creditsUsed, locale),
+      meta: copy.creditsConsumedSoFar
     },
     {
-      label: "Percentage consumed",
+      label: copy.percentageConsumed,
       value: formatPercent(summary.percentConsumed),
-      meta: "Of your current allowance"
+      meta: copy.currentAllowance
     },
     {
-      label: "Remaining usage",
-      value: formatCompactNumber(summary.remainingUsage),
-      meta: "Still available this cycle"
+      label: copy.remainingUsage,
+      value: formatCompactNumber(summary.remainingUsage, locale),
+      meta: copy.stillAvailable
     },
     {
-      label: "Reset date",
+      label: copy.resetDate,
       value: summary.resetDateLabel,
       meta: summary.resetRelativeLabel
     }
@@ -70,13 +142,13 @@ export function UsageScreen({ data }: UsageScreenProps) {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-[760px]">
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Usage
+              {copy.usage}
             </span>
             <h1 className="mt-2 text-[27px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">
-              Usage
+              {copy.heading}
             </h1>
             <p className="mt-2 text-[12.5px] leading-6 text-[var(--muted)]">
-              See what your workspace has used this cycle, where it went, and what needs attention next.
+              {copy.intro}
             </p>
           </div>
 
@@ -94,19 +166,19 @@ export function UsageScreen({ data }: UsageScreenProps) {
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                    / Current cycle
+                    {copy.currentCycle}
                   </p>
                   <h2 className="mt-2 text-[30px] font-semibold tracking-[-0.08em] text-[var(--foreground)]">
-                    {formatCompactNumber(summary.wordsUsed)} / {formatCompactNumber(summary.totalWords)}
+                    {formatCompactNumber(summary.wordsUsed, locale)} / {formatCompactNumber(summary.totalWords, locale)}
                   </h2>
                   <p className="mt-1 text-[13px] text-[var(--muted)]">
-                    Words used this cycle
+                    {copy.wordsUsedThisCycle}
                   </p>
                 </div>
 
                 <div className="rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-3">
                   <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                    Consumed
+                    {copy.consumed}
                   </p>
                   <p className="mt-1 text-[22px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">
                     {formatPercent(summary.percentConsumed)}
@@ -121,7 +193,7 @@ export function UsageScreen({ data }: UsageScreenProps) {
                 <div className="flex items-center justify-between gap-3 text-[12px] text-[var(--muted)]">
                   <span>{summary.cycleLabel}</span>
                   <span className="font-medium text-[var(--foreground)]">
-                    {formatCompactNumber(summary.remainingUsage)} remaining
+                    {formatCompactNumber(summary.remainingUsage, locale)} {copy.remaining}
                   </span>
                 </div>
                 <div className="mt-3 h-[7px] overflow-hidden rounded-full bg-[var(--border-light)]">
@@ -136,12 +208,12 @@ export function UsageScreen({ data }: UsageScreenProps) {
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
-                <CycleDetailCard label="Cycle" value={summary.cycleLabel} />
+                <CycleDetailCard label={copy.cycle} value={summary.cycleLabel} />
                 <CycleDetailCard
-                  label="Remaining usage"
-                  value={`${formatCompactNumber(summary.remainingUsage)} words`}
+                  label={copy.remainingUsage}
+                  value={`${formatCompactNumber(summary.remainingUsage, locale)} ${copy.words}`}
                 />
-                <CycleDetailCard label="Reset" value={summary.resetDateLabel} />
+                <CycleDetailCard label={copy.reset} value={summary.resetDateLabel} />
               </div>
             </div>
           </div>
@@ -155,35 +227,37 @@ export function UsageScreen({ data }: UsageScreenProps) {
             ].join(" ")}
           >
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Upgrade
+              {copy.upgrade}
             </p>
             <h3 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-              {showUpgradeWarning ? "Usage is getting close to the limit" : "Keep room for the next launch"}
+              {showUpgradeWarning ? copy.nearLimit : copy.keepRoom}
             </h3>
             <p className="mt-2 text-[12.5px] leading-6 text-[var(--muted)]">
               {showUpgradeWarning
-                ? `You've already used ${formatPercent(summary.percentConsumed)} of this cycle. Upgrade your plan or add credits before ${summary.resetDateLabel} to avoid slowing down upcoming deliveries.`
-                : "Your workspace is in a healthy range right now. If a larger release is coming up, you can expand your plan before the next cycle fills up."}
+                ? locale === "de"
+                  ? `Du hast bereits ${formatPercent(summary.percentConsumed)} dieses Zyklus verbraucht. Upgrade deinen Plan oder kaufe vor ${summary.resetDateLabel} zusätzliche Credits, damit kommende Auslieferungen nicht ausgebremst werden.`
+                  : `You've already used ${formatPercent(summary.percentConsumed)} of this cycle. Upgrade your plan or add credits before ${summary.resetDateLabel} to avoid slowing down upcoming deliveries.`
+                : copy.healthyRange}
             </p>
 
             {showUpgradeWarning ? (
               <div className="mt-4 rounded-[12px] border border-[var(--review-border)] bg-white/72 px-4 py-3 text-[12px] text-[var(--review)]">
-                Remaining usage is down to {formatCompactNumber(summary.remainingUsage)} words.
+                {copy.remainingUsageLow} {formatCompactNumber(summary.remainingUsage, locale)} {copy.words}.
               </div>
             ) : null}
 
             <div className="mt-5 flex flex-wrap gap-3">
               <Link
                 href="/billing"
-                className="inline-flex items-center justify-center rounded-[10px] bg-[var(--foreground)] px-4 py-2.5 text-[12.5px] font-medium text-white transition hover:opacity-90"
+                className="inline-flex items-center justify-center rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-2.5 text-[12.5px] font-medium text-[var(--foreground)] shadow-[0_8px_20px_rgba(17,17,16,0.06)] transition hover:border-[var(--foreground)] hover:bg-[var(--background-strong)]"
               >
-                Upgrade plan
+                {copy.upgradePlan}
               </Link>
               <Link
                 href="/billing?intent=credits"
                 className="inline-flex items-center justify-center rounded-[10px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12.5px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
               >
-                Buy credits
+                {copy.buyCredits}
               </Link>
             </div>
           </div>
@@ -205,12 +279,12 @@ export function UsageScreen({ data }: UsageScreenProps) {
                     : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 ].join(" ")}
               >
-                {tab.label}
+                {tab.id === "overview" ? copy.tabs.overview : tab.id === "breakdown" ? copy.tabs.breakdown : copy.tabs.activity}
               </button>
             ))}
           </div>
           <div className="ml-auto text-[11.5px] text-[var(--muted-soft)]">
-            Everything stays inside the Usage page.
+            {copy.everythingInside}
           </div>
         </section>
 
@@ -263,22 +337,67 @@ function BreakdownTab({
   languageUsage: UsageLanguageInsightItem[];
   topFiles: UsageTopFileItem[];
 }) {
+  const locale = useAppLocale();
+  const copy =
+    locale === "de"
+      ? {
+          usagePerProject: "/ Nutzung pro Projekt",
+          whereUsageGoes: "Wohin der Großteil der Nutzung fließt",
+          project: "Projekt",
+          files: "Dateien",
+          share: "Anteil",
+          used: "Verbraucht",
+          status: "Status",
+          noProjectUsage: "Noch keine Projektnutzung",
+          noProjectUsageDesc: "Sobald Dateien übersetzt werden, erscheint hier die Nutzung auf Projektebene.",
+          usagePerLanguage: "/ Nutzung pro Sprache",
+          targetLanguages: "Zielsprachen mit dem meisten Volumen",
+          fileLabel: (count: number) => `${count} Datei${count === 1 ? "" : "en"}`,
+          noLanguageUsage: "Noch keine Sprachnutzung",
+          noLanguageUsageDesc: "Sobald Übersetzungen gelaufen sind, erscheint hier das Volumen je Sprache.",
+          topFiles: "/ Top-Dateien",
+          topFilesTitle: "Dateien mit dem höchsten Verbrauch",
+          words: "Wörter",
+          noFileActivity: "Noch keine Dateiaktivität",
+          noFileActivityDesc: "Top-Dateien erscheinen nach Uploads und Übersetzungen im Workspace."
+        }
+      : {
+          usagePerProject: "/ Usage per project",
+          whereUsageGoes: "Where most usage is going",
+          project: "Project",
+          files: "Files",
+          share: "Share",
+          used: "Used",
+          status: "Status",
+          noProjectUsage: "No project usage yet",
+          noProjectUsageDesc: "Once files are translated, project-level usage will appear here.",
+          usagePerLanguage: "/ Usage per language",
+          targetLanguages: "Target languages using the most volume",
+          fileLabel: (count: number) => `${count} file${count === 1 ? "" : "s"}`,
+          noLanguageUsage: "No language usage yet",
+          noLanguageUsageDesc: "Language-level volume will appear once translations have been run.",
+          topFiles: "/ Top files",
+          topFilesTitle: "Files driving the most usage",
+          words: "words",
+          noFileActivity: "No file activity yet",
+          noFileActivityDesc: "Top files will appear after uploads and translations start moving through the workspace."
+        };
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
       <div className="rounded-[16px] border border-[var(--border)] bg-white">
         <div className="border-b border-[var(--border-light)] px-5 py-4">
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-            / Usage per project
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+            {copy.usagePerProject}
           </p>
           <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-            Where most usage is going
+            {copy.whereUsageGoes}
           </h2>
         </div>
 
         {projectUsage.length > 0 ? (
           <div className="overflow-hidden">
             <div className="grid grid-cols-[minmax(0,1.6fr)_90px_80px_95px_110px] border-b border-[var(--border-light)] bg-[var(--background)] px-5 py-3">
-              {["Project", "Files", "Share", "Used", "Status"].map((label) => (
+              {[copy.project, copy.files, copy.share, copy.used, copy.status].map((label) => (
                 <span
                   key={label}
                   className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
@@ -304,7 +423,7 @@ function BreakdownTab({
                 <div className="text-[12px] text-[var(--muted)]">{project.fileCount}</div>
                 <div className="text-[12px] text-[var(--muted)]">{formatPercent(project.sharePercent)}</div>
                 <div className="text-[12px] font-medium text-[var(--foreground)]">
-                  {formatCompactNumber(project.wordsUsed)}
+                  {formatCompactNumber(project.wordsUsed, locale)}
                 </div>
                 <div>
                   <StatusBadge status={project.status} />
@@ -314,8 +433,8 @@ function BreakdownTab({
           </div>
         ) : (
           <EmptyState
-            title="No project usage yet"
-            description="Once files are translated, project-level usage will appear here."
+            title={copy.noProjectUsage}
+            description={copy.noProjectUsageDesc}
           />
         )}
       </div>
@@ -324,10 +443,10 @@ function BreakdownTab({
         <div className="rounded-[16px] border border-[var(--border)] bg-white">
           <div className="border-b border-[var(--border-light)] px-5 py-4">
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Usage per language
+              {copy.usagePerLanguage}
             </p>
             <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-              Target languages using the most volume
+              {copy.targetLanguages}
             </h2>
           </div>
 
@@ -339,12 +458,12 @@ function BreakdownTab({
                     <div>
                       <p className="text-[13px] font-medium text-[var(--foreground)]">{language.label}</p>
                       <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
-                        {language.fileCount} file{language.fileCount === 1 ? "" : "s"}
+                        {copy.fileLabel(language.fileCount)}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-[13px] font-medium text-[var(--foreground)]">
-                        {formatCompactNumber(language.wordsUsed)}
+                        {formatCompactNumber(language.wordsUsed, locale)}
                       </p>
                       <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
                         {formatPercent(language.sharePercent)}
@@ -361,8 +480,8 @@ function BreakdownTab({
               ))
             ) : (
               <EmptyState
-                title="No language usage yet"
-                description="Language-level volume will appear once translations have been run."
+                title={copy.noLanguageUsage}
+                description={copy.noLanguageUsageDesc}
                 compact
               />
             )}
@@ -372,10 +491,10 @@ function BreakdownTab({
         <div className="rounded-[16px] border border-[var(--border)] bg-white">
           <div className="border-b border-[var(--border-light)] px-5 py-4">
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              / Top files
+              {copy.topFiles}
             </p>
             <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-              Files driving the most usage
+              {copy.topFilesTitle}
             </h2>
           </div>
 
@@ -400,15 +519,15 @@ function BreakdownTab({
                   <div className="mt-3 flex items-center justify-between gap-3 text-[11.5px] text-[var(--muted)]">
                     <span>{file.updatedLabel}</span>
                     <span className="font-medium text-[var(--foreground)]">
-                      {formatCompactNumber(file.wordsUsed)} words
+                      {formatCompactNumber(file.wordsUsed, locale)} {copy.words}
                     </span>
                   </div>
                 </div>
               ))
             ) : (
               <EmptyState
-                title="No file activity yet"
-                description="Top files will appear after uploads and translations start moving through the workspace."
+                title={copy.noFileActivity}
+                description={copy.noFileActivityDesc}
                 compact
               />
             )}
@@ -420,14 +539,29 @@ function BreakdownTab({
 }
 
 function ActivityTab({ activity }: { activity: UsageActivityFeedItem[] }) {
+  const locale = useAppLocale();
+  const copy =
+    locale === "de"
+      ? {
+          recentActivity: "/ Letzte Aktivität",
+          heading: "Uploads, Übersetzungen und Exporte",
+          emptyTitle: "Keine aktuelle Aktivität",
+          emptyDescription: "Uploads, Übersetzungen und Exporte erscheinen hier, sobald der Workspace aktiv wird."
+        }
+      : {
+          recentActivity: "/ Recent activity",
+          heading: "Uploads, translations, and exports",
+          emptyTitle: "No recent activity",
+          emptyDescription: "Uploads, translations, and exports will appear here as soon as the workspace becomes active."
+        };
   return (
     <section className="rounded-[16px] border border-[var(--border)] bg-white">
       <div className="border-b border-[var(--border-light)] px-5 py-4">
         <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-          / Recent activity
+          {copy.recentActivity}
         </p>
         <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-          Uploads, translations, and exports
+          {copy.heading}
         </h2>
       </div>
 
@@ -462,8 +596,8 @@ function ActivityTab({ activity }: { activity: UsageActivityFeedItem[] }) {
           </div>
         ) : (
           <EmptyState
-            title="No recent activity"
-            description="Uploads, translations, and exports will appear here as soon as the workspace becomes active."
+            title={copy.emptyTitle}
+            description={copy.emptyDescription}
           />
         )}
       </div>
@@ -478,6 +612,7 @@ function UsageTrendCard({
   trend: UsageTrendPoint[];
   updatedLabel: string;
 }) {
+  const locale = useAppLocale();
   const chartPoints = useMemo(() => buildChartPoints(trend, 520, 160), [trend]);
   const svgRef = useRef<SVGSVGElement>(null);
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
@@ -512,18 +647,35 @@ function UsageTrendCard({
           ? { left: `${(activePoint.x / 560) * 100}%`, top: "16px" }
           : undefined;
 
+  const copy =
+    locale === "de"
+      ? {
+          usageTrend: "/ Nutzungsverlauf",
+          heading: "Nutzung in den letzten Tagen",
+          helper: "Fahre mit der Maus über die Linie, um den exakten Wert pro Tag zu sehen.",
+          wordsUsed: "Verbrauchte Wörter",
+          aria: "Diagramm zum Nutzungsverlauf"
+        }
+      : {
+          usageTrend: "/ Usage trend",
+          heading: "Usage over the last days",
+          helper: "Hover over the line to see the exact value for each day.",
+          wordsUsed: "Words used",
+          aria: "Usage trend chart"
+        };
+
   return (
     <section className="rounded-[16px] border border-[var(--border)] bg-white">
       <div className="flex flex-col gap-3 border-b border-[var(--border-light)] px-5 py-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-            / Usage trend
+            {copy.usageTrend}
           </p>
           <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-            Usage over the last days
+            {copy.heading}
           </h2>
           <p className="mt-1 text-[12px] text-[var(--muted)]">
-            Hover over the line to see the exact value for each day.
+            {copy.helper}
           </p>
         </div>
         <div className="text-[11.5px] text-[var(--muted-soft)]">{updatedLabel}</div>
@@ -543,10 +695,10 @@ function UsageTrendCard({
                 {activePoint.label}
               </p>
               <p className="mt-1 text-[15px] font-semibold leading-none text-[var(--foreground)]">
-                {formatCompactNumber(activePoint.value)}
+                {formatCompactNumber(activePoint.value, locale)}
               </p>
               <p className="mt-1 text-[11px] text-[var(--muted)]">
-                Words used
+                {copy.wordsUsed}
               </p>
             </div>
           ) : null}
@@ -556,7 +708,7 @@ function UsageTrendCard({
             viewBox="0 0 560 200"
             className="h-[220px] w-full"
             role="img"
-            aria-label="Usage trend chart"
+            aria-label={copy.aria}
             onMouseMove={handleChartMouseMove}
             onMouseLeave={handleChartMouseLeave}
           >
@@ -621,11 +773,7 @@ function UsageTrendCard({
                   r="14"
                   fill="transparent"
                   onMouseEnter={() => setActivePointIndex(index)}
-                >
-                  <title>
-                    {point.label}: {formatCompactNumber(point.value)} words
-                  </title>
-                </circle>
+                />
               </g>
             ))}
 
@@ -692,7 +840,8 @@ function CycleDetailCard({
 }
 
 function ActivityKindBadge({ kind }: { kind: UsageActivityFeedItem["kind"] }) {
-  const content = getActivityKindContent(kind);
+  const locale = useAppLocale();
+  const content = getActivityKindContent(kind, locale);
 
   return (
     <span
@@ -777,22 +926,25 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function getActivityKindContent(kind: UsageActivityFeedItem["kind"]) {
+function getActivityKindContent(
+  kind: UsageActivityFeedItem["kind"],
+  locale: "en" | "de"
+) {
   switch (kind) {
     case "upload":
       return {
-        label: "Upload",
+        label: locale === "de" ? "Upload" : "Upload",
         className: "border-[var(--border)] bg-white text-[var(--muted)]"
       };
     case "export":
       return {
-        label: "Export",
+        label: locale === "de" ? "Export" : "Export",
         className: "border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success)]"
       };
     case "translation":
     default:
       return {
-        label: "Translation",
+        label: locale === "de" ? "Übersetzung" : "Translation",
         className: "border-[var(--processing-border)] bg-[var(--processing-bg)] text-[var(--processing)]"
       };
   }

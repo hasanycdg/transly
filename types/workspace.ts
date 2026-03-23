@@ -1,3 +1,4 @@
+import type { AppLocale } from "@/types/i18n";
 import type { FileStatus, ProjectRecord, ProjectStatus } from "@/types/projects";
 
 export interface DashboardProjectLink {
@@ -172,6 +173,7 @@ export interface SettingsTranslationData {
 }
 
 export interface SettingsPreferencesData {
+  locale: AppLocale;
   autoDownloadAfterTranslation: boolean;
   defaultFilenameFormat: SettingsFilenameFormat;
 }
