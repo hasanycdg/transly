@@ -28,6 +28,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
   const copy =
     locale === "de"
       ? {
+          dashboard: "Dashboard",
           usage: "Nutzung",
           translate: "Übersetzen",
           glossary: "Glossar",
@@ -46,6 +47,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           planSuffix: "Tarif"
         }
       : {
+          dashboard: "Dashboard",
           usage: "Usage",
           translate: "Translate",
           glossary: "Glossary",
@@ -64,6 +66,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           planSuffix: "plan"
         };
   const mainNavItems = [
+    { label: copy.dashboard, href: "/dashboard", icon: HomeIcon, prefetch: shouldPrefetch },
     { label: copy.translate, href: "/translate", icon: TranslateIcon, prefetch: shouldPrefetch },
     { label: copy.usage, href: "/usage", icon: UsageIcon, prefetch: false },
     { label: copy.glossary, href: "/glossary", icon: GlossaryIcon, prefetch: shouldPrefetch }
@@ -152,6 +155,34 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           </div>
 
           <div className="px-2 py-[10px]">
+            <div className="space-y-[1px] pt-[4px]">
+              {mainNavItems.map((item) => {
+                const Icon = item.icon;
+                const active = item.href ? pathname.startsWith(item.href) : false;
+
+                const className = [
+                  "flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
+                  active
+                    ? "bg-[var(--background)] text-[var(--foreground)]"
+                    : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                ].join(" ");
+
+                return item.href ? (
+                  <Link key={item.label} href={item.href} prefetch={item.prefetch} className={className}>
+                    <Icon />
+                    <span>
+                      {item.label}
+                    </span>
+                  </Link>
+                ) : (
+                  <button key={item.label} type="button" className={className}>
+                    <Icon />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="px-2 pb-1 pt-[10px] text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
               {copy.workspace}
             </div>
@@ -243,34 +274,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                 </div>
               </div>
             ) : null}
-
-            <div className="space-y-[1px] pt-[8px]">
-              {mainNavItems.map((item) => {
-                const Icon = item.icon;
-                const active = item.href ? pathname.startsWith(item.href) : false;
-
-                const className = [
-                  "flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
-                  active
-                    ? "bg-[var(--background)] text-[var(--foreground)]"
-                    : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                ].join(" ");
-
-                return item.href ? (
-                  <Link key={item.label} href={item.href} prefetch={item.prefetch} className={className}>
-                    <Icon />
-                    <span>
-                      {item.label}
-                    </span>
-                  </Link>
-                ) : (
-                  <button key={item.label} type="button" className={className}>
-                    <Icon />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           <div className="mt-auto border-t border-[var(--border-light)]">
@@ -353,6 +356,19 @@ function ProjectsIcon() {
       <rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
       <rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
       <rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+      <path
+        d="M2 6.5 7.5 2l5.5 4.5v6a.5.5 0 0 1-.5.5H9v-3.5H6V13H2.5a.5.5 0 0 1-.5-.5v-6Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

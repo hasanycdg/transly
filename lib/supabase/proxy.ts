@@ -5,7 +5,7 @@ import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 const AUTH_PATHS = new Set(["/login", "/register"]);
 const PUBLIC_API_PATHS = new Set(["/api/stripe/webhook"]);
-const PROTECTED_APP_PATH_PREFIXES = ["/projects", "/translate", "/usage", "/glossary", "/billing", "/settings"];
+const PROTECTED_APP_PATH_PREFIXES = ["/dashboard", "/projects", "/translate", "/usage", "/glossary", "/billing", "/settings"];
 
 function isProtectedAppPath(pathname: string) {
   return PROTECTED_APP_PATH_PREFIXES.some(
@@ -20,7 +20,7 @@ function isProtectedApiPath(pathname: string) {
 function getSafeRedirectTarget(request: NextRequest) {
   const redirectTarget = `${request.nextUrl.pathname}${request.nextUrl.search}`;
 
-  return redirectTarget.startsWith("/") ? redirectTarget : "/projects";
+  return redirectTarget.startsWith("/") ? redirectTarget : "/dashboard";
 }
 
 export async function updateSession(request: NextRequest) {
@@ -64,7 +64,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (isAuthenticated && AUTH_PATHS.has(pathname)) {
-    return NextResponse.redirect(new URL("/projects", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return response;

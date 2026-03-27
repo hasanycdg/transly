@@ -24,6 +24,18 @@ export function formatCompactNumber(
   }).format(value);
 }
 
+export function formatCurrency(
+  value: number,
+  locale: AppLocale = "en",
+  currency = "EUR"
+): string {
+  return new Intl.NumberFormat(getIntlLocale(locale), {
+    style: "currency",
+    currency,
+    maximumFractionDigits: value % 1 === 0 ? 0 : 2
+  }).format(value);
+}
+
 export function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
 }

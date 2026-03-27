@@ -124,7 +124,7 @@ export function AcceptInviteScreen() {
 
 function getSafeRedirectPath(redirectTo: string | null) {
   if (!redirectTo || !redirectTo.startsWith("/") || redirectTo.startsWith("//")) {
-    return "/projects";
+    return "/dashboard";
   }
 
   return redirectTo;

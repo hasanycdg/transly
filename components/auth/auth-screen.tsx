@@ -100,7 +100,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
           alternatePrompt: isRegister ? "Schon ein Konto?" : "Noch kein Konto?",
           alternateCta: isRegister ? "Anmelden" : "Registrieren",
           alternateHref: isRegister ? "/login" : "/register",
-          directNote: "Direkter Weitergang zur Projektübersicht.",
+          directNote: "Direkter Weitergang ins Dashboard.",
           magicLink: "Magic Link senden",
           sendingMagicLink: "Magic Link wird gesendet...",
           forgotPassword: "Passwort vergessen?",
@@ -125,7 +125,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
           heading: isRegister ? "Register without extra steps." : "Sign in and keep moving.",
           description: isRegister
             ? "A focused entry point for teams that want to organize their translation workflow in a clean dashboard right away."
-            : "Sign in and jump straight back into projects, glossary, usage, and billing.",
+            : "Sign in and jump straight back into your dashboard, usage, glossary, and billing.",
           tabs: {
             login: "Sign in",
             register: "Register"
@@ -145,7 +145,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
             : [
                 {
                   title: "Fast return",
-                  description: "Back to your projects without extra clicks."
+                  description: "Back to your dashboard without extra clicks."
                 },
                 {
                   title: "Focused access",
@@ -173,7 +173,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
           alternatePrompt: isRegister ? "Already have an account?" : "Need an account?",
           alternateCta: isRegister ? "Sign in" : "Register",
           alternateHref: isRegister ? "/login" : "/register",
-          directNote: "Direct redirect into the project overview.",
+          directNote: "Direct redirect into the dashboard.",
           magicLink: "Send magic link",
           sendingMagicLink: "Sending magic link...",
           forgotPassword: "Forgot password?",
@@ -596,7 +596,7 @@ function BrandIcon() {
 
 function getSafeRedirectPath(redirectTo: string | null) {
   if (!redirectTo || !redirectTo.startsWith("/") || redirectTo.startsWith("//")) {
-    return "/projects";
+    return "/dashboard";
   }
 
   return redirectTo;

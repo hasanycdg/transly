@@ -13,7 +13,7 @@ export default async function LoginPage() {
   const user = await getAuthenticatedUser();
 
   if (user) {
-    redirect("/projects");
+    redirect("/dashboard");
   }
 
   return <AuthScreen mode="login" />;

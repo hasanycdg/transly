@@ -13,6 +13,36 @@ export interface DashboardShellData {
   projects: DashboardProjectLink[];
 }
 
+export interface DashboardRecentTranslationItem {
+  id: string;
+  projectId: string;
+  projectName: string;
+  fileName: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  wordsUsed: number;
+  timestamp: string;
+}
+
+export interface ProjectsHomeData {
+  wordsThisMonth: number;
+  costThisMonthCents: number;
+  agencyCostThisMonthCents: number;
+  savingsVsAgencyCents: number;
+  creditsUsed: number;
+  creditsLimit: number;
+  creditsRemaining: number;
+  planPercent: number;
+  cycleStart: string;
+  cycleEnd: string;
+  recentTranslations: DashboardRecentTranslationItem[];
+}
+
+export interface ProjectsOverviewData {
+  projects: ProjectRecord[];
+  home: ProjectsHomeData;
+}
+
 export type WorkspaceMemberRole = "owner" | "admin" | "editor" | "reviewer" | "viewer";
 
 export type WorkspaceMemberStatus = "invited" | "active" | "disabled";

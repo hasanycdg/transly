@@ -44,6 +44,7 @@ import type {
   BillingInvoiceItem,
   BillingPlanOption,
   BillingScreenData,
+  ProjectsOverviewData,
   DashboardShellData,
   SettingsFilenameFormat,
   SettingsQualityPreset,
@@ -314,6 +315,7 @@ const DEFAULT_WORKSPACE_SLUG = "workspace";
 const DEFAULT_WORKSPACE_PLAN = getBillingPlanDefinition(DEFAULT_WORKSPACE_PLAN_ID).name;
 const DEFAULT_WORKSPACE_AVATAR_LABEL = "W";
 const DEFAULT_CREDITS_LIMIT = getBillingPlanDefinition(DEFAULT_WORKSPACE_PLAN_ID).creditsLimit;
+const AGENCY_BASELINE_RATE_CENTS_PER_WORD = 12;
 const SUPPORTED_LANGUAGE_CODES = new Set(LANGUAGE_OPTIONS.map((option) => option.code));
 
 export async function getDashboardShellData(): Promise<DashboardShellData> {
@@ -361,6 +363,93 @@ export async function getProjectsOverviewRecords(): Promise<ProjectRecord[]> {
   noStore();
 
   return getProjectRecords();
+}
+
+export async function getProjectsOverviewData(): Promise<ProjectsOverviewData> {
+  noStore();
+
+  const now = new Date();
+  const { supabase, workspace } = await getWorkspaceContext();
+  const [projects, { data: billingCycleData, error: billingError }, { data: monthlyUsageData, error: monthlyUsageError }] =
+    await Promise.all([
+      getProjectRecordsForWorkspace(supabase, workspace.id),
+      supabase
+        .from("workspace_billing_cycles")
+        .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "active")
+        .order("period_start", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("workspace_daily_usage")
+        .select("usage_date, credits_used")
+        .eq("workspace_id", workspace.id)
+        .gte("usage_date", formatDateKey(startOfCurrentMonth(now)))
+        .lte("usage_date", formatDateKey(endOfCurrentMonth(now)))
+    ]);
+
+  if (billingError) {
+    throw new Error(`Failed to load dashboard billing cycle: ${billingError.message}`);
+  }
+
+  if (monthlyUsageError) {
+    throw new Error(`Failed to load dashboard monthly usage: ${monthlyUsageError.message}`);
+  }
+
+  const activeCycle = billingCycleData as BillingCycleRow | null;
+  const currentPlan = getBillingPlanDefinition(workspace.plan_name);
+  const monthlyUsageRows =
+    (monthlyUsageData as Pick<DailyUsageRow, "usage_date" | "credits_used">[] | null) ?? [];
+  const wordsThisMonth = monthlyUsageRows.length > 0
+    ? monthlyUsageRows.reduce((sum, row) => sum + row.credits_used, 0)
+    : Math.max(activeCycle?.credits_used ?? 0, 0);
+  const creditsLimit = Math.max(activeCycle?.credits_limit ?? 0, currentPlan.creditsLimit);
+  const creditsUsed = Math.max(activeCycle?.credits_used ?? 0, wordsThisMonth);
+  const creditsRemaining = Math.max(creditsLimit - creditsUsed, 0);
+  const planPercent = creditsLimit > 0 ? Math.min((creditsUsed / creditsLimit) * 100, 100) : 0;
+  const costThisMonthCents = Math.max(
+    activeCycle?.projected_spend_cents ?? 0,
+    currentPlan.basePriceCents
+  );
+  const agencyCostThisMonthCents = wordsThisMonth * AGENCY_BASELINE_RATE_CENTS_PER_WORD;
+  const savingsVsAgencyCents = Math.max(agencyCostThisMonthCents - costThisMonthCents, 0);
+  const cycleStart = activeCycle?.period_start ?? startOfCurrentMonth(now).toISOString();
+  const cycleEnd = activeCycle?.period_end ?? endOfCurrentMonth(now).toISOString();
+  const recentTranslations = projects
+    .flatMap((project) =>
+      project.files
+        .filter((file) => file.status === "Done" || file.status === "Review")
+        .map((file) => ({
+          id: `${project.id}-${file.id}`,
+          projectId: project.id,
+          projectName: project.name,
+          fileName: file.name,
+          sourceLanguage: file.sourceLanguage,
+          targetLanguage: file.targetLanguage,
+          wordsUsed: file.words,
+          timestamp: file.lastUpdated
+        }))
+    )
+    .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
+    .slice(0, 5);
+
+  return {
+    projects,
+    home: {
+      wordsThisMonth,
+      costThisMonthCents,
+      agencyCostThisMonthCents,
+      savingsVsAgencyCents,
+      creditsUsed,
+      creditsLimit,
+      creditsRemaining,
+      planPercent,
+      cycleStart,
+      cycleEnd,
+      recentTranslations
+    }
+  };
 }
 
 export async function getProjectRecordBySlug(projectSlug: string): Promise<ProjectRecord | null> {
@@ -1552,7 +1641,7 @@ export async function inviteWorkspaceMember(input: {
   }
 
   const upsertedMember = upsertedMemberData as WorkspaceMemberRow;
-  const redirectTo = `${getAppUrl()}/auth/accept-invite?next=${encodeURIComponent("/projects")}`;
+  const redirectTo = `${getAppUrl()}/auth/accept-invite?next=${encodeURIComponent("/dashboard")}`;
   const supabaseAdmin = createServerSupabaseAdminClient();
   const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
     redirectTo,
@@ -2091,10 +2180,18 @@ export async function createProject(input: NewProjectInput): Promise<{ slug: str
 
 async function getProjectRecords(): Promise<ProjectRecord[]> {
   const { supabase, workspace } = await getWorkspaceContext();
+
+  return getProjectRecordsForWorkspace(supabase, workspace.id);
+}
+
+async function getProjectRecordsForWorkspace(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string
+): Promise<ProjectRecord[]> {
   const { data: projectsData, error: projectsError } = await supabase
     .from("projects")
     .select("id, workspace_id, slug, name, description, source_language, status, glossary_enabled, credits_used, quality_score, origin, updated_at")
-    .eq("workspace_id", workspace.id)
+    .eq("workspace_id", workspaceId)
     .order("updated_at", { ascending: false });
 
   if (projectsError) {

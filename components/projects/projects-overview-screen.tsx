@@ -24,7 +24,9 @@ type ProjectsOverviewScreenProps = {
   initialProjects: ProjectRecord[];
 };
 
-export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScreenProps) {
+export function ProjectsOverviewScreen({
+  initialProjects
+}: ProjectsOverviewScreenProps) {
   const locale = useAppLocale();
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -50,7 +52,6 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
       return matchesFilter && matchesSearch;
     });
   }, [filter, projects, search]);
-
   const stats = useMemo(() => getOverviewStatsDisplay(projects, locale), [locale, projects]);
   const copy =
     locale === "de"
@@ -71,8 +72,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
           progress: "Fortschritt",
           updated: "Aktualisiert",
           open: "Öffnen →",
-          noProjects: "Keine Projekte entsprechen der aktuellen Suche oder dem Filter."
-          ,
+          noProjects: "Keine Projekte entsprechen der aktuellen Suche oder dem Filter.",
           rename: "Umbenennen",
           renamePrompt: "Neuen Projektnamen eingeben",
           renameFailed: "Projekt konnte nicht umbenannt werden."
