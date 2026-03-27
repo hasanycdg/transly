@@ -12,7 +12,7 @@ import {
 } from "@/lib/billing/plans";
 import { DEFAULT_APP_LOCALE, getIntlLocale, normalizeAppLocale } from "@/lib/i18n";
 import { LANGUAGE_OPTIONS } from "@/lib/languages";
-import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
+import { formatCompactNumber, formatPercent, getLanguageLabel } from "@/lib/projects/formatters";
 import { createServerSupabaseAdminClient, createServerSupabaseClient } from "@/lib/supabase/admin";
 import { getAppUrl } from "@/lib/supabase/env";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
@@ -44,8 +44,11 @@ import type {
   BillingInvoiceItem,
   BillingPlanOption,
   BillingScreenData,
-  ProjectsOverviewData,
   DashboardShellData,
+  NotificationChannelItem,
+  NotificationEventItem,
+  NotificationsScreenData,
+  ProjectsOverviewData,
   SettingsFilenameFormat,
   SettingsQualityPreset,
   SettingsScreenData,
@@ -983,6 +986,136 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
     planValue,
     planMeta,
     planPercent: cycleConsumedPercent
+  };
+}
+
+export async function getNotificationsScreenData(): Promise<NotificationsScreenData> {
+  noStore();
+
+  const now = new Date();
+  const { supabase, workspace, settings } = await getWorkspaceContext();
+  const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const locale = metadata.preferredLocale ?? DEFAULT_APP_LOCALE;
+  const [{ data: billingCycleData, error: billingError }, projects] = await Promise.all([
+    supabase
+      .from("workspace_billing_cycles")
+      .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
+      .eq("workspace_id", workspace.id)
+      .order("period_start", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    getProjectRecords()
+  ]);
+
+  if (billingError) {
+    throw new Error(`Failed to load notification billing cycle: ${billingError.message}`);
+  }
+
+  const billingCycle = billingCycleData as BillingCycleRow | null;
+  const currentPlan = getBillingPlanDefinition(workspace.plan_name);
+  const creditsLimit = Math.max(billingCycle?.credits_limit ?? 0, currentPlan.creditsLimit);
+  const creditsUsed = Math.max(
+    billingCycle?.credits_used ?? 0,
+    workspace.credits_used ?? 0,
+    projects.reduce((sum, project) => sum + project.files.reduce((fileSum, file) => fileSum + file.words, 0), 0)
+  );
+  const planPercent = creditsLimit > 0 ? Math.min(Math.round((creditsUsed / creditsLimit) * 100), 100) : 0;
+  const reviewQueue = projects.reduce(
+    (sum, project) => sum + project.files.filter((file) => file.status === "Review").length,
+    0
+  );
+  const failedFiles = projects.reduce(
+    (sum, project) => sum + project.files.filter((file) => file.status === "Error").length,
+    0
+  );
+
+  const channels: NotificationChannelItem[] = [
+    {
+      id: "translation_complete_email",
+      label: locale === "de" ? "Übersetzung fertig" : "Translation complete",
+      description: locale === "de" ? "E-Mail, wenn Datei- oder Textübersetzungen abgeschlossen sind." : "Email when file or text translations finish.",
+      enabled: settings.email_notifications,
+      type: "email"
+    },
+    {
+      id: "invoice_created_email",
+      label: locale === "de" ? "Rechnung erstellt" : "Invoice created",
+      description: locale === "de" ? "E-Mail bei neuen Rechnungen oder Abrechnungsbelegen." : "Email when a new invoice or billing document is issued.",
+      enabled: metadata.invoiceCreatedEmail ?? true,
+      type: "email"
+    },
+    {
+      id: "payment_failed_email",
+      label: locale === "de" ? "Zahlung fehlgeschlagen" : "Payment failed",
+      description: locale === "de" ? "E-Mail, wenn Stripe eine fehlgeschlagene Zahlung meldet." : "Email when Stripe reports a failed payment.",
+      enabled: metadata.paymentFailedEmail ?? true,
+      type: "email"
+    },
+    {
+      id: "spending_limit_email",
+      label: locale === "de" ? "Limit fast erreicht" : "Spending limit reached",
+      description: locale === "de" ? "E-Mail, wenn der Workspace sich dem Credit-Limit nähert." : "Email when the workspace gets close to its credit limit.",
+      enabled: metadata.spendingLimitEmail ?? true,
+      type: "email"
+    },
+    {
+      id: "review_reminders",
+      label: locale === "de" ? "Review-Erinnerungen" : "Review reminders",
+      description: locale === "de" ? "Erinnerungen für offene Review-Warteschlangen." : "Reminders for open review queues.",
+      enabled: settings.review_reminders,
+      type: "email"
+    },
+    {
+      id: "in_app_notifications",
+      label: locale === "de" ? "In-App Notifications" : "In-app notifications",
+      description: locale === "de" ? "Hinweise direkt im Produkt statt nur per E-Mail." : "Alerts inside the product instead of email only.",
+      enabled: metadata.inAppNotifications ?? true,
+      type: "in_app"
+    }
+  ];
+
+  const emailEnabledCount = channels.filter((channel) => channel.type === "email" && channel.enabled).length;
+  const totalChannelCount = channels.length;
+
+  const metrics: UsageMetricItem[] = [
+    {
+      value: `${channels.filter((channel) => channel.enabled).length}/${totalChannelCount}`,
+      label: locale === "de" ? "Kanäle aktiv" : "Channels active",
+      meta: locale === "de" ? "Über E-Mail und In-App" : "Across email and in-app",
+      tone: "positive"
+    },
+    {
+      value: String(emailEnabledCount),
+      label: locale === "de" ? "E-Mail-Alerts aktiv" : "Email alerts active",
+      meta: locale === "de" ? "Lieferung, Billing und Limits" : "Delivery, billing, and limits"
+    },
+    {
+      value: String(reviewQueue),
+      label: locale === "de" ? "Review-Hinweise offen" : "Review notifications open",
+      meta: locale === "de" ? "Dateien warten auf Prüfung" : "Files are waiting for review"
+    },
+    {
+      value: String(failedFiles),
+      label: locale === "de" ? "Fehler mit Signalwert" : "Failures to signal",
+      meta: locale === "de" ? "Dateien mit Fehlerstatus" : "Files currently in error state"
+    }
+  ];
+
+  const items: NotificationEventItem[] = buildNotificationEventItems({
+    projects,
+    locale,
+    now,
+    planPercent,
+    reviewQueue,
+    metadata
+  });
+
+  return {
+    metrics,
+    channels,
+    items,
+    updatedLabel: formatUpdatedLabel(now, locale),
+    settingsHref: "/settings?section=notifications"
   };
 }
 
@@ -3608,6 +3741,96 @@ function buildUsageActivityFeed(projects: ProjectRecord[], locale: AppLocale): U
     .slice(0, 12);
 }
 
+function buildNotificationEventItems({
+  projects,
+  locale,
+  now,
+  planPercent,
+  reviewQueue,
+  metadata
+}: {
+  projects: ProjectRecord[];
+  locale: AppLocale;
+  now: Date;
+  planPercent: number;
+  reviewQueue: number;
+  metadata: WorkspaceSettingsMetadata;
+}): NotificationEventItem[] {
+  const items: Array<NotificationEventItem & { timestamp: string }> = [];
+
+  if (planPercent >= 80 && (metadata.spendingLimitEmail ?? true)) {
+    items.push({
+      id: "workspace-usage-warning",
+      title: locale === "de" ? "Workspace nähert sich dem Limit" : "Workspace is nearing the limit",
+      detail:
+        locale === "de"
+          ? `${Math.round(planPercent)}% des aktuellen Credit-Limits sind bereits verbraucht.`
+          : `${Math.round(planPercent)}% of the current credit limit has already been consumed.`,
+      projectName: locale === "de" ? "Workspace" : "Workspace",
+      timestampLabel: formatActivityTimestamp(now, locale),
+      href: "/billing",
+      tone: "warning",
+      timestamp: now.toISOString()
+    });
+  }
+
+  if (reviewQueue > 0) {
+    items.push({
+      id: "workspace-review-queue",
+      title: locale === "de" ? "Review-Warteschlange benötigt Aufmerksamkeit" : "Review queue needs attention",
+      detail:
+        locale === "de"
+          ? `${formatCompactNumber(reviewQueue, locale)} Dateien warten aktuell auf Freigabe oder QA.`
+          : `${formatCompactNumber(reviewQueue, locale)} files are currently waiting for approval or QA.`,
+      projectName: locale === "de" ? "Workspace" : "Workspace",
+      timestampLabel: formatActivityTimestamp(now, locale),
+      href: "/usage",
+      tone: "warning",
+      timestamp: now.toISOString()
+    });
+  }
+
+  if (metadata.stripeSubscriptionStatus && ["past_due", "unpaid", "incomplete"].includes(metadata.stripeSubscriptionStatus)) {
+    items.push({
+      id: "workspace-billing-issue",
+      title: locale === "de" ? "Billing benötigt Aufmerksamkeit" : "Billing needs attention",
+      detail:
+        locale === "de"
+          ? `Stripe meldet den Status ${formatStripeStatusLabel(metadata.stripeSubscriptionStatus, locale)}.`
+          : `Stripe currently reports ${formatStripeStatusLabel(metadata.stripeSubscriptionStatus, locale)}.`,
+      projectName: locale === "de" ? "Abrechnung" : "Billing",
+      timestampLabel: formatActivityTimestamp(now, locale),
+      href: "/billing",
+      tone: "danger",
+      timestamp: now.toISOString()
+    });
+  }
+
+  for (const project of projects) {
+    for (const activity of project.recentActivity) {
+      items.push({
+        id: `${project.id}-${activity.id}`,
+        title: activity.title,
+        detail: activity.detail,
+        projectName: project.name,
+        timestampLabel: formatActivityTimestamp(new Date(activity.timestamp), locale),
+        href: `/projects/${project.id}`,
+        tone: classifyNotificationTone(activity.title, activity.detail),
+        timestamp: activity.timestamp
+      });
+    }
+  }
+
+  return items
+    .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
+    .slice(0, 10)
+    .map((item) => {
+      const { timestamp, ...nextItem } = item;
+      void timestamp;
+      return nextItem;
+    });
+}
+
 function classifyUsageActivityKind(
   title: string,
   detail: string
@@ -3623,6 +3846,43 @@ function classifyUsageActivityKind(
   }
 
   return "translation";
+}
+
+function classifyNotificationTone(
+  title: string,
+  detail: string
+): NotificationEventItem["tone"] {
+  const normalized = `${title} ${detail}`.toLowerCase();
+
+  if (
+    normalized.includes("error") ||
+    normalized.includes("failed") ||
+    normalized.includes("fehl") ||
+    normalized.includes("block")
+  ) {
+    return "danger";
+  }
+
+  if (
+    normalized.includes("review") ||
+    normalized.includes("approval") ||
+    normalized.includes("prüfung") ||
+    normalized.includes("qa")
+  ) {
+    return "warning";
+  }
+
+  if (
+    normalized.includes("done") ||
+    normalized.includes("generated") ||
+    normalized.includes("export") ||
+    normalized.includes("synced") ||
+    normalized.includes("approved")
+  ) {
+    return "positive";
+  }
+
+  return "default";
 }
 
 function formatDateKey(date: Date) {

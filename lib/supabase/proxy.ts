@@ -5,7 +5,7 @@ import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 const AUTH_PATHS = new Set(["/login", "/register"]);
 const PUBLIC_API_PATHS = new Set(["/api/stripe/webhook"]);
-const PROTECTED_APP_PATH_PREFIXES = ["/dashboard", "/projects", "/translate", "/usage", "/glossary", "/billing", "/settings"];
+const PROTECTED_APP_PATH_PREFIXES = ["/dashboard", "/projects", "/translate", "/usage", "/glossary", "/notifications", "/billing", "/settings"];
 
 function isProtectedAppPath(pathname: string) {
   return PROTECTED_APP_PATH_PREFIXES.some(

@@ -24,6 +24,7 @@ import type {
 
 type SettingsScreenProps = {
   data: SettingsScreenData;
+  initialSection?: SettingsSectionId;
 };
 
 type SectionMeta = {
@@ -120,12 +121,12 @@ const FILENAME_OPTIONS: Array<{ value: SettingsFilenameFormat; description: stri
 const INPUT_CLASS_NAME =
   "h-11 w-full rounded-[12px] border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--foreground)] outline-none transition focus:border-[var(--border-strong)]";
 
-export function SettingsScreen({ data }: SettingsScreenProps) {
+export function SettingsScreen({ data, initialSection = "translation" }: SettingsScreenProps) {
   const providerLocale = useAppLocale();
   const router = useRouter();
   const [supabase] = useState(() => createClient());
   const [draft, setDraft] = useState(data);
-  const [activeSection, setActiveSection] = useState<SettingsSectionId>("translation");
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>(initialSection);
   const [isPending, startTransition] = useTransition();
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
