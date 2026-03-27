@@ -12,7 +12,12 @@ import { parseStringsDocument, serializeTranslatedStrings, type ParsedStringsDoc
 import { parseTxtDocument, serializeTranslatedTxt, type ParsedTxtDocument } from "@/lib/file-formats/txt";
 import { containsMeaningfulText, maskProtectedTokens } from "@/lib/masking/tokens";
 import { restoreProtectedTokens, unmaskString } from "@/lib/masking/restore";
-import { getExactGlossaryTranslations, getTranslationRuntimeSettings } from "@/lib/supabase/workspace";
+import { countWordsFromSourceTexts } from "@/lib/translation/word-count";
+import {
+  getExactGlossaryTranslations,
+  getTranslationRuntimeSettings,
+  recordFileTranslationUsage
+} from "@/lib/supabase/workspace";
 import { parseXliffDocument } from "@/lib/xliff/parser";
 import { serializeTranslatedXliff } from "@/lib/xliff/serializer";
 import { OpenAITranslationProvider } from "@/services/translation/openai-provider";
@@ -201,6 +206,8 @@ async function translateXliffDocument(input: {
     targetLanguage: input.targetLanguage
   });
 
+  await recordFileTranslationUsage(countWordsFromSourceTexts(parsedDocument.units));
+
   return {
     fileName: buildOutputFileName(
       input.fileName,
@@ -259,6 +266,8 @@ async function translateGenericDocument(input: {
     translationMap
   );
 
+  await recordFileTranslationUsage(countWordsFromSourceTexts(parsed.units));
+
   return {
     fileName: buildOutputFileName(
       input.fileName,
@@ -314,6 +323,8 @@ async function translateOfficeDocument(input: {
     parsedDocument,
     new Map(writebacks.map((writeback) => [writeback.id, writeback.value]))
   );
+
+  await recordFileTranslationUsage(countWordsFromSourceTexts(parsedDocument.units));
 
   return {
     fileName: buildOutputFileName(

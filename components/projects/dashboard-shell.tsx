@@ -64,13 +64,13 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           planSuffix: "plan"
         };
   const mainNavItems = [
-    { label: copy.translate, href: "/translate", icon: TranslateIcon },
-    { label: copy.usage, href: "/usage", icon: UsageIcon },
-    { label: copy.glossary, href: "/glossary", icon: GlossaryIcon }
+    { label: copy.translate, href: "/translate", icon: TranslateIcon, prefetch: shouldPrefetch },
+    { label: copy.usage, href: "/usage", icon: UsageIcon, prefetch: false },
+    { label: copy.glossary, href: "/glossary", icon: GlossaryIcon, prefetch: shouldPrefetch }
   ];
   const utilityNavItems = [
-    { label: copy.billing, href: "/billing", icon: BillingIcon },
-    { label: copy.settings, href: "/settings", icon: SettingsIcon }
+    { label: copy.billing, href: "/billing", icon: BillingIcon, prefetch: shouldPrefetch },
+    { label: copy.settings, href: "/settings", icon: SettingsIcon, prefetch: shouldPrefetch }
   ];
 
   useEffect(() => {
@@ -257,7 +257,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                 ].join(" ");
 
                 return item.href ? (
-                  <Link key={item.label} href={item.href} prefetch={shouldPrefetch} className={className}>
+                  <Link key={item.label} href={item.href} prefetch={item.prefetch} className={className}>
                     <Icon />
                     <span>
                       {item.label}
@@ -287,7 +287,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                   ].join(" ");
 
                   return (
-                    <Link key={item.label} href={item.href} prefetch={shouldPrefetch} className={className}>
+                    <Link key={item.label} href={item.href} prefetch={item.prefetch} className={className}>
                       <Icon />
                       <span>
                         {item.label}

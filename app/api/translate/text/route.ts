@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
-import { getTranslationRuntimeSettings } from "@/lib/supabase/workspace";
+import { getTranslationRuntimeSettings, recordTextTranslationUsage } from "@/lib/supabase/workspace";
 import { OpenAITranslationProvider } from "@/services/translation/openai-provider";
 import {
   isTranslationPipelineError,
@@ -67,6 +67,8 @@ export async function POST(request: Request) {
       wordCount: countMeaningfulTextContent(text),
       characterCount: text.length
     };
+
+    await recordTextTranslationUsage(responsePayload.wordCount);
 
     return NextResponse.json(responsePayload, { status: 200 });
   } catch (error) {

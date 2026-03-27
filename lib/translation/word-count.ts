@@ -32,6 +32,12 @@ export function countMeaningfulWords(text: string): number {
 export function countWordsFromTranslationUnits(
   units: Array<Pick<ParsedTranslationUnit, "sourceText">>
 ): number {
+  return countWordsFromSourceTexts(units);
+}
+
+export function countWordsFromSourceTexts(
+  units: Array<{ sourceText: string }>
+): number {
   return units.reduce((sum, unit) => sum + countMeaningfulWords(unit.sourceText), 0);
 }
 
@@ -69,10 +75,6 @@ export async function estimateBinaryTranslationFileWordCount(
 
 export function countMeaningfulTextContent(content: string) {
   return countMeaningfulWords(stripMarkup(content));
-}
-
-function countWordsFromSourceTexts(units: Array<Pick<ParsedTranslationUnit, "sourceText">>) {
-  return units.reduce((sum, unit) => sum + countMeaningfulWords(unit.sourceText), 0);
 }
 
 function stripMarkup(content: string) {

@@ -426,6 +426,13 @@ export async function syncProjectFiles(
       existingBySourceKey.get(getProjectFileSourceKey(file.name, file.targetLanguage, sourceStoragePath)) ??
       existingByFallbackKey.get(getProjectFileFallbackKey(file.name, file.targetLanguage));
     const wordCount = await resolveProjectFileWordCount(file);
+    const nextStatus = mapFileStatusToDatabase(file.status);
+
+    // The background "queued" sync after upload must never overwrite a file that
+    // already progressed to a real translation state.
+    if (existing && nextStatus === "queued" && countsTowardUsage(existing.status)) {
+      continue;
+    }
 
     const values = {
       project_id: project.id,
@@ -433,7 +440,7 @@ export async function syncProjectFiles(
       file_format: getFileFormat(file.name),
       source_language: file.sourceLanguage,
       target_language: file.targetLanguage,
-      status: mapFileStatusToDatabase(file.status),
+      status: nextStatus,
       progress_percent: file.progress,
       word_count: wordCount,
       source_storage_path: sourceStoragePath,
@@ -502,50 +509,36 @@ export async function syncProjectFiles(
     throw new Error(`Failed to update project status: ${projectUpdateError.message}`);
   }
 
-  const workspaceCreditsUsed = await getWorkspaceCurrentCreditsUsed(supabase, workspace.id);
-  const { error: workspaceUpdateError } = await supabase
-    .from("workspaces")
-    .update({
-      credits_used: workspaceCreditsUsed,
-      updated_at: now
-    })
-    .eq("id", workspace.id);
-
-  if (workspaceUpdateError) {
-    throw new Error(`Failed to update workspace credits: ${workspaceUpdateError.message}`);
-  }
-
-  const { data: activeCycleData, error: activeCycleError } = await supabase
-    .from("workspace_billing_cycles")
-    .select("id, credits_used")
-    .eq("workspace_id", workspace.id)
-    .eq("status", "active")
-    .order("period_start", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (activeCycleError) {
-    throw new Error(`Failed to load active billing cycle: ${activeCycleError.message}`);
-  }
-
-  const activeCycle = activeCycleData as Pick<BillingCycleRow, "id" | "credits_used"> | null;
-
-  if (activeCycle) {
-    const cycleCreditsUsed = Math.max(activeCycle.credits_used, workspaceCreditsUsed);
-
-    if (cycleCreditsUsed !== activeCycle.credits_used) {
-      const { error: billingUpdateError } = await supabase
-        .from("workspace_billing_cycles")
-        .update({ credits_used: cycleCreditsUsed })
-        .eq("id", activeCycle.id);
-
-      if (billingUpdateError) {
-        throw new Error(`Failed to update billing cycle usage: ${billingUpdateError.message}`);
-      }
-    }
-  }
-
   return refreshedFiles.map(mapProjectFileRecord);
+}
+
+export async function recordTextTranslationUsage(wordCount: number) {
+  if (!Number.isFinite(wordCount) || wordCount <= 0) {
+    return;
+  }
+
+  const { supabase, workspace } = await getWorkspaceContext();
+
+  await recordWorkspaceUsageDelta(supabase, workspace, {
+    occurredAt: new Date(),
+    creditsUsed: Math.max(0, Math.round(wordCount)),
+    apiRequests: 1
+  });
+}
+
+export async function recordFileTranslationUsage(wordCount: number) {
+  if (!Number.isFinite(wordCount) || wordCount <= 0) {
+    return;
+  }
+
+  const { supabase, workspace } = await getWorkspaceContext();
+
+  await recordWorkspaceUsageDelta(supabase, workspace, {
+    occurredAt: new Date(),
+    creditsUsed: Math.max(0, Math.round(wordCount)),
+    apiRequests: 1,
+    exportCount: 1
+  });
 }
 
 export async function deleteProject(projectSlug: string): Promise<void> {
@@ -2830,6 +2823,114 @@ async function archiveDeletedProjectUsage(
   };
 }
 
+async function recordWorkspaceUsageDelta(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspace: Pick<WorkspaceRow, "id" | "credits_used">,
+  delta: {
+    occurredAt: Date;
+    creditsUsed: number;
+    apiRequests?: number;
+    uploadCount?: number;
+    exportCount?: number;
+    reviewSessions?: number;
+  }
+) {
+  const creditsUsed = Math.max(0, Math.round(delta.creditsUsed));
+  const apiRequests = Math.max(0, Math.round(delta.apiRequests ?? 0));
+  const uploadCount = Math.max(0, Math.round(delta.uploadCount ?? 0));
+  const exportCount = Math.max(0, Math.round(delta.exportCount ?? 0));
+  const reviewSessions = Math.max(0, Math.round(delta.reviewSessions ?? 0));
+
+  if (creditsUsed === 0 && apiRequests === 0 && uploadCount === 0 && exportCount === 0 && reviewSessions === 0) {
+    return;
+  }
+
+  const usageDate = formatDateKey(delta.occurredAt);
+  const [{ data: activeCycleData, error: activeCycleError }, { data: dailyUsageData, error: dailyUsageError }, { data: projectRows, error: projectRowsError }] =
+    await Promise.all([
+      supabase
+        .from("workspace_billing_cycles")
+        .select("id, credits_used")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "active")
+        .order("period_start", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("workspace_daily_usage")
+        .select("usage_date, credits_used, api_requests, upload_count, export_count, review_sessions, active_projects")
+        .eq("workspace_id", workspace.id)
+        .eq("usage_date", usageDate)
+        .maybeSingle(),
+      supabase
+        .from("projects")
+        .select("status")
+        .eq("workspace_id", workspace.id)
+    ]);
+
+  if (activeCycleError) {
+    throw new Error(`Failed to load active billing cycle: ${activeCycleError.message}`);
+  }
+
+  if (dailyUsageError) {
+    throw new Error(`Failed to load daily usage row: ${dailyUsageError.message}`);
+  }
+
+  if (projectRowsError) {
+    throw new Error(`Failed to load projects for usage sync: ${projectRowsError.message}`);
+  }
+
+  const activeCycle = activeCycleData as Pick<BillingCycleRow, "id" | "credits_used"> | null;
+  const existingDailyRow = dailyUsageData as DailyUsageRow | null;
+  const activeProjects = (((projectRows as Array<{ status: ProjectRow["status"] }> | null) ?? [])).filter(
+    (project) => project.status !== "completed"
+  ).length;
+
+  const { error: usageUpsertError } = await supabase
+    .from("workspace_daily_usage")
+    .upsert(
+      {
+        workspace_id: workspace.id,
+        billing_cycle_id: activeCycle?.id ?? null,
+        usage_date: usageDate,
+        credits_used: (existingDailyRow?.credits_used ?? 0) + creditsUsed,
+        api_requests: (existingDailyRow?.api_requests ?? 0) + apiRequests,
+        upload_count: (existingDailyRow?.upload_count ?? 0) + uploadCount,
+        export_count: (existingDailyRow?.export_count ?? 0) + exportCount,
+        review_sessions: (existingDailyRow?.review_sessions ?? 0) + reviewSessions,
+        active_projects: Math.max(existingDailyRow?.active_projects ?? 0, activeProjects)
+      },
+      { onConflict: "workspace_id,usage_date" }
+    );
+
+  if (usageUpsertError) {
+    throw new Error(`Failed to update daily usage: ${usageUpsertError.message}`);
+  }
+
+  const nextWorkspaceCreditsUsed = workspace.credits_used + creditsUsed;
+  const { error: workspaceUpdateError } = await supabase
+    .from("workspaces")
+    .update({ credits_used: nextWorkspaceCreditsUsed })
+    .eq("id", workspace.id);
+
+  if (workspaceUpdateError) {
+    throw new Error(`Failed to update workspace credits: ${workspaceUpdateError.message}`);
+  }
+
+  if (activeCycle) {
+    const { error: billingUpdateError } = await supabase
+      .from("workspace_billing_cycles")
+      .update({ credits_used: activeCycle.credits_used + creditsUsed })
+      .eq("id", activeCycle.id);
+
+    if (billingUpdateError) {
+      throw new Error(`Failed to update billing cycle usage: ${billingUpdateError.message}`);
+    }
+  }
+
+  await syncWorkspaceUsageBreakdown(supabase, workspace.id);
+}
+
 async function rollbackArchivedProjectUsage(
   supabase: ReturnType<typeof createServerSupabaseClient>,
   workspaceId: string,
@@ -2933,6 +3034,92 @@ function getCreditsUsedFromFiles(files: Array<Pick<ProjectFileRow, "word_count" 
 
     return sum + file.word_count;
   }, 0);
+}
+
+async function syncWorkspaceUsageBreakdown(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  workspaceId: string
+) {
+  const { data, error } = await supabase
+    .from("workspace_daily_usage")
+    .select("credits_used, upload_count, export_count, review_sessions")
+    .eq("workspace_id", workspaceId);
+
+  if (error) {
+    throw new Error(`Failed to load usage rows for breakdown sync: ${error.message}`);
+  }
+
+  const rows = (data as Pick<DailyUsageRow, "credits_used" | "upload_count" | "export_count" | "review_sessions">[] | null) ?? [];
+  const totals = rows.reduce(
+    (sum, row) => ({
+      creditsUsed: sum.creditsUsed + row.credits_used,
+      uploads: sum.uploads + row.upload_count,
+      exports: sum.exports + row.export_count,
+      reviews: sum.reviews + row.review_sessions
+    }),
+    {
+      creditsUsed: 0,
+      uploads: 0,
+      exports: 0,
+      reviews: 0
+    }
+  );
+  const maxValue = Math.max(totals.creditsUsed, totals.uploads, totals.exports, totals.reviews, 1);
+  const nextRows = [
+    {
+      workspace_id: workspaceId,
+      metric_key: "credits_consumed",
+      metric_label: "Credits consumed",
+      metric_value: totals.creditsUsed,
+      share_percent: Math.round((totals.creditsUsed / maxValue) * 100),
+      sort_order: 1
+    },
+    {
+      workspace_id: workspaceId,
+      metric_key: "uploads",
+      metric_label: "Uploads",
+      metric_value: totals.uploads,
+      share_percent: Math.round((totals.uploads / maxValue) * 100),
+      sort_order: 2
+    },
+    {
+      workspace_id: workspaceId,
+      metric_key: "exports_generated",
+      metric_label: "Exports generated",
+      metric_value: totals.exports,
+      share_percent: Math.round((totals.exports / maxValue) * 100),
+      sort_order: 3
+    },
+    {
+      workspace_id: workspaceId,
+      metric_key: "review_sessions",
+      metric_label: "Review sessions",
+      metric_value: totals.reviews,
+      share_percent: Math.round((totals.reviews / maxValue) * 100),
+      sort_order: 4
+    }
+  ];
+
+  const { error: deleteError } = await supabase
+    .from("workspace_usage_breakdown")
+    .delete()
+    .eq("workspace_id", workspaceId);
+
+  if (deleteError) {
+    throw new Error(`Failed to clear usage breakdown: ${deleteError.message}`);
+  }
+
+  const { error: insertError } = await supabase
+    .from("workspace_usage_breakdown")
+    .insert(nextRows);
+
+  if (insertError) {
+    throw new Error(`Failed to update usage breakdown: ${insertError.message}`);
+  }
+}
+
+function countsTowardUsage(status: ProjectFileRow["status"]) {
+  return status !== "queued";
 }
 
 function getProjectFileUsageDate(file: ProjectFileRow) {
