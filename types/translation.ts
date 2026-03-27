@@ -85,6 +85,15 @@ export interface TextTranslationApiSuccess {
   characterCount: number;
 }
 
+export interface InsufficientCreditsErrorDetails {
+  requiredCredits: number;
+  remainingCredits: number;
+  creditsLimit: number;
+  creditsUsed: number;
+  billingPath?: string;
+  upgradePath?: string;
+}
+
 export interface TranslationApiErrorShape {
   error: {
     code: PipelineErrorCode;
@@ -102,6 +111,7 @@ export type PipelineErrorCode =
   | "tag_mismatch"
   | "invalid_ai_response"
   | "translation_provider_error"
+  | "insufficient_credits"
   | "validation_error";
 
 export class TranslationPipelineError extends Error {

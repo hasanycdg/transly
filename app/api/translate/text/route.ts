@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
-import { getTranslationRuntimeSettings, recordTextTranslationUsage } from "@/lib/supabase/workspace";
+import {
+  assertWorkspaceHasCredits,
+  getTranslationRuntimeSettings,
+  recordTextTranslationUsage
+} from "@/lib/supabase/workspace";
 import { OpenAITranslationProvider } from "@/services/translation/openai-provider";
 import {
   isTranslationPipelineError,
@@ -48,6 +52,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const wordCount = countMeaningfulTextContent(text);
+
+    await assertWorkspaceHasCredits(wordCount);
+
     const provider = new OpenAITranslationProvider({
       model: runtimeSettings.translationModel
     });
@@ -64,7 +72,7 @@ export async function POST(request: Request) {
       detectedSourceLanguage: result.detectedSourceLanguage,
       targetLanguage,
       toneStyle,
-      wordCount: countMeaningfulTextContent(text),
+      wordCount,
       characterCount: text.length
     };
 

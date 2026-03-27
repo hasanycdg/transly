@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
+import {
+  buildTranslationUiError,
+  type TranslationErrorAction,
+  type TranslationUiError
+} from "@/lib/translation/api-errors";
 import { getProjectStatusTone } from "@/lib/projects/display";
 import { formatCompactNumber, formatPercent, formatProjectDate, getLanguageLabel } from "@/lib/projects/formatters";
 import { getProjectSummary } from "@/lib/projects/mock-data";
@@ -42,6 +47,7 @@ type ProjectTranslationFailure = {
   sourceFileName: string;
   targetLanguage: string;
   message: string;
+  actions: TranslationErrorAction[];
 };
 
 type UploadedSourceFile = {
@@ -75,7 +81,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [translationProgress, setTranslationProgress] = useState(0);
   const [currentTaskLabel, setCurrentTaskLabel] = useState<string | null>(null);
-  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [translationError, setTranslationError] = useState<TranslationUiError | null>(null);
   const [translationOutputs, setTranslationOutputs] = useState<ProjectTranslationOutput[]>([]);
   const [translationFailures, setTranslationFailures] = useState<ProjectTranslationFailure[]>([]);
   const autoDownloadedOutputIdsRef = useRef<Set<string>>(new Set());
@@ -169,7 +175,11 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           noTargets: "Für dieses Projekt sind noch keine Zielsprachen konfiguriert.",
           translationFailed: "Übersetzung fehlgeschlagen.",
           translationSummary: (failed: number, succeeded: number) =>
-            `${failed} Übersetzungsjob${failed === 1 ? "" : "s"} fehlgeschlagen, während ${succeeded} erfolgreich waren.`
+            `${failed} Übersetzungsjob${failed === 1 ? "" : "s"} fehlgeschlagen, während ${succeeded} erfolgreich waren.`,
+          openBilling: "Billing öffnen",
+          upgradePlan: "Plan upgraden",
+          insufficientCredits: (requiredCredits: number, remainingCredits: number) =>
+            `Für diese Übersetzung werden ${requiredCredits} Credits benötigt, verfügbar sind noch ${remainingCredits}.`
         }
       : {
           notFoundTitle: "Project not found",
@@ -254,7 +264,11 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           noTargets: "This project has no target languages configured yet.",
           translationFailed: "Translation failed.",
           translationSummary: (failed: number, succeeded: number) =>
-            `${failed} translation ${failed === 1 ? "job failed" : "jobs failed"} while ${succeeded} succeeded.`
+            `${failed} translation ${failed === 1 ? "job failed" : "jobs failed"} while ${succeeded} succeeded.`,
+          openBilling: "Open billing",
+          upgradePlan: "Upgrade plan",
+          insufficientCredits: (requiredCredits: number, remainingCredits: number) =>
+            `This translation needs ${requiredCredits} credits but only ${remainingCredits} remain.`
         };
 
   useEffect(() => {
@@ -501,30 +515,44 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
 
   async function handleStartTranslation() {
     if (selectedFiles.length === 0) {
-      setTranslationError(copy.selectFiles);
+      setTranslationError({
+        code: "validation_error",
+        message: copy.selectFiles,
+        actions: []
+      });
       setTranslationOutputs([]);
       setTranslationFailures([]);
       return;
     }
 
     if (isPreparingUploads) {
-      setTranslationError(copy.filesStillPreparing);
+      setTranslationError({
+        code: "validation_error",
+        message: copy.filesStillPreparing,
+        actions: []
+      });
       return;
     }
 
     const unsupportedFiles = selectedFiles.filter((file) => !isSupportedTranslationFile(file.name));
 
     if (unsupportedFiles.length > 0) {
-      setTranslationError(
-        copy.unsupportedFiles(unsupportedFiles.map((file) => file.name).join(", "))
-      );
+      setTranslationError({
+        code: "validation_error",
+        message: copy.unsupportedFiles(unsupportedFiles.map((file) => file.name).join(", ")),
+        actions: []
+      });
       setTranslationOutputs([]);
       setTranslationFailures([]);
       return;
     }
 
     if (uploadedSourceFiles.length !== selectedFiles.length) {
-      setTranslationError(copy.filesStillPreparing);
+      setTranslationError({
+        code: "validation_error",
+        message: copy.filesStillPreparing,
+        actions: []
+      });
       return;
     }
 
@@ -540,7 +568,11 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
     );
 
     if (jobs.length === 0) {
-      setTranslationError(copy.noTargets);
+      setTranslationError({
+        code: "validation_error",
+        message: copy.noTargets,
+        actions: []
+      });
       setTranslationOutputs([]);
       setTranslationFailures([]);
       return;
@@ -599,11 +631,23 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
         const payload = (await response.json()) as TranslationApiSuccess | TranslationApiErrorShape;
 
         if (!response.ok || "error" in payload) {
+          const translationApiError = "error" in payload
+            ? buildTranslationUiError(payload.error, {
+                insufficientCreditsMessage: (details) =>
+                  copy.insufficientCredits(details.requiredCredits, details.remainingCredits)
+              })
+            : {
+                code: "translation_provider_error" as const,
+                message: copy.translationFailed,
+                actions: []
+              };
+
           nextFailures.push({
             id: `${job.sourceFileName}-${job.targetLanguage}-${index}`,
             sourceFileName: job.sourceFileName,
             targetLanguage: job.targetLanguage,
-            message: "error" in payload ? payload.error.message : copy.translationFailed
+            message: translationApiError.message,
+            actions: translationApiError.actions
           });
           setRuntimeFileStates((current) => ({
             ...current,
@@ -639,12 +683,26 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           }));
         }
       } catch (error) {
+        const translationUiError =
+          error instanceof Error
+            ? {
+                code: "translation_provider_error" as const,
+                message: error.message,
+                actions: []
+              }
+            : {
+                code: "translation_provider_error" as const,
+                message: copy.translationFailed,
+                actions: []
+              };
+
         nextFailures.push({
           id: `${job.sourceFileName}-${job.targetLanguage}-${index}`,
           sourceFileName: job.sourceFileName,
           targetLanguage: job.targetLanguage,
-            message: error instanceof Error ? error.message : copy.translationFailed
-          });
+          message: translationUiError.message,
+          actions: translationUiError.actions
+        });
         finalRuntimeStates[job.id] = {
           status: "Error",
           progress: 100,
@@ -683,13 +741,28 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
     setIsTranslating(false);
 
     if (nextOutputs.length === 0 && nextFailures.length > 0) {
-      setTranslationError(nextFailures[0].message);
+      setTranslationError({
+        code: "translation_provider_error",
+        message: nextFailures[0].message,
+        actions: nextFailures[0].actions
+      });
       return;
     }
 
     if (nextFailures.length > 0) {
+      const priorityFailure = nextFailures.find((failure) => failure.actions.length > 0) ?? null;
       setTranslationError(
-        copy.translationSummary(nextFailures.length, nextOutputs.length)
+        priorityFailure
+          ? {
+              code: "insufficient_credits",
+              message: priorityFailure.message,
+              actions: priorityFailure.actions
+            }
+          : {
+              code: "translation_provider_error",
+              message: copy.translationSummary(nextFailures.length, nextOutputs.length),
+              actions: []
+            }
       );
     }
   }
@@ -899,9 +972,22 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                 }
               />
 
-              {translationError ? (
+              {translationError && !(translationFailures.length > 0 && translationError.actions.length > 0) ? (
                 <div className="rounded-[8px] border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2 text-[12px] text-[var(--danger)]">
-                  {translationError}
+                  <p>{translationError.message}</p>
+                  {translationError.actions.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {translationError.actions.map((action) => (
+                        <Link
+                          key={`${action.kind}-${action.href}`}
+                          href={action.href}
+                          className="inline-flex items-center justify-center rounded-[8px] border border-[var(--danger-border)] bg-white px-3 py-2 text-[12px] font-medium text-[var(--danger)] transition hover:border-[var(--danger)]"
+                        >
+                          {action.kind === "upgrade" ? copy.upgradePlan : copy.openBilling}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -963,6 +1049,19 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                         {failure.sourceFileName} → {failure.targetLanguage.toUpperCase()}
                       </p>
                       <p className="mt-1 text-[11.5px] text-[var(--danger)]">{failure.message}</p>
+                      {failure.actions.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {failure.actions.map((action) => (
+                            <Link
+                              key={`${failure.id}-${action.kind}-${action.href}`}
+                              href={action.href}
+                              className="inline-flex items-center justify-center rounded-[8px] border border-[var(--danger-border)] bg-white px-3 py-1.5 text-[11.5px] font-medium text-[var(--danger)] transition hover:border-[var(--danger)]"
+                            >
+                              {action.kind === "upgrade" ? copy.upgradePlan : copy.openBilling}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>

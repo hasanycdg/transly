@@ -14,6 +14,7 @@ import { containsMeaningfulText, maskProtectedTokens } from "@/lib/masking/token
 import { restoreProtectedTokens, unmaskString } from "@/lib/masking/restore";
 import { countWordsFromSourceTexts } from "@/lib/translation/word-count";
 import {
+  assertWorkspaceHasCredits,
   getExactGlossaryTranslations,
   getTranslationRuntimeSettings,
   recordFileTranslationUsage
@@ -171,6 +172,10 @@ async function translateXliffDocument(input: {
     });
   }
 
+  const requiredCredits = countWordsFromSourceTexts(parsedDocument.units);
+
+  await assertWorkspaceHasCredits(requiredCredits);
+
   const writebacks = await translateUnits({
     units: parsedDocument.units.map((unit) => ({
       id: unit.internalId,
@@ -206,7 +211,7 @@ async function translateXliffDocument(input: {
     targetLanguage: input.targetLanguage
   });
 
-  await recordFileTranslationUsage(countWordsFromSourceTexts(parsedDocument.units));
+  await recordFileTranslationUsage(requiredCredits);
 
   return {
     fileName: buildOutputFileName(
@@ -247,6 +252,9 @@ async function translateGenericDocument(input: {
   }
 
   const parsed = parseGenericDocument(input.detectedFormat, input.originalContent);
+  const requiredCredits = countWordsFromSourceTexts(parsed.units);
+
+  await assertWorkspaceHasCredits(requiredCredits);
   const writebacks = await translateUnits({
     units: parsed.units.map((unit) => ({
       id: unit.id,
@@ -266,7 +274,7 @@ async function translateGenericDocument(input: {
     translationMap
   );
 
-  await recordFileTranslationUsage(countWordsFromSourceTexts(parsed.units));
+  await recordFileTranslationUsage(requiredCredits);
 
   return {
     fileName: buildOutputFileName(
@@ -307,6 +315,9 @@ async function translateOfficeDocument(input: {
   }
 
   const parsedDocument = await parseOfficeDocument(input.originalBuffer, input.format);
+  const requiredCredits = countWordsFromSourceTexts(parsedDocument.units);
+
+  await assertWorkspaceHasCredits(requiredCredits);
   const writebacks = await translateUnits({
     units: parsedDocument.units.map((unit) => ({
       id: unit.id,
@@ -324,7 +335,7 @@ async function translateOfficeDocument(input: {
     new Map(writebacks.map((writeback) => [writeback.id, writeback.value]))
   );
 
-  await recordFileTranslationUsage(countWordsFromSourceTexts(parsedDocument.units));
+  await recordFileTranslationUsage(requiredCredits);
 
   return {
     fileName: buildOutputFileName(

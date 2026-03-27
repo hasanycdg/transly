@@ -39,6 +39,7 @@ import type {
   ProjectRecord,
   ProjectStatus
 } from "@/types/projects";
+import { TranslationPipelineError, type InsufficientCreditsErrorDetails } from "@/types/translation";
 import type {
   BillingInvoiceItem,
   BillingPlanOption,
@@ -539,6 +540,50 @@ export async function recordFileTranslationUsage(wordCount: number) {
     apiRequests: 1,
     exportCount: 1
   });
+}
+
+export async function assertWorkspaceHasCredits(requiredCredits: number) {
+  if (!Number.isFinite(requiredCredits) || requiredCredits <= 0) {
+    return;
+  }
+
+  const { supabase, workspace } = await getWorkspaceContext();
+  const { data, error } = await supabase
+    .from("workspace_billing_cycles")
+    .select("credits_limit, credits_used")
+    .eq("workspace_id", workspace.id)
+    .eq("status", "active")
+    .order("period_start", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load active billing cycle for credit validation: ${error.message}`);
+  }
+
+  const activeCycle = data as Pick<BillingCycleRow, "credits_limit" | "credits_used"> | null;
+  const planCreditsLimit = getBillingPlanDefinition(workspace.plan_name).creditsLimit;
+  const creditsLimit = activeCycle?.credits_limit ?? workspace.credits_limit ?? planCreditsLimit ?? DEFAULT_CREDITS_LIMIT;
+  const creditsUsed = Math.max(activeCycle?.credits_used ?? 0, workspace.credits_used ?? 0);
+  const remainingCredits = Math.max(creditsLimit - creditsUsed, 0);
+
+  if (requiredCredits > remainingCredits) {
+    const details: InsufficientCreditsErrorDetails = {
+      requiredCredits: Math.round(requiredCredits),
+      remainingCredits,
+      creditsLimit,
+      creditsUsed,
+      billingPath: "/billing",
+      upgradePath: "/billing?intent=credits"
+    };
+
+    throw new TranslationPipelineError(
+      "insufficient_credits",
+      `This translation needs ${details.requiredCredits} credits but only ${remainingCredits} remain in the current billing cycle.`,
+      402,
+      { ...details }
+    );
+  }
 }
 
 export async function deleteProject(projectSlug: string): Promise<void> {

@@ -1,8 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
+import {
+  buildTranslationUiError,
+  type TranslationUiError
+} from "@/lib/translation/api-errors";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
 import { getLanguageLabel } from "@/lib/projects/formatters";
 import { getLanguageOptions } from "@/lib/languages";
@@ -31,7 +36,7 @@ export function TextTranslationScreen({
   const [recentLanguageCodes, setRecentLanguageCodes] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [result, setResult] = useState<TextTranslationApiSuccess | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [translationError, setTranslationError] = useState<TranslationUiError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const languageOptions = useMemo(
     () =>
@@ -68,7 +73,11 @@ export function TextTranslationScreen({
           exportTxt: "Als TXT exportieren",
           emptyState: "Noch keine Übersetzung gestartet.",
           emptyStateBody: "Nutze diese Fläche für schnellen Text-Output und kurze Übersetzungen.",
-          translateFailed: "Textübersetzung fehlgeschlagen."
+          translateFailed: "Textübersetzung fehlgeschlagen.",
+          openBilling: "Billing öffnen",
+          upgradePlan: "Plan upgraden",
+          insufficientCredits: (requiredCredits: number, remainingCredits: number) =>
+            `Für diese Übersetzung werden ${requiredCredits} Credits benötigt, verfügbar sind noch ${remainingCredits}.`
         }
       : {
           eyebrow: "/ Translate",
@@ -94,7 +103,11 @@ export function TextTranslationScreen({
           exportTxt: "Export as TXT",
           emptyState: "No translation started yet.",
           emptyStateBody: "Use this surface for fast text output and short translations.",
-          translateFailed: "Text translation failed."
+          translateFailed: "Text translation failed.",
+          openBilling: "Open billing",
+          upgradePlan: "Upgrade plan",
+          insufficientCredits: (requiredCredits: number, remainingCredits: number) =>
+            `This translation needs ${requiredCredits} credits but only ${remainingCredits} remain.`
         };
 
   useEffect(() => {
@@ -129,7 +142,7 @@ export function TextTranslationScreen({
 
     try {
       setIsSubmitting(true);
-      setErrorMessage(null);
+      setTranslationError(null);
 
       const response = await fetch("/api/translate/text", {
         method: "POST",
@@ -146,7 +159,14 @@ export function TextTranslationScreen({
       const payload = (await response.json()) as TextTranslationApiSuccess | TranslationApiErrorShape;
 
       if (!response.ok || "error" in payload) {
-        throw new Error("error" in payload ? payload.error.message : copy.translateFailed);
+        if ("error" in payload) {
+          throw buildTranslationUiError(payload.error, {
+            insufficientCreditsMessage: (details) =>
+              copy.insufficientCredits(details.requiredCredits, details.remainingCredits)
+          });
+        }
+
+        throw new Error(copy.translateFailed);
       }
 
       setResult(payload);
@@ -155,7 +175,21 @@ export function TextTranslationScreen({
         payload.targetLanguage
       ]);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : copy.translateFailed);
+      setTranslationError(
+        isTranslationUiError(error)
+          ? error
+          : error instanceof Error
+          ? {
+              code: "translation_provider_error",
+              message: error.message,
+              actions: []
+            }
+          : {
+              code: "translation_provider_error",
+              message: copy.translateFailed,
+              actions: []
+            }
+      );
       setResult(null);
     } finally {
       setIsSubmitting(false);
@@ -294,9 +328,22 @@ export function TextTranslationScreen({
                 />
               </div>
 
-              {errorMessage ? (
+              {translationError ? (
                 <div className="rounded-[14px] border border-[var(--danger-border)] bg-[var(--danger-bg)] px-4 py-3 text-[12px] text-[var(--danger)]">
-                  {errorMessage}
+                  <p>{translationError.message}</p>
+                  {translationError.actions.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {translationError.actions.map((action) => (
+                        <Link
+                          key={`${action.kind}-${action.href}`}
+                          href={action.href}
+                          className="inline-flex items-center justify-center rounded-[10px] border border-[var(--danger-border)] bg-white px-3 py-2 text-[12px] font-medium text-[var(--danger)] transition hover:border-[var(--danger)]"
+                        >
+                          {action.kind === "upgrade" ? copy.upgradePlan : copy.openBilling}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -400,6 +447,16 @@ function ResultMeta({ label, value }: { label: string; value: string }) {
       <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">{label}</div>
       <div className="mt-1 text-[13px] font-medium text-[var(--foreground)]">{value}</div>
     </div>
+  );
+}
+
+function isTranslationUiError(value: unknown): value is TranslationUiError {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "code" in value &&
+      "message" in value &&
+      "actions" in value
   );
 }
 
