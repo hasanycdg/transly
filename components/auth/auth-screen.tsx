@@ -101,13 +101,21 @@ export function AuthScreen({ mode }: AuthScreenProps) {
           alternateCta: isRegister ? "Anmelden" : "Registrieren",
           alternateHref: isRegister ? "/login" : "/register",
           directNote: "Direkter Weitergang zur Projektübersicht.",
+          magicLink: "Magic Link senden",
+          sendingMagicLink: "Magic Link wird gesendet...",
+          forgotPassword: "Passwort vergessen?",
           success: {
             confirmEmail:
-              "Dein Konto wurde erstellt. Bitte bestätige jetzt deine E-Mail, bevor du ins Dashboard gehst."
+              "Dein Konto wurde erstellt. Bitte bestätige jetzt deine E-Mail, bevor du ins Dashboard gehst.",
+            magicLink:
+              "Dein Magic Link wurde verschickt. Öffne die E-Mail und gehe direkt in deinen Workspace.",
+            passwordReset:
+              "Wenn die E-Mail existiert, wurde ein Link zum Zurücksetzen des Passworts verschickt."
           },
           errors: {
             passwordMismatch: "Die Passwörter stimmen nicht überein.",
-            termsRequired: "Bitte bestätige die Nutzungsbedingungen, um fortzufahren."
+            termsRequired: "Bitte bestätige die Nutzungsbedingungen, um fortzufahren.",
+            emailRequired: "Gib zuerst deine E-Mail-Adresse ein."
           }
         }
       : {
@@ -166,13 +174,21 @@ export function AuthScreen({ mode }: AuthScreenProps) {
           alternateCta: isRegister ? "Sign in" : "Register",
           alternateHref: isRegister ? "/login" : "/register",
           directNote: "Direct redirect into the project overview.",
+          magicLink: "Send magic link",
+          sendingMagicLink: "Sending magic link...",
+          forgotPassword: "Forgot password?",
           success: {
             confirmEmail:
-              "Your account was created. Please confirm your email before entering the dashboard."
+              "Your account was created. Please confirm your email before entering the dashboard.",
+            magicLink:
+              "Your magic link was sent. Open the email and jump straight into your workspace.",
+            passwordReset:
+              "If that email exists, a password reset link has been sent."
           },
           errors: {
             passwordMismatch: "Passwords do not match.",
-            termsRequired: "Please confirm the terms to continue."
+            termsRequired: "Please confirm the terms to continue.",
+            emailRequired: "Enter your email address first."
           }
         };
 
@@ -252,6 +268,71 @@ export function AuthScreen({ mode }: AuthScreenProps) {
 
       router.replace(redirectTo);
       router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Authentication failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleMagicLink() {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!formValues.email.trim()) {
+      setErrorMessage(copy.errors.emailRequired);
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: formValues.email.trim(),
+        options: {
+          emailRedirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSuccessMessage(copy.success.magicLink);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Authentication failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handlePasswordReset() {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!formValues.email.trim()) {
+      setErrorMessage(copy.errors.emailRequired);
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(formValues.email.trim(), {
+        redirectTo: `${getAppUrl()}/reset-password`
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSuccessMessage(copy.success.passwordReset);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Authentication failed.");
     } finally {
@@ -428,6 +509,27 @@ export function AuthScreen({ mode }: AuthScreenProps) {
               <button type="submit" disabled={isSubmitting} className={PRIMARY_BUTTON_CLASS_NAME}>
                 {isSubmitting ? copy.submitting : copy.submit}
               </button>
+
+              {!isRegister ? (
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <button
+                    type="button"
+                    onClick={() => void handleMagicLink()}
+                    disabled={isSubmitting}
+                    className="inline-flex h-11 items-center justify-center rounded-[16px] border border-[#dfd7cc] bg-[#faf7f2] px-4 text-[13px] font-medium text-[#171412] transition hover:bg-white disabled:cursor-progress disabled:opacity-70"
+                  >
+                    {isSubmitting ? copy.sendingMagicLink : copy.magicLink}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handlePasswordReset()}
+                    disabled={isSubmitting}
+                    className="inline-flex h-11 items-center justify-center rounded-[16px] border border-transparent px-4 text-[13px] font-medium text-[#5f5851] transition hover:border-[#dfd7cc] hover:bg-[#faf7f2] hover:text-[#171412] disabled:cursor-progress disabled:opacity-70"
+                  >
+                    {copy.forgotPassword}
+                  </button>
+                </div>
+              ) : null}
             </form>
 
             <div className="mt-5 border-t border-[#ece3d8] pt-4 text-[13px] text-[#736c64]">

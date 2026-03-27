@@ -28,7 +28,7 @@ export function NewProjectModal({
   const [sourceLanguage, setSourceLanguage] = useState("en");
   const [targetLanguages, setTargetLanguages] = useState<string[]>(["de"]);
   const [targetPickerOpen, setTargetPickerOpen] = useState(false);
-  const languageOptions = getLanguageOptions(locale);
+  const languageOptions = getLanguageOptions(locale, [sourceLanguage, ...targetLanguages]);
   const copy =
     locale === "de"
       ? {

@@ -8,8 +8,11 @@ import { useAppLocale } from "@/components/app-locale-provider";
 import { WorkspaceMembersPanel } from "@/components/settings/workspace-members-panel";
 import { getAppLocaleOptions } from "@/lib/i18n";
 import { getLanguageOptions } from "@/lib/languages";
+import { createClient } from "@/lib/supabase/client";
+import { getAppUrl } from "@/lib/supabase/env";
 import type {
   SettingsFilenameFormat,
+  SettingsNotificationsData,
   SettingsPreferencesData,
   SettingsProfileData,
   SettingsQualityPreset,
@@ -66,6 +69,15 @@ const SECTION_ITEMS: SectionMeta[] = [
     icon: PreferencesIcon
   },
   {
+    id: "notifications",
+    label: "Notifications",
+    eyebrow: "/ Notifications",
+    sidebarDescription: "Email delivery, reminders, and in-app alerts.",
+    heading: "Notifications",
+    description: "Decide which delivery, billing, and review events should actively interrupt the team.",
+    icon: BellIcon
+  },
+  {
     id: "support",
     label: "Support",
     eyebrow: "/ Support",
@@ -111,14 +123,19 @@ const INPUT_CLASS_NAME =
 export function SettingsScreen({ data }: SettingsScreenProps) {
   const providerLocale = useAppLocale();
   const router = useRouter();
+  const [supabase] = useState(() => createClient());
   const [draft, setDraft] = useState(data);
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("translation");
   const [isPending, startTransition] = useTransition();
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const screenLocale = draft.preferences.locale ?? providerLocale;
-  const languageOptions = getLanguageOptions(screenLocale);
+  const languageOptions = getLanguageOptions(screenLocale, [
+    draft.translation.sourceLanguage,
+    draft.translation.targetLanguage
+  ]);
   const localeOptions = getAppLocaleOptions(screenLocale);
   const toneOptions =
     screenLocale === "de"
@@ -171,6 +188,8 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                 ? "Übersetzung"
                 : section.id === "preferences"
                   ? "Präferenzen"
+                  : section.id === "notifications"
+                    ? "Benachrichtigungen"
                   : section.id === "support"
                     ? "Support"
                     : "Gefahrenzone",
@@ -181,6 +200,8 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                 ? "/ Übersetzung"
                 : section.id === "preferences"
                   ? "/ Präferenzen"
+                  : section.id === "notifications"
+                    ? "/ Benachrichtigungen"
                   : section.id === "support"
                     ? "/ Support"
                     : "/ Gefahrenzone",
@@ -191,6 +212,8 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                 ? "Sprache, Ton, Tags, Glossar und KI-Standards."
                 : section.id === "preferences"
                   ? "Liefer- und Export-Standards."
+                  : section.id === "notifications"
+                    ? "E-Mails, Erinnerungen und In-App-Hinweise."
                   : section.id === "support"
                     ? "Hilfe, Kontakt, Doku und Service-Status."
                     : "Dauerhafte Kontoaktionen.",
@@ -201,6 +224,8 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                 ? "Übersetzungseinstellungen"
                 : section.id === "preferences"
                   ? "Präferenzen"
+                  : section.id === "notifications"
+                    ? "Benachrichtigungen"
                   : section.id === "support"
                     ? "Support"
                     : "Gefahrenzone",
@@ -211,6 +236,8 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                 ? "Lege die Standards fest, die Translayr anwenden soll, bevor ein Projekt oder eine Datei eigene Regeln mitbringt."
                 : section.id === "preferences"
                   ? "Kleine Liefer-Standards, die wiederholtes Setup nach jeder Übersetzung reduzieren."
+                  : section.id === "notifications"
+                    ? "Lege fest, welche Liefer-, Billing- und Review-Ereignisse dein Team aktiv unterbrechen dürfen."
                   : section.id === "support"
                     ? "Hol dir schnell Hilfe, erreiche den richtigen Kanal und halte operative Links an einem verlässlichen Ort."
                     : "Sensible Aktionen bleiben visuell vom Rest der Workspace-Einstellungen getrennt."
@@ -341,6 +368,55 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
         [key]: value
       }
     }));
+  }
+
+  function updateNotifications<Key extends keyof SettingsNotificationsData>(
+    key: Key,
+    value: SettingsNotificationsData[Key]
+  ) {
+    setDraft((current) => ({
+      ...current,
+      notifications: {
+        ...current.notifications,
+        [key]: value
+      }
+    }));
+  }
+
+  async function handlePasswordReset() {
+    if (isSendingPasswordReset) {
+      return;
+    }
+
+    try {
+      setIsSendingPasswordReset(true);
+      setErrorMessage(null);
+      setSaveMessage(null);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(draft.profile.email, {
+        redirectTo: `${getAppUrl()}/reset-password`
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSaveMessage(
+        screenLocale === "de"
+          ? "Ein Passwort-Reset-Link wurde an die hinterlegte E-Mail-Adresse gesendet."
+          : "A password reset link has been sent to the saved email address."
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : screenLocale === "de"
+            ? "Passwort-Reset konnte nicht gestartet werden."
+            : "Password reset could not be started."
+      );
+    } finally {
+      setIsSendingPasswordReset(false);
+    }
   }
 
   return (
@@ -497,6 +573,38 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                             className={INPUT_CLASS_NAME}
                           />
                         </FieldBlock>
+
+                        <FieldBlock
+                          label={screenLocale === "de" ? "Firma" : "Company"}
+                          description={
+                            screenLocale === "de"
+                              ? "Name der Firma oder des Teams, der für Rechnungen und Workspace-Kontext genutzt wird."
+                              : "Company or team name used for billing context and workspace identity."
+                          }
+                        >
+                          <input
+                            type="text"
+                            value={draft.profile.company}
+                            onChange={(event) => updateProfile("company", event.target.value)}
+                            className={INPUT_CLASS_NAME}
+                          />
+                        </FieldBlock>
+
+                        <FieldBlock
+                          label={screenLocale === "de" ? "Rechnungsadresse" : "Billing address"}
+                          description={
+                            screenLocale === "de"
+                              ? "Mehrzeilige Adresse für Rechnungsversand und interne Billing-Prozesse."
+                              : "Multi-line address for invoice handling and billing operations."
+                          }
+                        >
+                          <textarea
+                            value={draft.profile.billingAddress}
+                            onChange={(event) => updateProfile("billingAddress", event.target.value)}
+                            rows={4}
+                            className={`${INPUT_CLASS_NAME} min-h-[112px] py-3`}
+                          />
+                        </FieldBlock>
                       </div>
                     </SettingsCard>
 
@@ -511,9 +619,19 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                         </p>
                         <button
                           type="button"
+                          onClick={() => {
+                            void handlePasswordReset();
+                          }}
+                          disabled={isSendingPasswordReset}
                           className="rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12.5px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
                         >
-                          {screenLocale === "de" ? "Passwort ändern" : "Change password"}
+                          {isSendingPasswordReset
+                            ? screenLocale === "de"
+                              ? "Link wird gesendet..."
+                              : "Sending link..."
+                            : screenLocale === "de"
+                              ? "Passwort ändern"
+                              : "Change password"}
                         </button>
                       </div>
                     </SettingsCard>
@@ -970,6 +1088,167 @@ export function SettingsScreen({ data }: SettingsScreenProps) {
                   </div>
                 </SettingsCard>
               ) : null}
+
+              {activeSection === "notifications" ? (
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
+                  <SettingsCard
+                    eyebrow={screenLocale === "de" ? "/ Benachrichtigungen" : "/ Notifications"}
+                    title={screenLocale === "de" ? "E-Mail und In-App Alerts" : "Email and in-app alerts"}
+                    description={
+                      screenLocale === "de"
+                        ? "Steuere, welche Statuswechsel, Billing-Ereignisse und Review-Hinweise dein Team aktiv erreichen."
+                        : "Control which delivery states, billing events, and review nudges actively reach the team."
+                    }
+                  >
+                    <div className="space-y-5">
+                      <SettingRow
+                        label={screenLocale === "de" ? "E-Mail bei fertiger Übersetzung" : "Email when translation is ready"}
+                        description={
+                          screenLocale === "de"
+                            ? "Versendet eine Mail, sobald eine Übersetzung abgeschlossen und downloadbar ist."
+                            : "Sends an email once a translation run is completed and ready to download."
+                        }
+                        control={
+                          <div className="flex justify-start xl:justify-end">
+                            <Toggle
+                              checked={draft.notifications.translationCompleteEmail}
+                              onToggle={() =>
+                                updateNotifications(
+                                  "translationCompleteEmail",
+                                  !draft.notifications.translationCompleteEmail
+                                )
+                              }
+                            />
+                          </div>
+                        }
+                      />
+
+                      <SettingRow
+                        label={screenLocale === "de" ? "E-Mail bei neuer Rechnung" : "Email when invoice is created"}
+                        description={
+                          screenLocale === "de"
+                            ? "Nutzt die Workspace-Mailadresse für neue Billing-Dokumente."
+                            : "Uses the workspace email address for newly created billing documents."
+                        }
+                        control={
+                          <div className="flex justify-start xl:justify-end">
+                            <Toggle
+                              checked={draft.notifications.invoiceCreatedEmail}
+                              onToggle={() =>
+                                updateNotifications("invoiceCreatedEmail", !draft.notifications.invoiceCreatedEmail)
+                              }
+                            />
+                          </div>
+                        }
+                      />
+
+                      <SettingRow
+                        label={screenLocale === "de" ? "E-Mail bei fehlgeschlagener Zahlung" : "Email when payment fails"}
+                        description={
+                          screenLocale === "de"
+                            ? "Hebt kritische Billing-Probleme sofort hervor."
+                            : "Surfaces critical billing problems immediately."
+                        }
+                        control={
+                          <div className="flex justify-start xl:justify-end">
+                            <Toggle
+                              checked={draft.notifications.paymentFailedEmail}
+                              onToggle={() =>
+                                updateNotifications("paymentFailedEmail", !draft.notifications.paymentFailedEmail)
+                              }
+                            />
+                          </div>
+                        }
+                      />
+
+                      <SettingRow
+                        label={screenLocale === "de" ? "E-Mail bei Spending-Limit" : "Email when spending limit is reached"}
+                        description={
+                          screenLocale === "de"
+                            ? "Bereitet die Basis für verbrauchsbasierte Limits und Warnungen vor."
+                            : "Prepares the base for usage-based limits and warning emails."
+                        }
+                        control={
+                          <div className="flex justify-start xl:justify-end">
+                            <Toggle
+                              checked={draft.notifications.spendingLimitEmail}
+                              onToggle={() =>
+                                updateNotifications("spendingLimitEmail", !draft.notifications.spendingLimitEmail)
+                              }
+                            />
+                          </div>
+                        }
+                      />
+
+                      <SettingRow
+                        label={screenLocale === "de" ? "Review-Erinnerungen" : "Review reminders"}
+                        description={
+                          screenLocale === "de"
+                            ? "Erinnert an offene Review-Arbeit im Team."
+                            : "Keeps pending review work visible to the team."
+                        }
+                        control={
+                          <div className="flex justify-start xl:justify-end">
+                            <Toggle
+                              checked={draft.notifications.reviewReminders}
+                              onToggle={() =>
+                                updateNotifications("reviewReminders", !draft.notifications.reviewReminders)
+                              }
+                            />
+                          </div>
+                        }
+                      />
+
+                      <SettingRow
+                        label={screenLocale === "de" ? "In-App Notifications" : "In-app notifications"}
+                        description={
+                          screenLocale === "de"
+                            ? "Hält wichtige Produktzustände direkt im Workspace sichtbar."
+                            : "Keeps important product states visible directly inside the workspace."
+                        }
+                        control={
+                          <div className="flex justify-start xl:justify-end">
+                            <Toggle
+                              checked={draft.notifications.inAppNotifications}
+                              onToggle={() =>
+                                updateNotifications("inAppNotifications", !draft.notifications.inAppNotifications)
+                              }
+                            />
+                          </div>
+                        }
+                      />
+                    </div>
+                  </SettingsCard>
+
+                  <SettingsCard
+                    eyebrow={screenLocale === "de" ? "/ Routing" : "/ Routing"}
+                    title={screenLocale === "de" ? "Benachrichtigungsziel" : "Notification target"}
+                    description={
+                      screenLocale === "de"
+                        ? "Alle E-Mails laufen auf die primäre Workspace-Adresse, bis getrennte Empfänger pro Ereignis eingeführt werden."
+                        : "All emails route to the primary workspace address until per-event recipients are introduced."
+                    }
+                  >
+                    <div className="space-y-4">
+                      <DetailRow
+                        label={screenLocale === "de" ? "Empfänger" : "Recipient"}
+                        value={draft.profile.email}
+                      />
+                      <DetailRow
+                        label={screenLocale === "de" ? "Firma" : "Company"}
+                        value={draft.profile.company || (screenLocale === "de" ? "Nicht gesetzt" : "Not set")}
+                      />
+                      <div className="rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-3">
+                        <p className="text-[11.5px] leading-5 text-[var(--muted)]">
+                          {screenLocale === "de"
+                            ? "Die Zustelllogik ist jetzt konfigurierbar und vorbereitet für spätere Event-Auslieferung, In-App Center und verbrauchsbasierte Billing-Warnungen."
+                            : "Delivery preferences are now configurable and prepared for later event delivery, an in-app center, and usage-based billing warnings."}
+                        </p>
+                      </div>
+                    </div>
+                  </SettingsCard>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1216,6 +1495,20 @@ function PreferencesIcon({ className = "h-4 w-4" }: IconProps) {
   );
 }
 
+function BellIcon({ className = "h-4 w-4" }: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
+      <path
+        d="M5.2 11.8h5.6c-.55-.7-.8-1.45-.8-2.5V7.4a2.8 2.8 0 1 0-5.6 0v1.9c0 1.05-.25 1.8-.8 2.5Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M6.8 13.1a1.2 1.2 0 0 0 2.4 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function SupportIcon({ className = "h-4 w-4" }: IconProps) {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
@@ -1443,6 +1736,7 @@ function isSettingsPayload(value: SettingsScreenData | { error?: string } | null
       "profile" in value &&
       "translation" in value &&
       "preferences" in value &&
+      "notifications" in value &&
       "dangerZone" in value
   );
 }

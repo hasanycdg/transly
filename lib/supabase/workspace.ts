@@ -111,12 +111,18 @@ type WorkspaceMemberRow = {
 type WorkspaceSettingsMetadata = {
   profileName?: string;
   profileEmail?: string;
+  company?: string;
+  billingAddress?: string;
   preferredLocale?: AppLocale;
   preferredSourceLanguage?: string;
   toneStyle?: SettingsToneStyle;
   strictGlossaryMode?: boolean;
   aiBehavior?: SettingsQualityPreset;
   defaultFilenameFormat?: SettingsFilenameFormat;
+  invoiceCreatedEmail?: boolean;
+  paymentFailedEmail?: boolean;
+  spendingLimitEmail?: boolean;
+  inAppNotifications?: boolean;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   stripeSubscriptionStatus?: string;
@@ -166,7 +172,7 @@ type ProjectFileRow = {
   id: string;
   project_id: string;
   name: string;
-  file_format?: "xliff" | "xlf" | "po" | "strings" | "resx";
+  file_format?: "xliff" | "xlf" | "po" | "strings" | "resx" | "xml" | "txt";
   source_language: string;
   target_language: string;
   status: "queued" | "processing" | "review" | "done" | "error";
@@ -304,7 +310,6 @@ type GlossaryWriteContext = {
   termsByKey: Map<string, GlossaryTermLookupRow>;
 };
 
-const DEFAULT_WORKSPACE_NAME = "Workspace";
 const DEFAULT_WORKSPACE_SLUG = "workspace";
 const DEFAULT_WORKSPACE_PLAN = getBillingPlanDefinition(DEFAULT_WORKSPACE_PLAN_ID).name;
 const DEFAULT_WORKSPACE_AVATAR_LABEL = "W";
@@ -537,6 +542,76 @@ export async function deleteProject(projectSlug: string): Promise<void> {
 
     throw new Error(`Failed to delete project: ${deleteError.message}`);
   }
+}
+
+export async function updateProjectIdentity(
+  projectSlug: string,
+  input: {
+    name: string;
+  }
+): Promise<{ slug: string; previousSlug: string; name: string }> {
+  const { supabase, workspace } = await getWorkspaceContext();
+  const project = await getProjectRowBySlug(supabase, workspace.id, projectSlug);
+  const name = input.name.trim();
+
+  if (!project) {
+    throw new Error("Project not found.");
+  }
+
+  if (!name) {
+    throw new Error("Project name is required.");
+  }
+
+  let nextSlug = project.slug;
+
+  if (name !== project.name) {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("slug")
+      .eq("workspace_id", workspace.id)
+      .neq("id", project.id);
+
+    if (error) {
+      throw new Error(`Failed to validate project slug: ${error.message}`);
+    }
+
+    const existingSlugs = new Set((((data as { slug: string }[] | null) ?? [])).map((row) => row.slug));
+    nextSlug = buildUniqueSlugFromSet(slugify(name), existingSlugs);
+  }
+
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from("projects")
+    .update({
+      name,
+      slug: nextSlug,
+      updated_at: now
+    })
+    .eq("id", project.id);
+
+  if (updateError) {
+    throw new Error(`Failed to update project: ${updateError.message}`);
+  }
+
+  if (name !== project.name) {
+    const { error: activityError } = await supabase.from("project_activities").insert({
+      project_id: project.id,
+      kind: "project_updated",
+      title: "Project renamed",
+      detail: `Renamed project from "${project.name}" to "${name}".`,
+      occurred_at: now
+    });
+
+    if (activityError) {
+      console.error(`Project activity logging failed: ${activityError.message}`);
+    }
+  }
+
+  return {
+    slug: nextSlug,
+    previousSlug: project.slug,
+    name
+  };
 }
 
 export async function getUsageScreenData(): Promise<UsageScreenData> {
@@ -1141,7 +1216,9 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData> {
   return {
     profile: {
       name: metadata.profileName ?? workspace.name,
-      email: metadata.profileEmail ?? `${workspace.slug}@translayr.app`
+      email: metadata.profileEmail ?? `${workspace.slug}@translayr.app`,
+      company: metadata.company ?? "",
+      billingAddress: metadata.billingAddress ?? ""
     },
     translation: {
       sourceLanguageMode: settings.default_source_language ? "manual" : "auto",
@@ -1158,6 +1235,14 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData> {
       locale,
       autoDownloadAfterTranslation: settings.auto_export_after_completion,
       defaultFilenameFormat: metadata.defaultFilenameFormat ?? "Original + target locale"
+    },
+    notifications: {
+      translationCompleteEmail: settings.email_notifications,
+      invoiceCreatedEmail: metadata.invoiceCreatedEmail ?? true,
+      paymentFailedEmail: metadata.paymentFailedEmail ?? true,
+      spendingLimitEmail: metadata.spendingLimitEmail ?? true,
+      reviewReminders: settings.review_reminders,
+      inAppNotifications: metadata.inAppNotifications ?? true
     },
     dangerZone: {
       title: locale === "de" ? "Konto löschen" : "Delete account",
@@ -1177,6 +1262,8 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
 
   const profileName = input.profile.name.trim();
   const profileEmail = input.profile.email.trim().toLowerCase();
+  const company = input.profile.company.trim();
+  const billingAddress = input.profile.billingAddress.trim();
 
   if (!profileName) {
     throw new Error("Name is required.");
@@ -1206,12 +1293,18 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
     ...currentMetadata,
     profileName,
     profileEmail,
+    company,
+    billingAddress,
     preferredLocale,
     preferredSourceLanguage: sourceLanguage,
     toneStyle,
     strictGlossaryMode: Boolean(input.translation.strictGlossaryMode),
     aiBehavior,
-    defaultFilenameFormat
+    defaultFilenameFormat,
+    invoiceCreatedEmail: Boolean(input.notifications.invoiceCreatedEmail),
+    paymentFailedEmail: Boolean(input.notifications.paymentFailedEmail),
+    spendingLimitEmail: Boolean(input.notifications.spendingLimitEmail),
+    inAppNotifications: Boolean(input.notifications.inAppNotifications)
   };
 
   const avatarLabel = buildAvatarLabel(profileName);
@@ -1235,6 +1328,8 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
       default_target_language: targetLanguage,
       inline_tag_validation_mode: inlineTagValidationMode,
       block_export_on_validation_failure: Boolean(input.translation.failOnTagMismatch),
+      email_notifications: Boolean(input.notifications.translationCompleteEmail),
+      review_reminders: Boolean(input.notifications.reviewReminders),
       auto_export_after_completion: Boolean(input.preferences.autoDownloadAfterTranslation),
       glossary_prompt_injection: Boolean(input.translation.useGlossaryAutomatically),
       translation_batch_size: translationBatchSize,
@@ -1249,7 +1344,9 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
   return {
     profile: {
       name: profileName,
-      email: profileEmail
+      email: profileEmail,
+      company,
+      billingAddress
     },
     translation: {
       sourceLanguageMode,
@@ -1266,6 +1363,14 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
       locale: preferredLocale,
       autoDownloadAfterTranslation: Boolean(input.preferences.autoDownloadAfterTranslation),
       defaultFilenameFormat
+    },
+    notifications: {
+      translationCompleteEmail: Boolean(input.notifications.translationCompleteEmail),
+      invoiceCreatedEmail: Boolean(input.notifications.invoiceCreatedEmail),
+      paymentFailedEmail: Boolean(input.notifications.paymentFailedEmail),
+      spendingLimitEmail: Boolean(input.notifications.spendingLimitEmail),
+      reviewReminders: Boolean(input.notifications.reviewReminders),
+      inAppNotifications: Boolean(input.notifications.inAppNotifications)
     },
     dangerZone: {
       title: input.dangerZone.title,
@@ -2082,12 +2187,6 @@ async function ensureWorkspaceSettings(
   return insertedSettings as WorkspaceSettingsRow;
 }
 
-function selectWorkspace(supabase: ReturnType<typeof createServerSupabaseClient>) {
-  return supabase
-    .from("workspaces")
-    .select("id, slug, name, plan_name, avatar_label, credits_limit, credits_used, quality_score_avg, created_at, updated_at");
-}
-
 async function selectWorkspaceById(
   supabase: ReturnType<typeof createServerSupabaseClient>,
   workspaceId: string
@@ -2370,6 +2469,14 @@ function getFileFormat(fileName: string): NonNullable<ProjectFileRow["file_forma
 
   if (/\.resx$/i.test(fileName)) {
     return "resx";
+  }
+
+  if (/\.xml$/i.test(fileName)) {
+    return "xml";
+  }
+
+  if (/\.txt$/i.test(fileName)) {
+    return "txt";
   }
 
   return "xliff";
@@ -3465,6 +3572,8 @@ function parseWorkspaceSettingsMetadata(value: Record<string, unknown> | null | 
   return {
     profileName: typeof metadata.profileName === "string" ? metadata.profileName : undefined,
     profileEmail: typeof metadata.profileEmail === "string" ? metadata.profileEmail : undefined,
+    company: typeof metadata.company === "string" ? metadata.company : undefined,
+    billingAddress: typeof metadata.billingAddress === "string" ? metadata.billingAddress : undefined,
     preferredLocale: normalizeAppLocale(typeof metadata.preferredLocale === "string" ? metadata.preferredLocale : undefined),
     preferredSourceLanguage:
       typeof metadata.preferredSourceLanguage === "string" &&
@@ -3478,6 +3587,14 @@ function parseWorkspaceSettingsMetadata(value: Record<string, unknown> | null | 
     defaultFilenameFormat: isFilenameFormat(metadata.defaultFilenameFormat)
       ? metadata.defaultFilenameFormat
       : undefined,
+    invoiceCreatedEmail:
+      typeof metadata.invoiceCreatedEmail === "boolean" ? metadata.invoiceCreatedEmail : undefined,
+    paymentFailedEmail:
+      typeof metadata.paymentFailedEmail === "boolean" ? metadata.paymentFailedEmail : undefined,
+    spendingLimitEmail:
+      typeof metadata.spendingLimitEmail === "boolean" ? metadata.spendingLimitEmail : undefined,
+    inAppNotifications:
+      typeof metadata.inAppNotifications === "boolean" ? metadata.inAppNotifications : undefined,
     stripeCustomerId:
       typeof metadata.stripeCustomerId === "string" ? metadata.stripeCustomerId : undefined,
     stripeSubscriptionId:

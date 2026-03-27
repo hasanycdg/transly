@@ -106,7 +106,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           preparingJobs: "Übersetzungsjobs werden vorbereitet...",
           readyOutputs: (count: number) =>
             `${count} übersetzte Ausgabe${count === 1 ? "" : "n"} bereit für Download oder ZIP-Export.`,
-          defaultRunDesc: "Hochgeladene XLIFF-Dateien werden einmal pro Projekt-Zielsprache übersetzt.",
+          defaultRunDesc: "Hochgeladene Übersetzungsdateien werden einmal pro Projekt-Zielsprache übersetzt.",
           complete: "Fertig",
           idle: "Leerlauf",
           output: "Ausgabe",
@@ -153,10 +153,10 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           uploadNotice: (extractedCount: number, archiveCount: number, ignoredCount: number) =>
             `Es wurden ${extractedCount} Datei${extractedCount === 1 ? "" : "en"} aus ${archiveCount} ZIP-Archiv${archiveCount === 1 ? "" : "en"} extrahiert${ignoredCount > 0 ? ` und ${ignoredCount} nicht unterstützte oder System-Einträge ignoriert` : ""}.`,
           prepareError: "Die ausgewählten Dateien konnten nicht vorbereitet werden.",
-          selectFiles: "Wähle in Upload Files eine oder mehrere XLIFF-Dateien aus, bevor du einen Übersetzungslauf startest.",
+          selectFiles: "Wähle in Upload Files eine oder mehrere Übersetzungsdateien aus, bevor du einen Übersetzungslauf startest.",
           filesStillPreparing: "Dateien werden noch vorbereitet. Bitte in einem Moment erneut versuchen.",
           unsupportedFiles: (names: string) =>
-            `Phase 1 übersetzt aktuell nur .xliff- und .xlf-Dateien. Nicht unterstützte Dateien: ${names}.`,
+            `Aktuell unterstützt sind .xliff, .xlf, .po, .strings, .resx, .xml und .txt. Nicht unterstützte Dateien: ${names}.`,
           noTargets: "Für dieses Projekt sind noch keine Zielsprachen konfiguriert.",
           translationFailed: "Übersetzung fehlgeschlagen.",
           translationSummary: (failed: number, succeeded: number) =>
@@ -190,7 +190,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           zipAnalyzing: "ZIP contents are being unpacked and analyzed.",
           preparingJobs: "Preparing translation jobs...",
           readyOutputs: (count: number) => `${count} translated output${count === 1 ? "" : "s"} ready for download or ZIP export.`,
-          defaultRunDesc: "Uploaded XLIFF files will be translated once for each project target language.",
+          defaultRunDesc: "Uploaded translation files will be translated once for each project target language.",
           complete: "Complete",
           idle: "Idle",
           output: "Output",
@@ -234,10 +234,10 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           uploadNotice: (extractedCount: number, archiveCount: number, ignoredCount: number) =>
             `Extracted ${extractedCount} file${extractedCount === 1 ? "" : "s"} from ${archiveCount} ZIP archive${archiveCount === 1 ? "" : "s"}${ignoredCount > 0 ? ` and ignored ${ignoredCount} unsupported or system entr${ignoredCount === 1 ? "y" : "ies"}` : ""}.`,
           prepareError: "The selected files could not be prepared.",
-          selectFiles: "Select one or more XLIFF files in Upload Files before starting a translation run.",
+          selectFiles: "Select one or more translation files in Upload Files before starting a translation run.",
           filesStillPreparing: "Files are still being prepared. Try again in a second.",
           unsupportedFiles: (names: string) =>
-            `Phase 1 currently translates only .xliff and .xlf files. Unsupported files: ${names}.`,
+            `Currently supported formats are .xliff, .xlf, .po, .strings, .resx, .xml, and .txt. Unsupported files: ${names}.`,
           noTargets: "This project has no target languages configured yet.",
           translationFailed: "Translation failed.",
           translationSummary: (failed: number, succeeded: number) =>
@@ -1095,7 +1095,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
 }
 
 function isSupportedTranslationFile(fileName: string) {
-  return /\.(xliff|xlf)$/i.test(fileName);
+  return /\.(xliff|xlf|po|strings|resx|xml|txt)$/i.test(fileName);
 }
 
 function buildRuntimeFileId(sourceFileId: string, targetLanguage: string) {

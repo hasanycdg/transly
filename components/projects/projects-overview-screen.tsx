@@ -35,6 +35,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
   const [overviewFiles, setOverviewFiles] = useState<File[]>([]);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
 
   const projects = initialProjects;
   const roadmapCounts = getRoadmapStatusCounts();
@@ -84,6 +85,10 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
           updated: "Aktualisiert",
           open: "Öffnen →",
           noProjects: "Keine Projekte entsprechen der aktuellen Suche oder dem Filter."
+          ,
+          rename: "Umbenennen",
+          renamePrompt: "Neuen Projektnamen eingeben",
+          renameFailed: "Projekt konnte nicht umbenannt werden."
         }
       : {
           createError: "Project could not be created.",
@@ -112,7 +117,10 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
           progress: "Progress",
           updated: "Updated",
           open: "Open →",
-          noProjects: "No projects match the current search or filter."
+          noProjects: "No projects match the current search or filter.",
+          rename: "Rename",
+          renamePrompt: "Enter a new project name",
+          renameFailed: "Project could not be renamed."
         };
 
   async function handleCreateProject(input: NewProjectInput) {
@@ -142,6 +150,45 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
       setCreateError(error instanceof Error ? error.message : copy.createError);
     } finally {
       setIsCreatingProject(false);
+    }
+  }
+
+  async function handleRenameProject(project: ProjectRecord) {
+    if (renamingProjectId) {
+      return;
+    }
+
+    const nextName = window.prompt(copy.renamePrompt, project.name)?.trim();
+
+    if (!nextName || nextName === project.name) {
+      return;
+    }
+
+    try {
+      setRenamingProjectId(project.id);
+
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: nextName
+        })
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string; slug?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? copy.renameFailed);
+      }
+
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : copy.renameFailed);
+    } finally {
+      setRenamingProjectId(null);
     }
   }
 
@@ -307,7 +354,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
             </div>
 
             <div className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-white">
-              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_55px_140px_75px_80px] border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]">
+              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_55px_140px_75px_136px] border-b border-[var(--border-light)] bg-[var(--background)] px-[18px] py-[9px]">
                 {[copy.project, copy.languages, copy.files, copy.progress, copy.updated, ""].map((label) => (
                   <span
                     key={label || "open"}
@@ -334,7 +381,7 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
                           router.push(`/projects/${project.id}`);
                         }
                       }}
-                      className="grid cursor-pointer grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_55px_140px_75px_80px] items-center border-b border-[var(--border-light)] px-[18px] py-[13px] transition hover:bg-[var(--background-strong)] last:border-b-0"
+                      className="grid cursor-pointer grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_55px_140px_75px_136px] items-center border-b border-[var(--border-light)] px-[18px] py-[13px] transition hover:bg-[var(--background-strong)] last:border-b-0"
                     >
                       <div>
                         <p className="mb-0.5 text-[13px] font-medium text-[var(--foreground)]">
@@ -373,7 +420,18 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
                         {formatProjectDate(display.updated, locale)}
                       </div>
 
-                      <div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleRenameProject(project);
+                          }}
+                          disabled={renamingProjectId === project.id}
+                          className="rounded-[6px] border border-[var(--border)] px-[10px] py-[5px] text-[11.5px] font-medium text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--foreground)] disabled:cursor-progress disabled:opacity-45"
+                        >
+                          {renamingProjectId === project.id ? "…" : copy.rename}
+                        </button>
                         <button
                           type="button"
                           onClick={(event) => {

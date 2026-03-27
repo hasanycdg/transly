@@ -166,7 +166,13 @@ export interface BillingScreenData {
   invoices: BillingInvoiceItem[];
 }
 
-export type SettingsSectionId = "profile" | "translation" | "preferences" | "support" | "danger";
+export type SettingsSectionId =
+  | "profile"
+  | "translation"
+  | "preferences"
+  | "notifications"
+  | "support"
+  | "danger";
 
 export type SettingsToneStyle = "Neutral" | "Formal" | "Informal" | "Marketing" | "Technical";
 
@@ -180,6 +186,8 @@ export type SettingsFilenameFormat =
 export interface SettingsProfileData {
   name: string;
   email: string;
+  company: string;
+  billingAddress: string;
 }
 
 export interface SettingsTranslationData {
@@ -200,6 +208,15 @@ export interface SettingsPreferencesData {
   defaultFilenameFormat: SettingsFilenameFormat;
 }
 
+export interface SettingsNotificationsData {
+  translationCompleteEmail: boolean;
+  invoiceCreatedEmail: boolean;
+  paymentFailedEmail: boolean;
+  spendingLimitEmail: boolean;
+  reviewReminders: boolean;
+  inAppNotifications: boolean;
+}
+
 export interface SettingsDangerZoneData {
   title: string;
   description: string;
@@ -210,6 +227,7 @@ export interface SettingsScreenData {
   profile: SettingsProfileData;
   translation: SettingsTranslationData;
   preferences: SettingsPreferencesData;
+  notifications: SettingsNotificationsData;
   dangerZone: SettingsDangerZoneData;
 }
 

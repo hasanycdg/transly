@@ -49,7 +49,7 @@ test("extracts supported files from zip uploads and ignores system entries", asy
   zip.file("ios/app.xliff", "<xliff version=\"1.2\"></xliff>");
   zip.file("android/strings.resx", "<root />");
   zip.file("__MACOSX/._app.xliff", "ignored");
-  zip.file("notes.txt", "ignored");
+  zip.file("notes.md", "ignored");
 
   const content = await zip.generateAsync({ type: "uint8array" });
   const archiveBuffer = new ArrayBuffer(content.byteLength);

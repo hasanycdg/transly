@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 
+import { parsePoDocument, serializeTranslatedPo, type ParsedPoDocument } from "@/lib/file-formats/po";
+import { parseResxDocument, serializeTranslatedResx, type ParsedResxDocument } from "@/lib/file-formats/resx";
+import { parseStringsDocument, serializeTranslatedStrings, type ParsedStringsDocument } from "@/lib/file-formats/strings";
+import { parseTxtDocument, serializeTranslatedTxt, type ParsedTxtDocument } from "@/lib/file-formats/txt";
 import { containsMeaningfulText, maskProtectedTokens } from "@/lib/masking/tokens";
-import { unmaskString } from "@/lib/masking/restore";
-import { restoreProtectedTokens } from "@/lib/masking/restore";
+import { restoreProtectedTokens, unmaskString } from "@/lib/masking/restore";
 import { getExactGlossaryTranslations, getTranslationRuntimeSettings } from "@/lib/supabase/workspace";
 import { parseXliffDocument } from "@/lib/xliff/parser";
 import { serializeTranslatedXliff } from "@/lib/xliff/serializer";
 import { OpenAITranslationProvider } from "@/services/translation/openai-provider";
-import { isTranslationPipelineError, TranslationPipelineError } from "@/types/translation";
-import type { MaskedSegment, TranslationApiErrorShape, TranslationApiSuccess } from "@/types/translation";
+import {
+  isTranslationPipelineError,
+  TranslationPipelineError,
+  type MaskedSegment,
+  type TranslationApiErrorShape,
+  type TranslationApiSuccess
+} from "@/types/translation";
 import type { TranslationWriteback, XliffWarning } from "@/types/xliff";
 
 export const runtime = "nodejs";
@@ -28,7 +36,7 @@ export async function POST(request: Request) {
     if (!(fileEntry instanceof File)) {
       throw new TranslationPipelineError(
         "validation_error",
-        "Please upload a single XLIFF file.",
+        "Please upload a single translation file.",
         400
       );
     }
@@ -41,159 +49,47 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!isSupportedXliffFile(fileEntry.name)) {
+    const originalContent = await fileEntry.text();
+    const detectedFormat = detectTranslationFileFormat(fileEntry.name);
+
+    if (!detectedFormat) {
       throw new TranslationPipelineError(
         "validation_error",
-        "Only .xliff and .xlf files are supported in Phase 1.",
+        "Supported formats are .xliff, .xlf, .po, .strings, .resx, .xml, and .txt.",
         400
       );
     }
 
-    const originalXml = await fileEntry.text();
-    const parsedDocument = parseXliffDocument(originalXml);
-    const warnings: XliffWarning[] = [...parsedDocument.warnings];
-    const detectedSourceLanguage = parsedDocument.sourceLanguage ?? sourceLanguageFallback;
-
-    if (!detectedSourceLanguage) {
-      throw new TranslationPipelineError(
-        "missing_source_language",
-        "This XLIFF file does not declare a usable source language. Select one manually and try again.",
-        422
-      );
-    }
-
-    if (!parsedDocument.sourceLanguage && sourceLanguageFallback) {
-      warnings.push({
-        code: "used_source_language_fallback",
-        message: `Used the manually selected source language fallback: ${sourceLanguageFallback}.`
-      });
-    }
-
-    const maskedSegments = new Map<string, MaskedSegment>();
-    const writebacks: TranslationWriteback[] = [];
-    const glossaryMatches = runtimeSettings.useGlossaryAutomatically
-      ? await getExactGlossaryTranslations(
-          detectedSourceLanguage,
-          targetLanguage,
-          parsedDocument.units.map((unit) => unit.sourceText)
-        )
-      : new Map<string, string>();
-    const translationItems = parsedDocument.units.flatMap((unit) => {
-      const masked = maskProtectedTokens(unit.sourceXml);
-      maskedSegments.set(unit.internalId, masked);
-
-      const exactGlossaryTranslation = glossaryMatches.get(unit.sourceText.trim());
-
-      if (exactGlossaryTranslation && runtimeSettings.strictGlossaryMode) {
-        writebacks.push({
-          unitInternalId: unit.internalId,
-          translatedXml: escapeXmlText(exactGlossaryTranslation)
-        });
-
-        return [];
-      }
-
-      if (!containsMeaningfulText(masked.maskedText)) {
-        writebacks.push({
-          unitInternalId: unit.internalId,
-          translatedXml: unit.sourceXml
-        });
-
-        return [];
-      }
-
-      return [
-        {
-          unitInternalId: unit.internalId,
-          text: masked.maskedText,
-          sourceLanguage: detectedSourceLanguage,
-          targetLanguage
-        }
-      ];
-    });
-
     const provider = new OpenAITranslationProvider({
       model: runtimeSettings.translationModel
     });
-    const translatedItems = await provider.translateBatch(translationItems, {
-      sourceLanguage: detectedSourceLanguage,
-      targetLanguage,
-      model: runtimeSettings.translationModel,
-      maxBatchItems: runtimeSettings.translationBatchSize,
-      toneStyle: runtimeSettings.toneStyle
-    });
 
-    for (const translatedItem of translatedItems) {
-      const maskedSegment = maskedSegments.get(translatedItem.unitInternalId);
-
-      if (!maskedSegment) {
-        throw new TranslationPipelineError(
-          "validation_error",
-          "Missing token metadata for a translated segment.",
-          500,
-          {
-            unitInternalId: translatedItem.unitInternalId
-          }
-        );
-      }
-
-      try {
-        writebacks.push({
-          unitInternalId: translatedItem.unitInternalId,
-          translatedXml: restoreWithRuntimeRules(
-            translatedItem.translatedText,
-            maskedSegment,
-            runtimeSettings.strictTagProtection,
-            translatedItem.unitInternalId
-          )
-        });
-      } catch (error) {
-        if (
-          isTranslationPipelineError(error) &&
-          !runtimeSettings.failOnTagMismatch &&
-          (error.code === "tag_mismatch" || error.code === "placeholder_mismatch")
-        ) {
-          warnings.push({
-            code: "tag_mismatch_fallback",
-            message: "A translation changed protected tags or placeholders. The affected unit kept its original source content.",
-            unitInternalId: translatedItem.unitInternalId
-          });
-          writebacks.push({
-            unitInternalId: translatedItem.unitInternalId,
-            translatedXml: maskedSegment.originalText
-          });
-          continue;
-        }
-
-        throw error;
-      }
+    if (detectedFormat === "xliff") {
+      return NextResponse.json(
+        await translateXliffDocument({
+          fileName: fileEntry.name,
+          originalContent,
+          projectSlug,
+          targetLanguage,
+          sourceLanguageFallback,
+          provider,
+          runtimeSettings
+        })
+      );
     }
 
-    const translatedContent = serializeTranslatedXliff({
-      originalXml,
-      parsedDocument,
-      translations: writebacks,
-      targetLanguage
-    });
-
-    const responsePayload: TranslationApiSuccess = {
-      fileName: buildOutputFileName(
-        fileEntry.name,
-        detectedSourceLanguage,
+    return NextResponse.json(
+      await translateGenericDocument({
+        fileName: fileEntry.name,
+        originalContent,
+        detectedFormat,
+        projectSlug,
         targetLanguage,
-        runtimeSettings.defaultFilenameFormat,
-        projectSlug ?? runtimeSettings.workspaceSlug
-      ),
-      translatedContent,
-      warnings,
-      detectedSourceLanguage,
-      detectedTargetLanguage: targetLanguage,
-      xliffVersion: parsedDocument.version,
-      translatedUnitCount: writebacks.length,
-      autoDownloadAfterTranslation: runtimeSettings.autoDownloadAfterTranslation
-    };
-
-    return NextResponse.json(responsePayload);
+        sourceLanguageFallback,
+        provider,
+        runtimeSettings
+      })
+    );
   } catch (error) {
     if (isTranslationPipelineError(error)) {
       return NextResponse.json(
@@ -212,11 +108,294 @@ export async function POST(request: Request) {
       {
         error: {
           code: "translation_provider_error",
-          message: "Translation failed due to an unexpected server error."
+          message: error instanceof Error ? error.message : "Translation failed due to an unexpected server error."
         }
       } satisfies TranslationApiErrorShape,
       { status: 500 }
     );
+  }
+}
+
+async function translateXliffDocument(input: {
+  fileName: string;
+  originalContent: string;
+  projectSlug?: string;
+  targetLanguage: string;
+  sourceLanguageFallback?: string;
+  provider: OpenAITranslationProvider;
+  runtimeSettings: Awaited<ReturnType<typeof getTranslationRuntimeSettings>>;
+}): Promise<TranslationApiSuccess> {
+  const parsedDocument = parseXliffDocument(input.originalContent);
+  const warnings: XliffWarning[] = [...parsedDocument.warnings];
+  const detectedSourceLanguage = parsedDocument.sourceLanguage ?? input.sourceLanguageFallback;
+
+  if (!detectedSourceLanguage) {
+    throw new TranslationPipelineError(
+      "missing_source_language",
+      "This XLIFF file does not declare a usable source language. Select one manually and try again.",
+      422
+    );
+  }
+
+  if (!parsedDocument.sourceLanguage && input.sourceLanguageFallback) {
+    warnings.push({
+      code: "used_source_language_fallback",
+      message: `Used the manually selected source language fallback: ${input.sourceLanguageFallback}.`
+    });
+  }
+
+  const writebacks = await translateUnits({
+    units: parsedDocument.units.map((unit) => ({
+      id: unit.internalId,
+      sourceText: unit.sourceXml,
+      sourceLookupText: unit.sourceText
+    })),
+    sourceLanguage: detectedSourceLanguage,
+    targetLanguage: input.targetLanguage,
+    provider: input.provider,
+    runtimeSettings: input.runtimeSettings,
+    encodeExactGlossaryMatch: escapeXmlText
+  });
+
+  for (const writeback of writebacks) {
+    if (writeback.warning) {
+      warnings.push({
+        code: "tag_mismatch_fallback",
+        message: "A translation changed protected tags or placeholders. The affected unit kept its original source content.",
+        unitInternalId: writeback.id
+      });
+    }
+  }
+
+  const translatedContent = serializeTranslatedXliff({
+    originalXml: input.originalContent,
+    parsedDocument,
+    translations: writebacks.map(
+      (writeback): TranslationWriteback => ({
+        unitInternalId: writeback.id,
+        translatedXml: writeback.value
+      })
+    ),
+    targetLanguage: input.targetLanguage
+  });
+
+  return {
+    fileName: buildOutputFileName(
+      input.fileName,
+      detectedSourceLanguage,
+      input.targetLanguage,
+      input.runtimeSettings.defaultFilenameFormat,
+      input.projectSlug ?? input.runtimeSettings.workspaceSlug
+    ),
+    translatedContent,
+    warnings,
+    detectedSourceLanguage,
+    detectedTargetLanguage: input.targetLanguage,
+    xliffVersion: parsedDocument.version,
+    translatedUnitCount: writebacks.length,
+    autoDownloadAfterTranslation: input.runtimeSettings.autoDownloadAfterTranslation
+  };
+}
+
+async function translateGenericDocument(input: {
+  fileName: string;
+  originalContent: string;
+  detectedFormat: Exclude<ReturnType<typeof detectTranslationFileFormat>, "xliff" | null>;
+  projectSlug?: string;
+  targetLanguage: string;
+  sourceLanguageFallback?: string;
+  provider: OpenAITranslationProvider;
+  runtimeSettings: Awaited<ReturnType<typeof getTranslationRuntimeSettings>>;
+}): Promise<TranslationApiSuccess> {
+  const detectedSourceLanguage = input.sourceLanguageFallback;
+
+  if (!detectedSourceLanguage) {
+    throw new TranslationPipelineError(
+      "missing_source_language",
+      "Select a source language before translating non-XLIFF files.",
+      422
+    );
+  }
+
+  const parsed = parseGenericDocument(input.detectedFormat, input.originalContent);
+  const writebacks = await translateUnits({
+    units: parsed.units.map((unit) => ({
+      id: unit.id,
+      sourceText: unit.sourceText,
+      sourceLookupText: unit.sourceText
+    })),
+    sourceLanguage: detectedSourceLanguage,
+    targetLanguage: input.targetLanguage,
+    provider: input.provider,
+    runtimeSettings: input.runtimeSettings
+  });
+  const translationMap = new Map(writebacks.map((writeback) => [writeback.id, writeback.value]));
+  const translatedContent = serializeGenericDocument(
+    input.detectedFormat,
+    input.originalContent,
+    parsed,
+    translationMap
+  );
+
+  return {
+    fileName: buildOutputFileName(
+      input.fileName,
+      detectedSourceLanguage,
+      input.targetLanguage,
+      input.runtimeSettings.defaultFilenameFormat,
+      input.projectSlug ?? input.runtimeSettings.workspaceSlug
+    ),
+    translatedContent,
+    warnings: [],
+    detectedSourceLanguage,
+    detectedTargetLanguage: input.targetLanguage,
+    xliffVersion: "unknown",
+    translatedUnitCount: writebacks.length,
+    autoDownloadAfterTranslation: input.runtimeSettings.autoDownloadAfterTranslation
+  };
+}
+
+async function translateUnits(input: {
+  units: Array<{
+    id: string;
+    sourceText: string;
+    sourceLookupText: string;
+  }>;
+  sourceLanguage: string;
+  targetLanguage: string;
+  provider: OpenAITranslationProvider;
+  runtimeSettings: Awaited<ReturnType<typeof getTranslationRuntimeSettings>>;
+  encodeExactGlossaryMatch?: (value: string) => string;
+}) {
+  const maskedSegments = new Map<string, MaskedSegment>();
+  const writebacks: Array<{ id: string; value: string; warning?: boolean }> = [];
+  const glossaryMatches = input.runtimeSettings.useGlossaryAutomatically
+    ? await getExactGlossaryTranslations(
+        input.sourceLanguage,
+        input.targetLanguage,
+        input.units.map((unit) => unit.sourceLookupText)
+      )
+    : new Map<string, string>();
+  const translationItems = input.units.flatMap((unit) => {
+    const masked = maskProtectedTokens(unit.sourceText);
+    maskedSegments.set(unit.id, masked);
+
+    const exactGlossaryTranslation = glossaryMatches.get(unit.sourceLookupText.trim());
+
+    if (exactGlossaryTranslation && input.runtimeSettings.strictGlossaryMode) {
+      writebacks.push({
+        id: unit.id,
+        value: input.encodeExactGlossaryMatch
+          ? input.encodeExactGlossaryMatch(exactGlossaryTranslation)
+          : exactGlossaryTranslation
+      });
+
+      return [];
+    }
+
+    if (!containsMeaningfulText(masked.maskedText)) {
+      writebacks.push({
+        id: unit.id,
+        value: unit.sourceText
+      });
+
+      return [];
+    }
+
+    return [
+      {
+        unitInternalId: unit.id,
+        text: masked.maskedText,
+        sourceLanguage: input.sourceLanguage,
+        targetLanguage: input.targetLanguage
+      }
+    ];
+  });
+
+  const translatedItems = await input.provider.translateBatch(translationItems, {
+    sourceLanguage: input.sourceLanguage,
+    targetLanguage: input.targetLanguage,
+    model: input.runtimeSettings.translationModel,
+    maxBatchItems: input.runtimeSettings.translationBatchSize,
+    toneStyle: input.runtimeSettings.toneStyle
+  });
+
+  for (const translatedItem of translatedItems) {
+    const maskedSegment = maskedSegments.get(translatedItem.unitInternalId);
+
+    if (!maskedSegment) {
+      throw new TranslationPipelineError(
+        "validation_error",
+        "Missing token metadata for a translated segment.",
+        500,
+        {
+          unitInternalId: translatedItem.unitInternalId
+        }
+      );
+    }
+
+    try {
+      writebacks.push({
+        id: translatedItem.unitInternalId,
+        value: restoreWithRuntimeRules(
+          translatedItem.translatedText,
+          maskedSegment,
+          input.runtimeSettings.strictTagProtection,
+          translatedItem.unitInternalId
+        )
+      });
+    } catch (error) {
+      if (
+        isTranslationPipelineError(error) &&
+        !input.runtimeSettings.failOnTagMismatch &&
+        (error.code === "tag_mismatch" || error.code === "placeholder_mismatch")
+      ) {
+        writebacks.push({
+          id: translatedItem.unitInternalId,
+          value: maskedSegment.originalText,
+          warning: true
+        });
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  return writebacks;
+}
+
+function parseGenericDocument(
+  format: Exclude<ReturnType<typeof detectTranslationFileFormat>, "xliff" | null>,
+  content: string
+) {
+  switch (format) {
+    case "po":
+      return parsePoDocument(content);
+    case "strings":
+      return parseStringsDocument(content);
+    case "resx":
+      return parseResxDocument(content);
+    case "txt":
+      return parseTxtDocument(content);
+  }
+}
+
+function serializeGenericDocument(
+  format: Exclude<ReturnType<typeof detectTranslationFileFormat>, "xliff" | null>,
+  originalContent: string,
+  parsedDocument: ReturnType<typeof parseGenericDocument>,
+  translations: Map<string, string>
+) {
+  switch (format) {
+    case "po":
+      return serializeTranslatedPo(originalContent, parsedDocument as ParsedPoDocument, translations);
+    case "strings":
+      return serializeTranslatedStrings(originalContent, parsedDocument as ParsedStringsDocument, translations);
+    case "resx":
+      return serializeTranslatedResx(originalContent, parsedDocument as ParsedResxDocument, translations);
+    case "txt":
+      return serializeTranslatedTxt(parsedDocument as ParsedTxtDocument, translations);
   }
 }
 
@@ -230,8 +409,28 @@ function normalizeLanguageValue(value: FormDataEntryValue | null): string | unde
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function isSupportedXliffFile(fileName: string): boolean {
-  return /\.(xliff|xlf)$/i.test(fileName);
+function detectTranslationFileFormat(fileName: string) {
+  if (/\.(xliff|xlf)$/i.test(fileName)) {
+    return "xliff" as const;
+  }
+
+  if (/\.po$/i.test(fileName)) {
+    return "po" as const;
+  }
+
+  if (/\.strings$/i.test(fileName)) {
+    return "strings" as const;
+  }
+
+  if (/\.(resx|xml)$/i.test(fileName)) {
+    return "resx" as const;
+  }
+
+  if (/\.txt$/i.test(fileName)) {
+    return "txt" as const;
+  }
+
+  return null;
 }
 
 function buildOutputFileName(
@@ -241,9 +440,9 @@ function buildOutputFileName(
   filenameFormat: string,
   workspaceSlug: string
 ) {
-  const match = fileName.match(/^(.*?)(\.(?:xliff|xlf))$/i);
+  const match = fileName.match(/^(.*?)(\.[^.]*)$/i);
   const baseName = match ? match[1] : fileName;
-  const extension = match ? match[2] : ".xliff";
+  const extension = match ? match[2] : "";
 
   if (filenameFormat === "Original + source + target") {
     return `${baseName}.${sourceLanguage}-${targetLanguage}${extension}`;

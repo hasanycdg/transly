@@ -24,7 +24,7 @@ export function ProjectUploadZone({
       ? {
           dropFiles: "Dateien zum Hochladen ablegen",
           uploadFiles: "Übersetzungsdateien hochladen",
-          fileTypes: "XLIFF, .po, .strings, .resx oder .zip",
+          fileTypes: "XLIFF, .po, .strings, .resx, .xml, .txt oder .zip",
           upload: "/ Upload",
           translationFiles: "Übersetzungsdateien",
           noneSelected: "Noch keine Dateien ausgewählt."
@@ -32,7 +32,7 @@ export function ProjectUploadZone({
       : {
           dropFiles: "Drop files to upload",
           uploadFiles: "Upload translation files",
-          fileTypes: "XLIFF, .po, .strings, .resx, or .zip",
+          fileTypes: "XLIFF, .po, .strings, .resx, .xml, .txt, or .zip",
           upload: "/ Upload",
           translationFiles: "Translation files",
           noneSelected: "No files selected yet."
@@ -71,7 +71,7 @@ export function ProjectUploadZone({
         <input
           id={inputId}
           type="file"
-          accept=".xliff,.xlf,.po,.strings,.resx,.zip"
+          accept=".xliff,.xlf,.po,.strings,.resx,.xml,.txt,.zip"
           multiple
           className="hidden"
           onChange={(event) => handleFiles(event.target.files)}
@@ -92,7 +92,7 @@ export function ProjectUploadZone({
         </div>
 
         <div className="ml-auto flex flex-wrap gap-[5px]">
-          {[".XLIFF", ".PO", ".strings", ".ZIP"].map((extension) => (
+          {[".XLIFF", ".PO", ".strings", ".RESX", ".XML", ".TXT", ".ZIP"].map((extension) => (
             <span
               key={extension}
               className="inline-flex items-center rounded-[5px] border border-[var(--border)] bg-[var(--background)] px-2 py-[3px] text-[10.5px] font-medium tracking-[0.03em] text-[var(--muted-soft)]"
@@ -153,7 +153,7 @@ export function ProjectUploadZone({
         <input
           id={inputId}
           type="file"
-          accept=".xliff,.xlf,.po,.strings,.resx,.zip"
+          accept=".xliff,.xlf,.po,.strings,.resx,.xml,.txt,.zip"
           multiple
           className="hidden"
           onChange={(event) => handleFiles(event.target.files)}
@@ -167,13 +167,13 @@ export function ProjectUploadZone({
               {copy.uploadFiles}
             </p>
             <p className="mt-0.5 text-[12px] text-[var(--muted-soft)]">
-              .xliff, .po, .strings, .resx, .zip
+              .xliff, .po, .strings, .resx, .xml, .txt, .zip
             </p>
           </div>
         </div>
 
         <div className="ml-auto flex flex-wrap gap-[5px]">
-          {[".XLIFF", ".PO", ".strings", ".RESX", ".ZIP"].map((extension) => (
+          {[".XLIFF", ".PO", ".strings", ".RESX", ".XML", ".TXT", ".ZIP"].map((extension) => (
             <span
               key={extension}
               className="inline-flex items-center rounded-[5px] border border-[var(--border)] bg-white px-2 py-[3px] text-[10.5px] font-medium tracking-[0.03em] text-[var(--muted-soft)]"

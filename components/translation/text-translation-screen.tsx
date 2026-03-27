@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
 import { getRoadmapStatusCounts, PRODUCT_ROADMAP_PHASES } from "@/lib/product-roadmap";
@@ -13,6 +13,7 @@ import type {
 } from "@/types/translation";
 
 const TONE_OPTIONS: SettingsToneStyle[] = ["Neutral", "Formal", "Informal", "Marketing", "Technical"];
+const RECENT_LANGUAGE_STORAGE_KEY = "translayr.recent-language-codes";
 
 type TextTranslationScreenProps = {
   defaultTargetLanguage: string;
@@ -24,15 +25,24 @@ export function TextTranslationScreen({
   defaultToneStyle
 }: TextTranslationScreenProps) {
   const locale = useAppLocale();
-  const languageOptions = getLanguageOptions(locale);
   const roadmapCounts = getRoadmapStatusCounts();
   const [sourceLanguage, setSourceLanguage] = useState("auto");
   const [targetLanguage, setTargetLanguage] = useState(defaultTargetLanguage);
   const [toneStyle, setToneStyle] = useState<SettingsToneStyle>(defaultToneStyle);
+  const [recentLanguageCodes, setRecentLanguageCodes] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [result, setResult] = useState<TextTranslationApiSuccess | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const languageOptions = useMemo(
+    () =>
+      getLanguageOptions(locale, [
+        ...recentLanguageCodes,
+        sourceLanguage !== "auto" ? sourceLanguage : "",
+        targetLanguage
+      ]),
+    [locale, recentLanguageCodes, sourceLanguage, targetLanguage]
+  );
   const copy =
     locale === "de"
       ? {
@@ -112,6 +122,24 @@ export function TextTranslationScreen({
           }
         };
 
+  useEffect(() => {
+    try {
+      const rawValue = window.localStorage.getItem(RECENT_LANGUAGE_STORAGE_KEY);
+
+      if (!rawValue) {
+        return;
+      }
+
+      const parsedValue = JSON.parse(rawValue) as unknown;
+
+      if (Array.isArray(parsedValue)) {
+        setRecentLanguageCodes(parsedValue.filter((value): value is string => typeof value === "string"));
+      }
+    } catch {
+      // Ignore malformed local storage and fall back to static language ordering.
+    }
+  }, []);
+
   const textStats = useMemo(() => {
     const trimmed = text.trim();
 
@@ -149,6 +177,10 @@ export function TextTranslationScreen({
       }
 
       setResult(payload);
+      persistRecentLanguages([
+        payload.detectedSourceLanguage,
+        payload.targetLanguage
+      ]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : copy.translateFailed);
       setResult(null);
@@ -177,6 +209,22 @@ export function TextTranslationScreen({
     anchor.download = `translation-${result.detectedSourceLanguage}-${result.targetLanguage}.txt`;
     anchor.click();
     URL.revokeObjectURL(objectUrl);
+  }
+
+  function persistRecentLanguages(codes: string[]) {
+    const nextCodes = Array.from(
+      new Set(
+        [...codes, ...recentLanguageCodes].filter((value): value is string => typeof value === "string" && value.length > 0)
+      )
+    ).slice(0, 8);
+
+    setRecentLanguageCodes(nextCodes);
+
+    try {
+      window.localStorage.setItem(RECENT_LANGUAGE_STORAGE_KEY, JSON.stringify(nextCodes));
+    } catch {
+      // Ignore storage failures and keep recent language priority in memory.
+    }
   }
 
   return (
