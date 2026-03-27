@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
-import { getRoadmapStatusCounts, PRODUCT_ROADMAP_PHASES } from "@/lib/product-roadmap";
+import { countMeaningfulTextContent } from "@/lib/translation/word-count";
 import { getLanguageLabel } from "@/lib/projects/formatters";
 import { getLanguageOptions } from "@/lib/languages";
 import type { SettingsToneStyle } from "@/types/workspace";
@@ -25,7 +25,6 @@ export function TextTranslationScreen({
   defaultToneStyle
 }: TextTranslationScreenProps) {
   const locale = useAppLocale();
-  const roadmapCounts = getRoadmapStatusCounts();
   const [sourceLanguage, setSourceLanguage] = useState("auto");
   const [targetLanguage, setTargetLanguage] = useState(defaultTargetLanguage);
   const [toneStyle, setToneStyle] = useState<SettingsToneStyle>(defaultToneStyle);
@@ -49,14 +48,7 @@ export function TextTranslationScreen({
           eyebrow: "/ Translate",
           heading: "Text übersetzen",
           intro:
-            "Erster Ausbau über XLIFF hinaus: direkter Text-Flow für schnelle Übersetzungen, QA-Snippets und kurze Produkttexte.",
-          roadmapEyebrow: "/ Produkt-Roadmap",
-          roadmapTitle: "Vom Dateitool zur Translation Workspace",
-          roadmapBody:
-            "Phase 1 erweitert die Oberfläche um direkte Textübersetzung und eine klarere Produktführung. Die nächsten Phasen bauen Multi-Format, Memory und API darauf auf.",
-          live: "Live",
-          inProgress: "In Arbeit",
-          planned: "Geplant",
+            "Direkter Text-Flow für schnelle Übersetzungen, QA-Snippets und kurze Produkttexte.",
           sourceLanguage: "Quellsprache",
           targetLanguage: "Zielsprache",
           autoDetect: "Automatisch erkennen",
@@ -75,26 +67,14 @@ export function TextTranslationScreen({
           copyResult: "Ergebnis kopieren",
           exportTxt: "Als TXT exportieren",
           emptyState: "Noch keine Übersetzung gestartet.",
-          emptyStateBody: "Nutze diese Fläche für schnellen Text-Output, bevor Multi-Format und Translation Memory dazukommen.",
-          translateFailed: "Textübersetzung fehlgeschlagen.",
-          roadmapLabels: {
-            live: "Bereits produktiv",
-            in_progress: "Aktuell in Umsetzung",
-            planned: "Als Nächstes geplant"
-          }
+          emptyStateBody: "Nutze diese Fläche für schnellen Text-Output und kurze Übersetzungen.",
+          translateFailed: "Textübersetzung fehlgeschlagen."
         }
       : {
           eyebrow: "/ Translate",
           heading: "Translate text",
           intro:
-            "The first expansion beyond XLIFF: a direct text flow for quick translations, QA snippets, and short product copy.",
-          roadmapEyebrow: "/ Product Roadmap",
-          roadmapTitle: "From file tool to translation workspace",
-          roadmapBody:
-            "Phase 1 expands the surface with direct text translation and clearer product direction. The following phases build multi-format, memory, and API on top of that base.",
-          live: "Live",
-          inProgress: "In progress",
-          planned: "Planned",
+            "A direct text flow for quick translations, QA snippets, and short product copy.",
           sourceLanguage: "Source language",
           targetLanguage: "Target language",
           autoDetect: "Auto-detect",
@@ -113,13 +93,8 @@ export function TextTranslationScreen({
           copyResult: "Copy result",
           exportTxt: "Export as TXT",
           emptyState: "No translation started yet.",
-          emptyStateBody: "Use this surface for fast text output before multi-format and translation memory arrive.",
-          translateFailed: "Text translation failed.",
-          roadmapLabels: {
-            live: "Already productive",
-            in_progress: "Currently shipping",
-            planned: "Planned next"
-          }
+          emptyStateBody: "Use this surface for fast text output and short translations.",
+          translateFailed: "Text translation failed."
         };
 
   useEffect(() => {
@@ -141,10 +116,8 @@ export function TextTranslationScreen({
   }, []);
 
   const textStats = useMemo(() => {
-    const trimmed = text.trim();
-
     return {
-      wordCount: trimmed.length > 0 ? trimmed.split(/\s+/).length : 0,
+      wordCount: countMeaningfulTextContent(text),
       characterCount: text.length
     };
   }, [text]);
@@ -230,29 +203,21 @@ export function TextTranslationScreen({
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--background)] px-7 py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-[760px]">
-            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              {copy.eyebrow}
-            </span>
-            <h1 className="mt-2 text-[27px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">
-              {copy.heading}
-            </h1>
-            <p className="mt-2 text-[12.5px] leading-6 text-[var(--muted)]">
-              {copy.intro}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 overflow-hidden rounded-[14px] border border-[var(--border)] bg-white">
-            <RoadmapMetric label={copy.live} value={String(roadmapCounts.live)} />
-            <RoadmapMetric label={copy.inProgress} value={String(roadmapCounts.in_progress)} />
-            <RoadmapMetric label={copy.planned} value={String(roadmapCounts.planned)} />
-          </div>
+        <div className="max-w-[760px]">
+          <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+            {copy.eyebrow}
+          </span>
+          <h1 className="mt-2 text-[27px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">
+            {copy.heading}
+          </h1>
+          <p className="mt-2 text-[12.5px] leading-6 text-[var(--muted)]">
+            {copy.intro}
+          </p>
         </div>
       </header>
 
-      <div className="grid gap-6 px-7 py-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
-        <div className="space-y-6">
+      <div className="px-7 py-6">
+        <div className="max-w-[1100px] space-y-6">
           <section className="rounded-[16px] border border-[var(--border)] bg-white">
             <div className="border-b border-[var(--border-light)] px-5 py-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -409,65 +374,7 @@ export function TextTranslationScreen({
           </section>
         </div>
 
-        <aside className="space-y-6">
-          <section className="rounded-[16px] border border-[var(--border)] bg-white px-5 py-5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              {copy.roadmapEyebrow}
-            </p>
-            <h2 className="mt-3 text-[19px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">
-              {copy.roadmapTitle}
-            </h2>
-            <p className="mt-2 text-[12px] leading-6 text-[var(--muted)]">
-              {copy.roadmapBody}
-            </p>
-
-            <div className="mt-5 space-y-4">
-              {PRODUCT_ROADMAP_PHASES.map((phase) => (
-                <div
-                  key={phase.id}
-                  className="rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                        {phase.horizon}
-                      </p>
-                      <h3 className="mt-1 text-[14px] font-semibold text-[var(--foreground)]">
-                        {phase.title}
-                      </h3>
-                    </div>
-                    <span className={getRoadmapBadgeClassName(phase.status)}>
-                      {copy.roadmapLabels[phase.status]}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-[12px] leading-6 text-[var(--muted)]">
-                    {phase.summary}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {phase.deliverables.map((item) => (
-                      <span
-                        key={`${phase.id}-${item}`}
-                        className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-[10.5px] font-medium text-[var(--foreground)]"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </aside>
       </div>
-    </div>
-  );
-}
-
-function RoadmapMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-r border-[var(--border-light)] px-4 py-3 last:border-r-0">
-      <div className="text-[20px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">{value}</div>
-      <div className="text-[11px] text-[var(--muted-soft)]">{label}</div>
     </div>
   );
 }
@@ -494,18 +401,6 @@ function ResultMeta({ label, value }: { label: string; value: string }) {
       <div className="mt-1 text-[13px] font-medium text-[var(--foreground)]">{value}</div>
     </div>
   );
-}
-
-function getRoadmapBadgeClassName(status: "live" | "in_progress" | "planned") {
-  switch (status) {
-    case "live":
-      return "rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--success)]";
-    case "in_progress":
-      return "rounded-full border border-[var(--processing-border)] bg-[var(--processing-bg)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--processing)]";
-    case "planned":
-    default:
-      return "rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]";
-  }
 }
 
 const INPUT_CLASS_NAME =

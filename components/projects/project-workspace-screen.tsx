@@ -2,13 +2,17 @@
 
 import JSZip from "jszip";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
 import { getProjectStatusTone } from "@/lib/projects/display";
 import { formatCompactNumber, formatPercent, formatProjectDate, getLanguageLabel } from "@/lib/projects/formatters";
 import { getProjectSummary } from "@/lib/projects/mock-data";
-import { estimateTranslationFileWordCount } from "@/lib/translation/word-count";
+import {
+  estimateBinaryTranslationFileWordCount,
+  estimateTranslationFileWordCount
+} from "@/lib/translation/word-count";
 import {
   buildTranslatedArchivePath,
   createUniqueArchivePaths,
@@ -57,6 +61,7 @@ type SelectedUploadFile = Pick<UploadedSourceFile, "file" | "name" | "sourceArch
 
 export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps) {
   const locale = useAppLocale();
+  const router = useRouter();
   const [hasMounted, setHasMounted] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<SelectedUploadFile[]>([]);
   const [uploadedSourceFiles, setUploadedSourceFiles] = useState<UploadedSourceFile[]>([]);
@@ -303,13 +308,18 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
       const sourceSnapshots = await Promise.all(
         expandedSelection.files.map(async (file) => {
           const content = isOfficeTranslationFile(file.name) ? null : await file.file.text();
+          const words = isOfficeTranslationFile(file.name)
+            ? await estimateBinaryTranslationFileWordCount(file.name, await file.file.arrayBuffer())
+            : content
+              ? estimateTranslationFileWordCount(file.name, content)
+              : 0;
 
           return {
             id: getClientFileId(file.name, file.file),
             file: file.file,
             name: file.name,
             content,
-            words: content ? estimateTranslationFileWordCount(file.name, content) : 0,
+            words,
             lastUpdated: new Date(file.file.lastModified || Date.now()).toISOString(),
             sourceArchiveName: file.sourceArchiveName
           } satisfies UploadedSourceFile;
@@ -393,6 +403,10 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
   const displayProjectStatus = useMemo(
     () => deriveProjectStatusFromFiles(displayFiles, project?.status ?? "Active"),
     [displayFiles, project?.status]
+  );
+  const displayProjectCreditsUsed = useMemo(
+    () => displayFiles.reduce((sum, file) => (file.status === "Queued" ? sum : sum + file.words), 0),
+    [displayFiles]
   );
 
   const reviewFile = useMemo(
@@ -658,6 +672,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
         "PATCH"
       );
       setPersistedFiles(files);
+      router.refresh();
     } catch {
       // Keep the successful translation outputs available even when file metadata sync fails.
     }
@@ -1061,7 +1076,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
             </div>
             <div className="space-y-3 px-[18px] py-4">
               <StatRow label={copy.glossaryEnabled} value={project.glossaryEnabled ? copy.yes : copy.no} />
-              <StatRow label={copy.creditsUsed} value={formatCompactNumber(project.creditsUsed, locale)} />
+              <StatRow label={copy.creditsUsed} value={formatCompactNumber(displayProjectCreditsUsed, locale)} />
               <StatRow
                 label={copy.qualityScoreAverage}
                 value={project.qualityScore > 0 ? `${project.qualityScore}/100` : copy.pending}

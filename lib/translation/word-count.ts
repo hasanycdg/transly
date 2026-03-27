@@ -1,7 +1,17 @@
 import { GENERATED_TOKEN_PATTERN, maskProtectedTokens } from "@/lib/masking/tokens";
+import { parseCsvDocument } from "@/lib/file-formats/csv";
+import { parseOfficeDocument } from "@/lib/file-formats/office";
+import { parsePoDocument } from "@/lib/file-formats/po";
+import { parseResxDocument } from "@/lib/file-formats/resx";
+import { parseStringsDocument } from "@/lib/file-formats/strings";
+import { parseTxtDocument } from "@/lib/file-formats/txt";
+import { parseXliffDocument } from "@/lib/xliff/parser";
 import type { ParsedTranslationUnit } from "@/types/xliff";
 
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’_-][\p{L}\p{N}]+)*/gu;
+const LETTER_PATTERN = /\p{L}/u;
+
+type CountableTextFormat = "xliff" | "po" | "strings" | "resx" | "csv" | "txt";
 
 export function countMeaningfulWords(text: string): number {
   const { maskedText } = maskProtectedTokens(text);
@@ -14,7 +24,9 @@ export function countMeaningfulWords(text: string): number {
     return 0;
   }
 
-  return normalized.match(WORD_PATTERN)?.length ?? 0;
+  const matches = normalized.match(WORD_PATTERN) ?? [];
+
+  return matches.filter((token) => LETTER_PATTERN.test(token)).length;
 }
 
 export function countWordsFromTranslationUnits(
@@ -24,73 +36,43 @@ export function countWordsFromTranslationUnits(
 }
 
 export function estimateTranslationFileWordCount(fileName: string, content: string): number {
-  if (isXliffFileName(fileName) && typeof DOMParser !== "undefined") {
-    const xliffCount = estimateBrowserXliffWordCount(content);
+  const format = detectCountableTextFormat(fileName);
 
-    if (xliffCount !== null) {
-      return xliffCount;
-    }
+  if (!format) {
+    return countMeaningfulTextContent(content);
   }
 
-  return countMeaningfulTextContent(content);
+  try {
+    return countWordsFromSourceTexts(parseTextDocumentUnits(format, content));
+  } catch {
+    return countMeaningfulTextContent(content);
+  }
+}
+
+export async function estimateBinaryTranslationFileWordCount(
+  fileName: string,
+  buffer: ArrayBuffer
+): Promise<number> {
+  const format = detectOfficeFormat(fileName);
+
+  if (!format) {
+    return 0;
+  }
+
+  try {
+    const parsedDocument = await parseOfficeDocument(buffer, format);
+    return countWordsFromSourceTexts(parsedDocument.units);
+  } catch {
+    return 0;
+  }
 }
 
 export function countMeaningfulTextContent(content: string) {
   return countMeaningfulWords(stripMarkup(content));
 }
 
-function estimateBrowserXliffWordCount(content: string) {
-  try {
-    const parser = new DOMParser();
-    const document = parser.parseFromString(content, "application/xml");
-
-    if (hasParserError(document)) {
-      return null;
-    }
-
-    let total = 0;
-    const transUnits = getDescendantElementsByLocalName(document, "trans-unit");
-
-    for (const transUnit of transUnits) {
-      const source = getFirstChildElementByLocalName(transUnit, "source");
-
-      if (source) {
-        total += countMeaningfulWords(getNormalizedTextContent(source));
-      }
-    }
-
-    const unitElements = getDescendantElementsByLocalName(document, "unit");
-
-    for (const unitElement of unitElements) {
-      const segments = getChildElementsByLocalName(unitElement, "segment");
-
-      if (segments.length > 0) {
-        for (const segment of segments) {
-          const source = getFirstChildElementByLocalName(segment, "source");
-
-          if (source) {
-            total += countMeaningfulWords(getNormalizedTextContent(source));
-          }
-        }
-
-        continue;
-      }
-
-      const source = getFirstChildElementByLocalName(unitElement, "source");
-
-      if (source) {
-        total += countMeaningfulWords(getNormalizedTextContent(source));
-      }
-    }
-
-    return total;
-  } catch {
-    return null;
-  }
-}
-
-function isXliffFileName(fileName: string) {
-  return /\.(xliff|xlf)$/i.test(fileName);
+function countWordsFromSourceTexts(units: Array<Pick<ParsedTranslationUnit, "sourceText">>) {
+  return units.reduce((sum, unit) => sum + countMeaningfulWords(unit.sourceText), 0);
 }
 
 function stripMarkup(content: string) {
@@ -101,38 +83,59 @@ function stripMarkup(content: string) {
     .trim();
 }
 
-function hasParserError(document: Document) {
-  return getDescendantElementsByLocalName(document, "parsererror").length > 0;
+function parseTextDocumentUnits(format: CountableTextFormat, content: string) {
+  switch (format) {
+    case "xliff":
+      return parseXliffDocument(content).units;
+    case "po":
+      return parsePoDocument(content).units;
+    case "strings":
+      return parseStringsDocument(content).units;
+    case "resx":
+      return parseResxDocument(content).units;
+    case "csv":
+      return parseCsvDocument(content).units;
+    case "txt":
+      return parseTxtDocument(content).units;
+  }
 }
 
-function getDescendantElementsByLocalName(root: Document | Element, localName: string) {
-  const matches: Element[] = [];
-  const elements = "getElementsByTagNameNS" in root
-    ? root.getElementsByTagNameNS("*", localName)
-    : [];
-
-  for (const element of Array.from(elements)) {
-    matches.push(element);
+function detectCountableTextFormat(fileName: string): CountableTextFormat | null {
+  if (/\.(xliff|xlf)$/i.test(fileName)) {
+    return "xliff";
   }
 
-  return matches;
+  if (/\.po$/i.test(fileName)) {
+    return "po";
+  }
+
+  if (/\.strings$/i.test(fileName)) {
+    return "strings";
+  }
+
+  if (/\.(resx|xml)$/i.test(fileName)) {
+    return "resx";
+  }
+
+  if (/\.csv$/i.test(fileName)) {
+    return "csv";
+  }
+
+  if (/\.txt$/i.test(fileName)) {
+    return "txt";
+  }
+
+  return null;
 }
 
-function getChildElementsByLocalName(root: Element, localName: string) {
-  return Array.from(root.childNodes).filter(
-    (node): node is Element =>
-      node instanceof Element && getNodeLocalName(node) === localName
-  );
-}
+function detectOfficeFormat(fileName: string) {
+  if (/\.docx$/i.test(fileName)) {
+    return "docx" as const;
+  }
 
-function getFirstChildElementByLocalName(root: Element, localName: string) {
-  return getChildElementsByLocalName(root, localName)[0] ?? null;
-}
+  if (/\.pptx$/i.test(fileName)) {
+    return "pptx" as const;
+  }
 
-function getNodeLocalName(node: Element) {
-  return node.localName ?? node.nodeName.split(":").pop() ?? node.nodeName;
-}
-
-function getNormalizedTextContent(element: Element) {
-  return (element.textContent ?? "").replace(/\s+/g, " ").trim();
+  return null;
 }

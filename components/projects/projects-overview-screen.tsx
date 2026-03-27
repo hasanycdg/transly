@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useMemo, useState } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
 import { translateProjectFilterLabel } from "@/lib/i18n";
-import { getRoadmapStatusCounts, PRODUCT_ROADMAP_PHASES } from "@/lib/product-roadmap";
 import {
   getOverviewProjectDisplay,
   getOverviewStatsDisplay,
@@ -38,7 +36,6 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
 
   const projects = initialProjects;
-  const roadmapCounts = getRoadmapStatusCounts();
 
   const filteredProjects = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -63,16 +60,6 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
           heading: "Alle Projekte",
           newProject: "Neues Projekt",
           activeProjects: "Aktive Projekte",
-          strategyEyebrow: "/ Produkt-Richtung",
-          strategyTitle: "Von XLIFF-Workflow zu Translation Workspace",
-          strategyBody:
-            "Die aktuelle Basis bleibt stark in Projekten, Glossar, Usage und Billing. Phase 1 erweitert das Produkt jetzt sichtbar um Textübersetzung und eine klarere Roadmap direkt im Dashboard.",
-          openTextTranslation: "Textübersetzung öffnen",
-          roadmapSummary: "Roadmap-Status",
-          roadmapLive: "Live",
-          roadmapInProgress: "In Arbeit",
-          roadmapPlanned: "Geplant",
-          nowShipping: "Jetzt in Umsetzung",
           filesInProgress: "Dateien in Bearbeitung",
           averageCompletion: "Durchschn. Fortschritt",
           languagesActive: "Aktive Sprachen",
@@ -96,16 +83,6 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
           heading: "All Projects",
           newProject: "New Project",
           activeProjects: "Active projects",
-          strategyEyebrow: "/ Product Direction",
-          strategyTitle: "From XLIFF workflow to translation workspace",
-          strategyBody:
-            "The current base is already strong in projects, glossary, usage, and billing. Phase 1 now expands the product with direct text translation and a clearer roadmap inside the dashboard.",
-          openTextTranslation: "Open text translation",
-          roadmapSummary: "Roadmap status",
-          roadmapLive: "Live",
-          roadmapInProgress: "In progress",
-          roadmapPlanned: "Planned",
-          nowShipping: "Now shipping",
           filesInProgress: "Files in progress",
           averageCompletion: "Avg. completion",
           languagesActive: "Languages active",
@@ -216,74 +193,6 @@ export function ProjectsOverviewScreen({ initialProjects }: ProjectsOverviewScre
         </header>
 
         <div className="flex flex-col gap-6 px-7 py-6">
-          <section className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
-            <div className="rounded-[14px] border border-[var(--border)] bg-white px-5 py-5">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                {copy.strategyEyebrow}
-              </p>
-              <h2 className="mt-3 text-[22px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">
-                {copy.strategyTitle}
-              </h2>
-              <p className="mt-2 max-w-[760px] text-[12.5px] leading-6 text-[var(--muted)]">
-                {copy.strategyBody}
-              </p>
-
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/translate"
-                  className="inline-flex items-center justify-center rounded-[10px] bg-[var(--foreground)] px-4 py-2.5 text-[12.5px] font-medium text-white transition hover:opacity-90"
-                >
-                  {copy.openTextTranslation}
-                </Link>
-                <span className="rounded-full border border-[var(--processing-border)] bg-[var(--processing-bg)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--processing)]">
-                  {copy.nowShipping}
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-[14px] border border-[var(--border)] bg-white">
-              <div className="border-b border-[var(--border-light)] px-5 py-4">
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  {copy.roadmapSummary}
-                </p>
-              </div>
-              <div className="grid grid-cols-3 border-b border-[var(--border-light)]">
-                <RoadmapCount label={copy.roadmapLive} value={String(roadmapCounts.live)} />
-                <RoadmapCount label={copy.roadmapInProgress} value={String(roadmapCounts.in_progress)} />
-                <RoadmapCount label={copy.roadmapPlanned} value={String(roadmapCounts.planned)} />
-              </div>
-              <div className="space-y-3 px-5 py-4">
-                {PRODUCT_ROADMAP_PHASES.map((phase) => (
-                  <div
-                    key={phase.id}
-                    className="rounded-[10px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                          {phase.horizon}
-                        </p>
-                        <h3 className="mt-1 text-[13px] font-medium text-[var(--foreground)]">
-                          {phase.title}
-                        </h3>
-                      </div>
-                      <span className={getRoadmapBadgeClassName(phase.status)}>
-                        {phase.status === "live"
-                          ? copy.roadmapLive
-                          : phase.status === "in_progress"
-                            ? copy.roadmapInProgress
-                            : copy.roadmapPlanned}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-[11.5px] leading-5 text-[var(--muted)]">
-                      {phase.summary}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
           <section className="grid grid-cols-1 overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 xl:grid-cols-4">
             <StatsCell
               value={stats.activeProjects}
@@ -496,29 +405,6 @@ function StatsCell({
       </div>
     </div>
   );
-}
-
-function RoadmapCount({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-r border-[var(--border-light)] px-5 py-4 last:border-r-0">
-      <div className="text-[24px] font-semibold leading-none tracking-[-0.06em] text-[var(--foreground)]">
-        {value}
-      </div>
-      <div className="mt-1 text-[11px] text-[var(--muted-soft)]">{label}</div>
-    </div>
-  );
-}
-
-function getRoadmapBadgeClassName(status: "live" | "in_progress" | "planned") {
-  switch (status) {
-    case "live":
-      return "rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--success)]";
-    case "in_progress":
-      return "rounded-full border border-[var(--processing-border)] bg-[var(--processing-bg)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--processing)]";
-    case "planned":
-    default:
-      return "rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]";
-  }
 }
 
 function LanguageChip({ code }: { code: string }) {

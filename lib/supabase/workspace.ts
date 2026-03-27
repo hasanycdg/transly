@@ -16,8 +16,7 @@ import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters
 import { createServerSupabaseAdminClient, createServerSupabaseClient } from "@/lib/supabase/admin";
 import { getAppUrl } from "@/lib/supabase/env";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
-import { countMeaningfulTextContent } from "@/lib/translation/word-count";
-import { countXliffTranslationWords } from "@/lib/xliff/metrics";
+import { estimateTranslationFileWordCount } from "@/lib/translation/word-count";
 import type { AppLocale } from "@/types/i18n";
 import type {
   GlossaryCollectionItem,
@@ -426,6 +425,7 @@ export async function syncProjectFiles(
     const existing =
       existingBySourceKey.get(getProjectFileSourceKey(file.name, file.targetLanguage, sourceStoragePath)) ??
       existingByFallbackKey.get(getProjectFileFallbackKey(file.name, file.targetLanguage));
+    const wordCount = await resolveProjectFileWordCount(file);
 
     const values = {
       project_id: project.id,
@@ -435,7 +435,7 @@ export async function syncProjectFiles(
       target_language: file.targetLanguage,
       status: mapFileStatusToDatabase(file.status),
       progress_percent: file.progress,
-      word_count: resolveProjectFileWordCount(file),
+      word_count: wordCount,
       source_storage_path: sourceStoragePath,
       xliff_version: file.xliffVersion ?? null,
       error_message: file.errorMessage ?? null,
@@ -488,16 +488,61 @@ export async function syncProjectFiles(
 
   const refreshedFiles = (refreshedData as ProjectFileRow[] | null) ?? [];
   const projectStatus = deriveProjectStatusFromRows(refreshedFiles);
+  const projectCreditsUsed = getProjectCreditsUsedFromRows(refreshedFiles);
   const { error: projectUpdateError } = await supabase
     .from("projects")
     .update({
       status: projectStatus,
+      credits_used: projectCreditsUsed,
       updated_at: now
     })
     .eq("id", project.id);
 
   if (projectUpdateError) {
     throw new Error(`Failed to update project status: ${projectUpdateError.message}`);
+  }
+
+  const workspaceCreditsUsed = await getWorkspaceCurrentCreditsUsed(supabase, workspace.id);
+  const { error: workspaceUpdateError } = await supabase
+    .from("workspaces")
+    .update({
+      credits_used: workspaceCreditsUsed,
+      updated_at: now
+    })
+    .eq("id", workspace.id);
+
+  if (workspaceUpdateError) {
+    throw new Error(`Failed to update workspace credits: ${workspaceUpdateError.message}`);
+  }
+
+  const { data: activeCycleData, error: activeCycleError } = await supabase
+    .from("workspace_billing_cycles")
+    .select("id, credits_used")
+    .eq("workspace_id", workspace.id)
+    .eq("status", "active")
+    .order("period_start", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeCycleError) {
+    throw new Error(`Failed to load active billing cycle: ${activeCycleError.message}`);
+  }
+
+  const activeCycle = activeCycleData as Pick<BillingCycleRow, "id" | "credits_used"> | null;
+
+  if (activeCycle) {
+    const cycleCreditsUsed = Math.max(activeCycle.credits_used, workspaceCreditsUsed);
+
+    if (cycleCreditsUsed !== activeCycle.credits_used) {
+      const { error: billingUpdateError } = await supabase
+        .from("workspace_billing_cycles")
+        .update({ credits_used: cycleCreditsUsed })
+        .eq("id", activeCycle.id);
+
+      if (billingUpdateError) {
+        throw new Error(`Failed to update billing cycle usage: ${billingUpdateError.message}`);
+      }
+    }
   }
 
   return refreshedFiles.map(mapProjectFileRecord);
@@ -2538,20 +2583,12 @@ function deriveProjectStatusFromRows(files: ProjectFileRow[]): ProjectRow["statu
   return "active";
 }
 
-function resolveProjectFileWordCount(file: ProjectFileSyncInput) {
+async function resolveProjectFileWordCount(file: ProjectFileSyncInput) {
   if (!file.content) {
     return file.words;
   }
 
-  if (/\.(xliff|xlf)$/i.test(file.name)) {
-    try {
-      return countXliffTranslationWords(file.content);
-    } catch {
-      return countMeaningfulTextContent(file.content);
-    }
-  }
-
-  return countMeaningfulTextContent(file.content);
+  return estimateTranslationFileWordCount(file.name, file.content);
 }
 
 function mapProjectExportRecord(projectExport: ProjectExportRow): ProjectExportRecord {
@@ -2881,7 +2918,15 @@ async function getWorkspaceCurrentCreditsUsed(
     throw new Error(`Failed to load project files while summarizing credits: ${filesError.message}`);
   }
 
-  return (((filesData as Pick<ProjectFileRow, "word_count" | "status">[] | null) ?? [])).reduce((sum, file) => {
+  return getCreditsUsedFromFiles(((filesData as Pick<ProjectFileRow, "word_count" | "status">[] | null) ?? []));
+}
+
+function getProjectCreditsUsedFromRows(files: ProjectFileRow[]) {
+  return getCreditsUsedFromFiles(files);
+}
+
+function getCreditsUsedFromFiles(files: Array<Pick<ProjectFileRow, "word_count" | "status">>) {
+  return files.reduce((sum, file) => {
     if (file.status === "queued") {
       return sum;
     }
