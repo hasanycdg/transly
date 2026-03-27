@@ -73,6 +73,15 @@ export interface TranslationApiSuccess {
   autoDownloadAfterTranslation: boolean;
 }
 
+export interface TextTranslationApiSuccess {
+  translatedText: string;
+  detectedSourceLanguage: string;
+  targetLanguage: string;
+  toneStyle: string;
+  wordCount: number;
+  characterCount: number;
+}
+
 export interface TranslationApiErrorShape {
   error: {
     code: PipelineErrorCode;

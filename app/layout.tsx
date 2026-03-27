@@ -21,7 +21,7 @@ const bodoni = Bodoni_Moda({
 export const metadata: Metadata = {
   title: "Translayr",
   description:
-    "Structure-safe AI localization for XLIFF files. Upload, translate, validate, and download without breaking placeholders or XML tags."
+    "AI translation workspace for text and localization files. Translate, review, validate, and export from one operational surface."
 };
 
 export default async function RootLayout({

@@ -14,16 +14,6 @@ type DashboardShellProps = {
   shellData: DashboardShellData;
 };
 
-const mainNavItems = [
-  { label: "Usage", href: "/usage", icon: UsageIcon },
-  { label: "Glossary", href: "/glossary", icon: GlossaryIcon }
-];
-
-const utilityNavItems = [
-  { label: "Billing", href: "/billing", icon: BillingIcon },
-  { label: "Settings", href: "/settings", icon: SettingsIcon }
-];
-
 export function DashboardShell({ children, shellData }: DashboardShellProps) {
   const locale = useAppLocale();
   const pathname = usePathname();
@@ -39,6 +29,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
     locale === "de"
       ? {
           usage: "Nutzung",
+          translate: "Übersetzen",
           glossary: "Glossar",
           billing: "Abrechnung",
           settings: "Einstellungen",
@@ -56,6 +47,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
         }
       : {
           usage: "Usage",
+          translate: "Translate",
           glossary: "Glossary",
           billing: "Billing",
           settings: "Settings",
@@ -71,6 +63,15 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           signOutFailed: "Sign-out failed.",
           planSuffix: "plan"
         };
+  const mainNavItems = [
+    { label: copy.translate, href: "/translate", icon: TranslateIcon },
+    { label: copy.usage, href: "/usage", icon: UsageIcon },
+    { label: copy.glossary, href: "/glossary", icon: GlossaryIcon }
+  ];
+  const utilityNavItems = [
+    { label: copy.billing, href: "/billing", icon: BillingIcon },
+    { label: copy.settings, href: "/settings", icon: SettingsIcon }
+  ];
 
   useEffect(() => {
     setHasMounted(true);
@@ -259,11 +260,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                   <Link key={item.label} href={item.href} prefetch={shouldPrefetch} className={className}>
                     <Icon />
                     <span>
-                      {item.label === "Usage"
-                        ? copy.usage
-                        : item.label === "Glossary"
-                          ? copy.glossary
-                          : item.label}
+                      {item.label}
                     </span>
                   </Link>
                 ) : (
@@ -293,11 +290,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                     <Link key={item.label} href={item.href} prefetch={shouldPrefetch} className={className}>
                       <Icon />
                       <span>
-                        {item.label === "Billing"
-                          ? copy.billing
-                          : item.label === "Settings"
-                            ? copy.settings
-                            : item.label}
+                        {item.label}
                       </span>
                     </Link>
                   );
@@ -368,6 +361,20 @@ function UsageIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
       <path d="M2 4h11M2 7.5h8M2 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TranslateIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+      <path
+        d="M2 3.5h7M5.5 3.5c0 3-1.2 5.2-3.5 6.6M4.5 6.5c1.1.9 2.2 1.7 3.4 2.2M9.5 4.5l3 7M8.4 9h4.2"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

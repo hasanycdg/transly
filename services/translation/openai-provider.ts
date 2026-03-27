@@ -118,6 +118,90 @@ export class OpenAITranslationProvider implements TranslationProvider {
       };
     });
   }
+
+  async translateText(input: {
+    text: string;
+    targetLanguage: string;
+    sourceLanguage?: string;
+    toneStyle?: string;
+    model?: string;
+  }) {
+    const normalizedSourceLanguage = normalizeLanguageToken(input.sourceLanguage);
+    const completion = await this.client.chat.completions.create({
+      model: input.model ?? this.model,
+      temperature: 0.2,
+      response_format: {
+        type: "json_object"
+      },
+      messages: [
+        {
+          role: "system",
+          content: [
+            "You are a professional translation engine.",
+            "Translate the user's text naturally and safely.",
+            "Detect the source language if it is not provided.",
+            "Return only valid JSON in this shape:",
+            '{"sourceLanguage":"en","translation":"translated text"}'
+          ].join("\n")
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            sourceLanguage: normalizedSourceLanguage ?? null,
+            targetLanguage: input.targetLanguage,
+            toneStyle: input.toneStyle ?? null,
+            text: input.text
+          })
+        }
+      ]
+    });
+
+    const content = completion.choices[0]?.message?.content;
+
+    if (!content) {
+      throw new TranslationPipelineError(
+        "invalid_ai_response",
+        "The AI provider returned an empty translation payload.",
+        502
+      );
+    }
+
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(stripMarkdownFence(content));
+    } catch (error) {
+      throw new TranslationPipelineError(
+        "invalid_ai_response",
+        "The AI provider returned invalid JSON for text translation.",
+        502,
+        {
+          cause: error instanceof Error ? error.message : "Unknown JSON parse error"
+        }
+      );
+    }
+
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !("translation" in parsed) ||
+      typeof parsed.translation !== "string" ||
+      !("sourceLanguage" in parsed) ||
+      typeof parsed.sourceLanguage !== "string"
+    ) {
+      throw new TranslationPipelineError(
+        "invalid_ai_response",
+        "The AI provider response had an unexpected shape for text translation.",
+        502
+      );
+    }
+
+    return {
+      translatedText: parsed.translation.trim(),
+      detectedSourceLanguage:
+        normalizeLanguageToken(parsed.sourceLanguage) ?? normalizedSourceLanguage ?? "auto"
+    };
+  }
 }
 
 function parseTranslationPayload(
@@ -214,4 +298,36 @@ function buildBehaviorInstruction(context: TranslationContext) {
   }
 
   return `Favor a ${context.toneStyle.toLowerCase()} tone whenever the source text allows it, while keeping translations concise and structurally safe.`;
+}
+
+function normalizeLanguageToken(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized || normalized === "auto") {
+    return undefined;
+  }
+
+  const aliasMap: Record<string, string> = {
+    english: "en",
+    german: "de",
+    deutsch: "de",
+    french: "fr",
+    spanish: "es",
+    italian: "it",
+    dutch: "nl",
+    portuguese: "pt",
+    polish: "pl",
+    turkish: "tr",
+    japanese: "ja"
+  };
+
+  if (/^[a-z]{2}(?:-[a-z]{2})?$/i.test(normalized)) {
+    return normalized.slice(0, 2);
+  }
+
+  return aliasMap[normalized];
 }

@@ -695,8 +695,8 @@ export function LandingPage() {
           <div className="mt-7 grid gap-8 rounded-[24px] border border-[#e3dacc] bg-white p-6 shadow-[0_16px_40px_rgba(22,20,18,0.04)] lg:grid-cols-[1.7fr_0.7fr] lg:p-8">
             <div>
               <blockquote className={`${DISPLAY_FONT_CLASS_NAME} max-w-[840px] text-[clamp(1.8rem,3vw,2.6rem)] leading-[1.08] text-[#171412]`}>
-                "{copy.storyQuoteLead} <span className="italic text-[#57514a]">{copy.storyQuoteEmphasis}</span>{" "}
-                {copy.storyQuoteTail}"
+                &ldquo;{copy.storyQuoteLead} <span className="italic text-[#57514a]">{copy.storyQuoteEmphasis}</span>{" "}
+                {copy.storyQuoteTail}&rdquo;
               </blockquote>
               <div className="mt-8">
                 <div className="text-[20px] font-medium tracking-[-0.04em] text-[#171412]">{copy.storyName}</div>
