@@ -12,7 +12,7 @@ import {
 } from "@/lib/billing/plans";
 import { DEFAULT_APP_LOCALE, getIntlLocale, normalizeAppLocale } from "@/lib/i18n";
 import { LANGUAGE_OPTIONS } from "@/lib/languages";
-import { formatCompactNumber, formatPercent, getLanguageLabel } from "@/lib/projects/formatters";
+import { formatCompactNumber, getLanguageLabel } from "@/lib/projects/formatters";
 import { createServerSupabaseAdminClient, createServerSupabaseClient } from "@/lib/supabase/admin";
 import { getAppUrl } from "@/lib/supabase/env";
 import { getAuthenticatedUser } from "@/lib/supabase/server";

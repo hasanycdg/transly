@@ -24,6 +24,34 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
   const home = data.home;
   const projects = data.projects;
   const insights = useMemo(() => {
+    const aggregateTargetLanguages = (
+      entries: Array<{ targetLanguage: string; words: number }>
+    ) =>
+      Array.from(
+        entries.reduce((map, entry) => {
+          const safeWords = Math.max(entry.words, 0);
+
+          if (!entry.targetLanguage || safeWords <= 0) {
+            return map;
+          }
+
+          const existing = map.get(entry.targetLanguage) ?? {
+            code: entry.targetLanguage,
+            words: 0,
+            files: 0
+          };
+
+          existing.words += safeWords;
+          existing.files += 1;
+          map.set(entry.targetLanguage, existing);
+          return map;
+        }, new Map<string, { code: string; words: number; files: number }>())
+          .values()
+      )
+        .filter((entry) => entry.files > 0 && entry.words > 0)
+        .sort((left, right) => right.words - left.words || right.files - left.files)
+        .slice(0, 4);
+
     const projectSummaries = projects.map((project) => {
       const summary = getProjectSummary(project);
       const processingFiles = project.files.filter((file) => file.status === "Processing" || file.status === "Queued").length;
@@ -71,20 +99,53 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
         return new Date(right.project.lastUpdated).getTime() - new Date(left.project.lastUpdated).getTime();
       })
       .slice(0, 5);
-    const topLanguages = Array.from(
-      projects
-        .flatMap((project) => project.files.filter((file) => file.status !== "Queued"))
-        .reduce((map, file) => {
-          const existing = map.get(file.targetLanguage) ?? { code: file.targetLanguage, words: 0, files: 0 };
-          existing.words += file.words;
-          existing.files += 1;
-          map.set(file.targetLanguage, existing);
-          return map;
-        }, new Map<string, { code: string; words: number; files: number }>())
-        .values()
-    )
-      .sort((left, right) => right.words - left.words)
-      .slice(0, 4);
+    const fileBasedTopLanguages = aggregateTargetLanguages(
+      projects.flatMap((project) =>
+        project.files
+          .filter((file) => file.status !== "Queued" && file.words > 0)
+          .map((file) => ({ targetLanguage: file.targetLanguage, words: file.words }))
+      )
+    );
+    const recentTranslationTopLanguages = aggregateTargetLanguages(
+      home.recentTranslations.map((translation) => ({
+        targetLanguage: translation.targetLanguage,
+        words: translation.wordsUsed
+      }))
+    );
+    const projectedTopLanguages = aggregateTargetLanguages(
+      projects.flatMap((project) => {
+        const targetCount = Math.max(project.targetLanguages.length, 1);
+        const estimatedWordsPerLanguage =
+          project.creditsUsed > 0 ? Math.round(project.creditsUsed / targetCount) : 0;
+
+        return project.targetLanguages.map((targetLanguage) => ({
+          targetLanguage,
+          words: estimatedWordsPerLanguage
+        }));
+      })
+    );
+    const targetLanguageOccurrences = projects.flatMap((project) =>
+      project.targetLanguages.length > 0
+        ? project.targetLanguages
+        : project.files.map((file) => file.targetLanguage)
+    );
+    const monthlyVolumeFallbackTopLanguages = aggregateTargetLanguages(
+      targetLanguageOccurrences.map((targetLanguage) => ({
+        targetLanguage,
+        words:
+          home.wordsThisMonth > 0 && targetLanguageOccurrences.length > 0
+            ? Math.round(home.wordsThisMonth / targetLanguageOccurrences.length)
+            : 0
+      }))
+    );
+    const topLanguages =
+      fileBasedTopLanguages.length > 0
+        ? fileBasedTopLanguages
+        : recentTranslationTopLanguages.length > 0
+          ? recentTranslationTopLanguages
+          : projectedTopLanguages.length > 0
+            ? projectedTopLanguages
+            : monthlyVolumeFallbackTopLanguages;
     const recentActivity = projects
       .flatMap((project) =>
         project.recentActivity.map((activity) => ({
@@ -109,7 +170,7 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
       topLanguages,
       recentActivity
     };
-  }, [projects]);
+  }, [home.recentTranslations, home.wordsThisMonth, projects]);
   const usagePercent = Math.max(0, Math.min(home.planPercent, 100));
   const copy =
     locale === "de"
