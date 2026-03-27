@@ -26,27 +26,27 @@ export const BILLING_PLANS: BillingPlanDefinition[] = [
     id: "starter",
     name: "Starter",
     basePriceCents: 1_900,
-    creditsLimit: 25_000,
+    creditsLimit: 50_000,
     description: "For smaller localization workloads and lightweight weekly release cycles.",
-    features: ["25k monthly words", "Project workspaces", "Glossary support"],
+    features: ["50k monthly words", "Project workspaces", "Glossary support"],
     paid: true
   },
   {
     id: "pro",
     name: "Pro",
     basePriceCents: 4_900,
-    creditsLimit: 150_000,
+    creditsLimit: 200_000,
     description: "For product teams shipping continuously across multiple locales.",
-    features: ["150k monthly words", "Review workflow", "Priority glossary injection"],
+    features: ["200k monthly words", "Review workflow", "Priority glossary injection"],
     paid: true
   },
   {
     id: "scale",
     name: "Scale",
     basePriceCents: 9_900,
-    creditsLimit: 400_000,
+    creditsLimit: 700_000,
     description: "For larger teams coordinating launches, QA, and exports at higher volume.",
-    features: ["400k monthly words", "Faster throughput", "Shared team operations"],
+    features: ["700k monthly words", "Faster throughput", "Shared team operations"],
     paid: true
   }
 ];

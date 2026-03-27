@@ -1,928 +1,1060 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
-import { BILLING_PLANS, type BillingPlanId } from "@/lib/billing/plans";
+import { BILLING_PLANS } from "@/lib/billing/plans";
 
 const DISPLAY_FONT_CLASS_NAME = "[font-family:var(--font-display)] font-medium tracking-[-0.065em]";
-const PRIMARY_BUTTON_TONE_CLASS_NAME =
-  "border border-[#dfd7cc] bg-[rgba(255,255,255,0.72)] text-[#161412] shadow-[0_4px_12px_rgba(17,15,13,0.03)] transition hover:bg-white";
+const EYEBROW_CLASS = "text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]";
+const PRIMARY_BUTTON_CLASS =
+  "inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-[13px] font-medium text-white transition hover:opacity-90";
+const SECONDARY_BUTTON_CLASS =
+  "inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-5 text-[13px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]";
 
-type FeatureItem = {
-  description: string;
+type MarketingPageId = "home" | "products" | "workspace" | "files" | "text" | "pricing";
+
+type MarketingNavItem = {
+  href: string;
+  label: string;
+  active: boolean;
+};
+
+type ProductCard = {
+  id: Exclude<MarketingPageId, "home" | "products" | "pricing">;
+  href: string;
+  label: string;
   title: string;
+  body: string;
+  points: string[];
 };
 
-type StepItem = {
-  description: string;
+type HeroAction = {
+  href: string;
+  label: string;
+  tone: "primary" | "secondary";
+};
+
+type PageHero = {
+  eyebrow: string;
   title: string;
+  body: string;
+  actions: HeroAction[];
 };
 
-type FaqItem = {
-  answer: string;
-  question: string;
+type DetailBlock = {
+  eyebrow: string;
+  title: string;
+  body: string;
+  points: string[];
 };
 
-type PricePlan = {
-  buttonHref: string;
-  buttonLabel: string;
-  description: string;
-  featured?: boolean;
-  features: string[];
-  id?: BillingPlanId;
+type PageFrameProps = {
+  hero: PageHero;
+  activePage: MarketingPageId;
+  navItems: MarketingNavItem[];
+  productCards: ProductCard[];
+  footer: MarketingFooterCopy;
+  loginLabel: string;
+  registerLabel: string;
+  cta: MarketingCtaCopy;
+  children: React.ReactNode;
+  visual: React.ReactNode;
+  locale: "de" | "en";
+  heroVisualLarge?: boolean;
+};
+
+type MarketingFooterCopy = {
+  copyright: string;
+  privacy: string;
+  terms: string;
+  status: string;
+};
+
+type MarketingCtaCopy = {
+  eyebrow: string;
+  title: string;
+  body: string;
+  primary: string;
+  secondary: string;
+};
+
+type PricingPlanView = {
+  id: string;
   name: string;
   price: string;
-  suffix?: string;
+  suffix: string;
+  note?: string;
+  credits: string;
+  description: string;
+  features: string[];
+  featured: boolean;
 };
 
+type PricingInterval = "monthly" | "yearly";
+
 export function LandingPage() {
+  return <MarketingPage pageId="home" />;
+}
+
+export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
   const locale = useAppLocale();
-  const copy =
-    locale === "de"
-      ? {
-          navFeatures: "Features",
-          navHowItWorks: "Ablauf",
-          navPricing: "Preise",
-          navBlog: "Story",
-          navLogin: "Anmelden",
-          navRegister: "Kostenlos starten",
-          heroEyebrow: "Localization Infrastructure",
-          heroTitleLead: "Übersetzungen launchen",
-          heroTitleAccent: "ohne das Chaos.",
-          heroBody:
-            "Translayr verbindet deine Dateien, dein Team und deine Sprachen in einem klaren Workflow. Von Upload bis Export bleibt alles sichtbar, geprüft und startklar.",
-          heroPrimary: "Kostenlos starten",
-          heroSecondary: "Im Workspace anmelden",
-          trustedBy: "Vertraut von mehreren Agenturen und Developern, die ihre Arbeit vereinfachen möchten",
-          featuresEyebrow: "Features",
-          featuresTitle: "Alles, was dein Localization-Workflow wirklich braucht.",
-          featuresBody:
-            "Gebaut für Teams, die in mehrere Märkte shippen. Keine Spreadsheet-Ketten, keine E-Mail-Threads und keine verlorenen Strings mehr.",
-          howEyebrow: "Ablauf",
-          howTitle: "Vom Upload bis Export in wenigen Minuten.",
-          howBody:
-            "Keine Setup-Calls, keine Implementierungsgebühren. Lade deine erste Datei hoch und dein Projekt ist in unter zwei Minuten live.",
-          storyEyebrow: "Customer Story",
-          storyQuoteLead: "Wir sind von vier verschiedenen Tools und einer Tabelle auf",
-          storyQuoteEmphasis: "einen einzigen sauberen Prozess",
-          storyQuoteTail: "gewechselt. Unser Release-Zyklus wurde drei Tage kürzer.",
-          storyName: "Sarah Chen",
-          storyRole: "Head of Product, Loomify",
-          pricingEyebrow: "Pricing",
-          pricingTitle: "Einfache Preise, ohne Überraschungen.",
-          pricingBody:
-            "Starte kostenlos und skaliere nur dann, wenn du es brauchst. Keine Kosten pro String und keine versteckten Gebühren.",
-          faqEyebrow: "FAQs",
-          faqTitle: "Häufige Fragen vor dem Start.",
-          faqBody:
-            "Die wichtigsten Punkte zu Dateiformaten, Team-Setup, Abrechnung und Export in einer kompakten Übersicht.",
-          ctaEyebrow: "Get started",
-          ctaTitle: "Dein nächster Release, in jeder Sprache.",
-          ctaBody:
-            "Schließe dich 140+ Teams an, die mit Translayr schneller shippen. Dein erstes Projekt ist in weniger als zwei Minuten aufgesetzt.",
-          ctaPrimary: "Kostenlos starten",
-          ctaSecondary: "Anmelden",
-          footerCopyright: "© 2026 Translayr. Alle Rechte vorbehalten.",
-          footerPrivacy: "Datenschutz",
-          footerTerms: "AGB",
-          footerStatus: "Status",
-          footerBlog: "Blog",
-          mockProjectLabel: "Alle Projekte",
-          mockNew: "+ Neu",
-          mockSidebarProjects: "Projekte",
-          mockSidebarUsage: "Usage",
-          mockSidebarGlossary: "Glossary",
-          mockSidebarSettings: "Settings",
-          mockActive: "Aktiv",
-          mockFiles: "Dateien",
-          mockDone: "Fertig",
-          mockLangs: "Sprachen",
-          mockStatusActive: "Aktiv",
-          mockStatusReview: "Review",
-          features: [
-            {
-              title: "Multi-Format Upload",
-              description:
-                "Ziehe XLIFF-, .po- oder .strings-Dateien direkt hinein. Wir lesen Struktur, extrahieren Strings und behalten deine Metadaten intakt."
-            },
-            {
-              title: "Live-Fortschritt",
-              description:
-                "Verfolge den Status über alle Zielsprachen hinweg. Du siehst sofort, was fertig, in Review oder blockiert ist."
-            },
-            {
-              title: "One-Click Export",
-              description:
-                "Exportiere geprüfte Übersetzungen im Originalformat. Ohne Reformatierung direkt zurück in deine Pipeline."
-            },
-            {
-              title: "Team-Workspaces",
-              description:
-                "Lade Übersetzer, Reviewer und Projektverantwortliche ein. Rollenbasierter Zugriff bleibt dabei übersichtlich."
-            },
-            {
-              title: "Gemeinsames Glossar",
-              description:
-                "Definiere Schlüsselbegriffe einmal und erzwinge sie projekt- und sprachübergreifend für echte Konsistenz."
-            },
-            {
-              title: "Versionskontrolle",
-              description:
-                "Volle Historie auf jeder Datei. Rolle auf frühere Stände zurück und sehe genau, was sich geändert hat."
-            }
-          ] satisfies FeatureItem[],
-          steps: [
-            {
-              title: "Dateien hochladen",
-              description:
-                "Ziehe deine XLIFF-, .po- oder .strings-Dateien hinein. Translayr parst sie sofort und erstellt automatisch ein Projekt."
-            },
-            {
-              title: "Zuweisen und übersetzen",
-              description:
-                "Lade dein Team ein oder verbinde bestehende Translation Memorys. Weise Sprachen mit einem Klick zu."
-            },
-            {
-              title: "Prüfen und exportieren",
-              description:
-                "Reviewe Strings mit Inline-Kommentaren und exportiere danach im Originalformat, bereit für den nächsten Deploy."
-            }
-          ] satisfies StepItem[],
-          stats: [
-            { value: "270K", label: "Übersetzte Strings" },
-            { value: "98%", label: "Kundenzufriedenheit" },
-            { value: "Mehrere", label: "Aktive Teams" },
-            { value: "90+", label: "Unterstützte Sprachen" }
-          ],
-          storyMetrics: [
-            { value: "3 Tage", label: "Schnellerer Release-Zyklus" },
-            { value: "7 → 1", label: "Konsolidierte Tools" },
-            { value: "12", label: "Ausgerollte Sprachen" }
-          ],
-          faqs: [
-            {
-              question: "Welche Dateiformate unterstützt Translayr?",
-              answer:
-                "Aktuell ist der Workflow auf XLIFF, .po und .strings ausgelegt. Diese Formate lassen sich direkt hochladen, bearbeiten und wieder im Originalformat exportieren."
-            },
-            {
-              question: "Kann ich mein Team direkt einladen?",
-              answer:
-                "Ja. Projekte lassen sich für Übersetzer, Reviewer und weitere Beteiligte im Workspace organisieren, damit Übergaben nicht außerhalb des Tools passieren."
-            },
-            {
-              question: "Wie funktioniert die Abrechnung?",
-              answer:
-                "Die Landingpage nutzt eure echten Plans aus dem Produkt: Free, Starter, Pro und Scale. Preise und Limits orientieren sich an den Daten aus dem Billing-Setup."
-            },
-            {
-              question: "Bleibt der Export struktursicher?",
-              answer:
-                "Ja. Der Fokus des Produkts liegt darauf, Strings und Dateistruktur sauber zu halten, damit du Übersetzungen ohne manuelles Nacharbeiten zurück in deine Pipeline geben kannst."
-            },
-            {
-              question: "Kann ich später auf einen größeren Plan wechseln?",
-              answer:
-                "Ja. Du kannst mit Free oder Starter beginnen und später im Billing-Bereich auf Starter, Pro oder Scale wechseln, wenn dein Volumen steigt."
-            },
-            {
-              question: "Unterstützt Translayr mehrere Zielsprachen gleichzeitig?",
-              answer:
-                "Ja. Projekte sind darauf ausgelegt, mehrere Zielsprachen parallel zu verwalten, damit Fortschritt, Review und Export zentral im selben Ablauf bleiben."
-            },
-            {
-              question: "Kann ich ein Glossar zentral pflegen?",
-              answer:
-                "Ja. Das Produkt enthält einen eigenen Glossar-Bereich, damit Begriffe nicht in einzelnen Projekten verloren gehen und teamweit konsistent bleiben."
-            },
-            {
-              question: "Wo sehe ich den Fortschritt meiner Projekte?",
-              answer:
-                "Die Projektübersicht und die einzelnen Projektseiten zeigen dir Fortschritt, Dateistatus und Review-Zustände direkt im Dashboard an."
-            },
-            {
-              question: "Brauche ich ein langes Setup oder Onboarding?",
-              answer:
-                "Nein. Der Einstieg ist bewusst schlank gehalten: registrieren oder anmelden, Datei hochladen und direkt im Projekt weiterarbeiten."
-            }
-          ] satisfies FaqItem[],
-          plans: [
-            {
-              name: "Starter",
-              price: "€0",
-              suffix: "/ Monat",
-              description: "Für Einzelpersonen und kleine Projekte, die mit Lokalisierung starten.",
-              features: [
-                "3 Projekte",
-                "2 Sprachen pro Projekt",
-                "5.000 Strings / Monat",
-                "XLIFF-, .po- und .strings-Upload",
-                "Community-Support"
-              ],
-              buttonLabel: "Kostenlos starten",
-              buttonHref: "/register"
-            },
-            {
-              name: "Pro",
-              price: "€49",
-              suffix: "/ Monat",
-              description: "Für Teams, die regelmäßig in mehrere Märkte shippen.",
-              features: [
-                "Unbegrenzte Projekte",
-                "Unbegrenzte Sprachen",
-                "100.000 Strings / Monat",
-                "Team-Workspaces & Rollen",
-                "Gemeinsames Glossar",
-                "Versionshistorie",
-                "Priority Support"
-              ],
-              buttonLabel: "14 Tage Pro kostenlos",
-              buttonHref: "/register"
-            },
-            {
-              name: "Enterprise",
-              price: "Custom",
-              description: "Für Organisationen mit höheren Anforderungen an Sicherheit, Compliance und Volumen.",
-              features: [
-                "Alles aus Pro",
-                "Unbegrenzte Strings",
-                "SSO / SAML",
-                "SLA-Garantie",
-                "Dediziertes Onboarding",
-                "Custom Integrations"
-              ],
-              buttonLabel: "Sales kontaktieren",
-              buttonHref: "/login"
-            }
-          ] satisfies PricePlan[]
-        }
-      : {
-          navFeatures: "Features",
-          navHowItWorks: "How it works",
-          navPricing: "Pricing",
-          navBlog: "Blog",
-          navLogin: "Sign in",
-          navRegister: "Get started free",
-          heroEyebrow: "Localization Infrastructure",
-          heroTitleLead: "Ship translations",
-          heroTitleAccent: "without the chaos.",
-          heroBody:
-            "Translayr connects your files, your team, and your languages in one clean workflow. From upload to export, everything stays tracked, reviewed, and ready.",
-          heroPrimary: "Start for free",
-          heroSecondary: "Sign in to your workspace",
-          trustedBy: "Trusted by agencies and developers who want to make their work easier",
-          featuresEyebrow: "Features",
-          featuresTitle: "Everything your localization workflow needs.",
-          featuresBody:
-            "Built for teams that ship to multiple markets. No more spreadsheets, no more email threads, and no more missed strings.",
-          howEyebrow: "How it works",
-          howTitle: "From upload to export in minutes.",
-          howBody:
-            "No setup calls. No implementation fees. Upload your first file and your project is live in under two minutes.",
-          storyEyebrow: "Customer Story",
-          storyQuoteLead: "We went from managing localization in",
-          storyQuoteEmphasis: "four different tools and a spreadsheet",
-          storyQuoteTail: "to having everything in one place. Our release cycle got three days shorter.",
-          storyName: "Sarah Chen",
-          storyRole: "Head of Product, Loomify",
-          pricingEyebrow: "Pricing",
-          pricingTitle: "Simple pricing, no surprises.",
-          pricingBody:
-            "Start free, scale when you need to. No per-string fees and no hidden costs.",
-          faqEyebrow: "FAQs",
-          faqTitle: "Common questions before you start.",
-          faqBody:
-            "The key points on file formats, team setup, billing, and exports in one compact section.",
-          ctaEyebrow: "Get started",
-          ctaTitle: "Your next release, in every language.",
-          ctaBody:
-            "Join 140+ teams that ship faster with Translayr. Set up your first project in under two minutes.",
-          ctaPrimary: "Start for free",
-          ctaSecondary: "Sign in",
-          footerCopyright: "© 2026 Translayr. All rights reserved.",
-          footerPrivacy: "Privacy",
-          footerTerms: "Terms",
-          footerStatus: "Status",
-          footerBlog: "Blog",
-          mockProjectLabel: "All Projects",
-          mockNew: "+ New",
-          mockSidebarProjects: "Projects",
-          mockSidebarUsage: "Usage",
-          mockSidebarGlossary: "Glossary",
-          mockSidebarSettings: "Settings",
-          mockActive: "Active",
-          mockFiles: "Files",
-          mockDone: "Done",
-          mockLangs: "Langs",
-          mockStatusActive: "Active",
-          mockStatusReview: "Review",
-          features: [
-            {
-              title: "Multi-format upload",
-              description:
-                "Drop XLIFF, .po, or .strings files directly. We parse structure, extract strings, and keep your metadata intact."
-            },
-            {
-              title: "Real-time progress",
-              description:
-                "Live completion tracking across all target languages. See exactly what is done, in review, and blocked."
-            },
-            {
-              title: "One-click export",
-              description:
-                "Export reviewed translations in their original format. Drop straight into your build pipeline without reformatting."
-            },
-            {
-              title: "Team workspaces",
-              description:
-                "Invite translators, reviewers, and project managers. Role-based access stays clear and lightweight."
-            },
-            {
-              title: "Shared glossary",
-              description:
-                "Define key terms once and enforce them across every project and language for consistency at scale."
-            },
-            {
-              title: "Version control",
-              description:
-                "Full history on every file. Roll back to any previous version and see exactly what changed."
-            }
-          ] satisfies FeatureItem[],
-          steps: [
-            {
-              title: "Upload your files",
-              description:
-                "Drag in your XLIFF, .po, or .strings files. Translayr parses them instantly and creates a project automatically."
-            },
-            {
-              title: "Assign and translate",
-              description:
-                "Invite your translators or connect your existing translation memory. Assign languages in one click."
-            },
-            {
-              title: "Review and export",
-              description:
-                "Review strings with inline comments and export in original format, ready for your next deploy."
-            }
-          ] satisfies StepItem[],
-          stats: [
-            { value: "270K", label: "Strings translated" },
-            { value: "98%", label: "Customer satisfaction" },
-            { value: "Multiple", label: "Active teams" },
-            { value: "90+", label: "Languages supported" }
-          ],
-          storyMetrics: [
-            { value: "3 days", label: "Faster release cycle" },
-            { value: "7 → 1", label: "Tools consolidated" },
-            { value: "12", label: "Languages shipped" }
-          ],
-          faqs: [
-            {
-              question: "Which file formats does Translayr support?",
-              answer:
-                "The current workflow is designed for XLIFF, .po, and .strings. These formats can be uploaded directly, worked on, and exported again in their original structure."
-            },
-            {
-              question: "Can I invite my team right away?",
-              answer:
-                "Yes. Projects can be organized for translators, reviewers, and other contributors inside the workspace so handoffs do not happen outside the product."
-            },
-            {
-              question: "How does billing work?",
-              answer:
-                "The landing page now uses your real product plans: Free, Starter, Pro, and Scale. Prices and limits follow the existing billing definitions in the app."
-            },
-            {
-              question: "Will exports stay structure-safe?",
-              answer:
-                "Yes. The product is built to keep strings and file structure intact so translations can go back into your pipeline without manual cleanup."
-            },
-            {
-              question: "Can I move to a bigger plan later?",
-              answer:
-                "Yes. You can start on Free or Starter and switch to Starter, Pro, or Scale later from billing as your volume grows."
-            },
-            {
-              question: "Does Translayr support multiple target languages at once?",
-              answer:
-                "Yes. Projects are designed to manage multiple target languages in parallel so progress, review, and export stay in one central workflow."
-            },
-            {
-              question: "Can I manage a glossary centrally?",
-              answer:
-                "Yes. The product includes a dedicated glossary area so important terms do not get scattered across projects and stay consistent across the team."
-            },
-            {
-              question: "Where can I see project progress?",
-              answer:
-                "The project overview and each project workspace show progress, file status, and review states directly inside the dashboard."
-            },
-            {
-              question: "Do I need a long setup or onboarding?",
-              answer:
-                "No. The entry flow is intentionally lightweight: register or sign in, upload a file, and continue working directly inside a project."
-            }
-          ] satisfies FaqItem[],
-          plans: [
-            {
-              name: "Starter",
-              price: "€0",
-              suffix: "/ month",
-              description: "For individuals and small projects getting started with localization.",
-              features: [
-                "3 projects",
-                "2 languages per project",
-                "5,000 strings / month",
-                "XLIFF, .po, and .strings upload",
-                "Community support"
-              ],
-              buttonLabel: "Get started free",
-              buttonHref: "/register"
-            },
-            {
-              name: "Pro",
-              price: "€49",
-              suffix: "/ month",
-              description: "For teams shipping to multiple markets on a regular cadence.",
-              features: [
-                "Unlimited projects",
-                "Unlimited languages",
-                "100,000 strings / month",
-                "Team workspaces & roles",
-                "Shared glossary",
-                "Version history",
-                "Priority support"
-              ],
-              buttonLabel: "Start Pro free for 14 days",
-              buttonHref: "/register"
-            },
-            {
-              name: "Enterprise",
-              price: "Custom",
-              description: "For organizations with advanced security, compliance, and volume needs.",
-              features: [
-                "Everything in Pro",
-                "Unlimited strings",
-                "SSO / SAML",
-                "SLA guarantee",
-                "Dedicated onboarding",
-                "Custom integrations"
-              ],
-              buttonLabel: "Talk to sales",
-              buttonHref: "/login"
-            }
-          ] satisfies PricePlan[]
-        };
+  const [pricingInterval, setPricingInterval] = useState<PricingInterval>("monthly");
+  const copy = locale === "de" ? getGermanMarketingCopy() : getEnglishMarketingCopy();
+  const navItems: MarketingNavItem[] = [
+    {
+      href: "/",
+      label: copy.navHome,
+      active: pageId === "home"
+    },
+    {
+      href: "/products",
+      label: copy.navProducts,
+      active: pageId === "products" || pageId === "workspace" || pageId === "files" || pageId === "text"
+    },
+    {
+      href: "/pricing",
+      label: copy.navPricing,
+      active: pageId === "pricing"
+    }
+  ];
+  const productCards = copy.productCards;
+  const pricingPlans = getPricingPlans(locale, pricingInterval);
 
-  const localizedPlanDescriptions =
-    locale === "de"
-      ? {
-          free: "Zum Ausprobieren des Produkts, für kleinere Dateisets und geringe Lokalisierungsvolumen.",
-          starter: "Für kleinere Lokalisierungs-Workloads und leichte wöchentliche Release-Zyklen.",
-          pro: "Für Produktteams, die kontinuierlich in mehreren Sprachen veröffentlichen.",
-          scale: "Für größere Teams, die Launches, QA und Exporte mit höherem Volumen koordinieren."
-        }
-      : {
-          free: "For trying the product, smaller file sets, and low-volume localization work.",
-          starter: "For smaller localization workloads and lightweight weekly release cycles.",
-          pro: "For product teams shipping continuously across multiple locales.",
-          scale: "For larger teams coordinating launches, QA, and exports at higher volume."
-        };
-
-  const localizedPlanFeatures =
-    locale === "de"
-      ? {
-          free: ["1k monatliche Wörter", "Core XLIFF Translation", "Glossar-Basics"],
-          starter: ["25k monatliche Wörter", "Projekt-Workspaces", "Glossar-Support"],
-          pro: ["150k monatliche Wörter", "Review-Workflow", "Priorisierte Glossar-Injektion"],
-          scale: ["400k monatliche Wörter", "Höherer Durchsatz", "Gemeinsame Team-Operationen"]
-        }
-      : {
-          free: BILLING_PLANS.find((plan) => plan.id === "free")?.features ?? [],
-          starter: BILLING_PLANS.find((plan) => plan.id === "starter")?.features ?? [],
-          pro: BILLING_PLANS.find((plan) => plan.id === "pro")?.features ?? [],
-          scale: BILLING_PLANS.find((plan) => plan.id === "scale")?.features ?? []
-        };
-
-  const pricingButtonLabels =
-    locale === "de"
-      ? {
-          free: "Free starten",
-          starter: "Starter wählen",
-          pro: "Pro wählen",
-          scale: "Scale wählen"
-        }
-      : {
-          free: "Start Free",
-          starter: "Choose Starter",
-          pro: "Choose Pro",
-          scale: "Choose Scale"
-        };
-
-  const pricingPlans: PricePlan[] = BILLING_PLANS.map((plan) => ({
-    id: plan.id,
-    name: plan.name,
-    price: new Intl.NumberFormat(locale === "de" ? "de-DE" : "en-US", {
-      style: "currency",
-      currency: "EUR",
-      maximumFractionDigits: 0
-    }).format(plan.basePriceCents / 100),
-    suffix: locale === "de" ? "/ Monat" : "/ month",
-    description: localizedPlanDescriptions[plan.id],
-    features: localizedPlanFeatures[plan.id],
-    buttonLabel: pricingButtonLabels[plan.id],
-    buttonHref: "/register",
-    featured: plan.id === "pro"
-  }));
-
-  return (
-    <main className="overflow-x-hidden bg-[#f7f3ed] text-[#161412]">
-      <header className="sticky top-0 z-30 border-b border-[#e7dfd4] bg-[rgba(247,243,237,0.9)] backdrop-blur-md">
-        <div className="relative mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-5 py-3.5 sm:px-7 lg:px-8">
-          <div className="pointer-events-none absolute inset-x-[38%] top-0 hidden h-full bg-[radial-gradient(circle,_rgba(255,255,255,0.9)_0%,_rgba(255,255,255,0)_72%)] lg:block" />
-          <Link href="/" className="relative z-10 flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#12100f] text-white shadow-[0_10px_24px_rgba(18,16,15,0.16)]">
-              <BrandIcon />
-            </span>
-            <span className="text-[15px] font-medium tracking-[-0.03em]">Translayr</span>
-          </Link>
-
-          <nav className="relative z-10 hidden items-center gap-7 text-[13px] text-[#5e5750] md:flex">
-            <a href="#features" className="transition hover:text-[#161412]">
-              {copy.navFeatures}
-            </a>
-            <a href="#how-it-works" className="transition hover:text-[#161412]">
-              {copy.navHowItWorks}
-            </a>
-            <a href="#pricing" className="transition hover:text-[#161412]">
-              {copy.navPricing}
-            </a>
-            <a href="#story" className="transition hover:text-[#161412]">
-              {copy.navBlog}
-            </a>
-          </nav>
-
-          <div className="relative z-10 flex items-center gap-3">
-            <Link
-              href="/login"
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-[#dfd7cc] bg-[rgba(255,255,255,0.68)] px-4 text-[13px] font-medium text-[#161412] shadow-[0_4px_12px_rgba(17,15,13,0.03)] transition hover:bg-white"
-            >
-              {copy.navLogin}
-            </Link>
-            <Link
-              href="/register"
-              className={`inline-flex h-10 items-center justify-center rounded-xl px-4 text-[13px] font-medium ${PRIMARY_BUTTON_TONE_CLASS_NAME}`}
-            >
-              {copy.navRegister}
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-[1240px] px-5 sm:px-7 lg:px-8">
-        <section className="grid gap-8 border-b border-[#ece3d8] py-12 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:gap-10 lg:py-15">
-          <div className="max-w-[500px]">
-            <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-[#a29a92]">/ {copy.heroEyebrow}</p>
-            <h1
-              className={`${DISPLAY_FONT_CLASS_NAME} mt-5 text-[clamp(2.5rem,5vw,4.1rem)] leading-[0.92] text-[#12100f]`}
-            >
-              <span className="block">{copy.heroTitleLead}</span>
-              <span className="mt-2 block italic text-[#57514a]">{copy.heroTitleAccent}</span>
-            </h1>
-            <p className="mt-6 max-w-[500px] text-[15px] leading-[1.8] tracking-[-0.02em] text-[#5f5851]">
-              {copy.heroBody}
-            </p>
-
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Link
-                href="/register"
-                className={`inline-flex h-[46px] items-center justify-center rounded-xl px-6 text-[14px] font-medium ${PRIMARY_BUTTON_TONE_CLASS_NAME}`}
-              >
-                {copy.heroPrimary}
-              </Link>
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 text-[14px] font-medium tracking-[-0.02em] text-[#5d5750] transition hover:text-[#2b2723]"
-              >
-                {copy.heroSecondary}
-                <span aria-hidden="true">→</span>
-              </Link>
-            </div>
-          </div>
-
-          <DashboardPreview
-            projectLabel={copy.mockProjectLabel}
-            newLabel={copy.mockNew}
-            activeLabel={copy.mockActive}
-            filesLabel={copy.mockFiles}
-            doneLabel={copy.mockDone}
-            langsLabel={copy.mockLangs}
-            sidebarProjects={copy.mockSidebarProjects}
-            sidebarUsage={copy.mockSidebarUsage}
-            sidebarGlossary={copy.mockSidebarGlossary}
-            sidebarSettings={copy.mockSidebarSettings}
-            activeStatus={copy.mockStatusActive}
-            reviewStatus={copy.mockStatusReview}
-          />
-        </section>
-
-        <section className="border-b border-[#ece3d8] py-5">
-          <div className="flex flex-wrap items-center gap-5 text-[#bbb1a5]">
-            <span className="text-[12px] font-medium uppercase tracking-[0.18em]">{copy.trustedBy}</span>
-          </div>
-        </section>
-
-        <section id="features" className="py-14 lg:py-16">
-          <div className="max-w-[620px]">
-            <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-[#a29a92]">/ {copy.featuresEyebrow}</p>
-            <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,4vw,3.2rem)] leading-[0.98]`}>
-              {copy.featuresTitle}
-            </h2>
-            <p className="mt-5 max-w-[620px] text-[15px] leading-[1.75] tracking-[-0.02em] text-[#5f5851]">
-              {copy.featuresBody}
-            </p>
-          </div>
-
-          <div className="mt-8 overflow-hidden rounded-[24px] border border-[#e3dacc] bg-white shadow-[0_16px_40px_rgba(22,20,18,0.04)]">
-            <div className="grid md:grid-cols-2 xl:grid-cols-3">
-              {copy.features.map((feature, index) => (
-                <FeatureCard key={feature.title} index={index} feature={feature} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="how-it-works" className="py-14 lg:py-16">
-          <div className="max-w-[620px]">
-            <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-[#a29a92]">/ {copy.howEyebrow}</p>
-            <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,4vw,3.2rem)] leading-[0.98]`}>
-              {copy.howTitle}
-            </h2>
-            <p className="mt-5 max-w-[620px] text-[15px] leading-[1.75] tracking-[-0.02em] text-[#5f5851]">
-              {copy.howBody}
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-8 lg:grid-cols-3 lg:gap-10">
-            {copy.steps.map((step, index) => (
-              <HowItWorksCard
-                key={step.title}
-                index={index}
-                step={step}
-              />
+  switch (pageId) {
+    case "products":
+      return (
+        <PageFrame
+          hero={copy.productsHero}
+          activePage={pageId}
+          navItems={navItems}
+          productCards={productCards}
+          footer={copy.footer}
+          loginLabel={copy.navLogin}
+          registerLabel={copy.navRegister}
+          cta={copy.cta}
+          visual={<ProductsOverviewVisual locale={locale} />}
+          locale={locale}
+        >
+          <SectionIntro eyebrow={copy.productsGridEyebrow} title={copy.productsGridTitle} body={copy.productsGridBody} />
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            {productCards.map((card) => (
+              <ProductLaneCard key={card.id} card={card} locale={locale} />
             ))}
           </div>
-        </section>
-      </div>
 
-      <section className="bg-[#121110] text-white">
-        <div className="mx-auto grid max-w-[1240px] gap-px px-5 sm:px-7 lg:grid-cols-4 lg:px-8">
-          {copy.stats.map((stat) => (
-            <div key={stat.label} className="border-b border-[#2b2927] px-4 py-8 last:border-b-0 lg:border-b-0 lg:border-l lg:border-[#2b2927] lg:px-7 lg:first:border-l-0">
-              <div className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(2.2rem,3vw,3rem)] leading-none text-white`}>
-                {stat.value}
-              </div>
-              <div className="mt-2 text-[14px] text-[#9d9790]">{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="mx-auto max-w-[1240px] px-5 sm:px-7 lg:px-8">
-        <section id="story" className="py-14 lg:py-16">
-          <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-[#a29a92]">/ {copy.storyEyebrow}</p>
-          <div className="mt-7 grid gap-8 rounded-[24px] border border-[#e3dacc] bg-white p-6 shadow-[0_16px_40px_rgba(22,20,18,0.04)] lg:grid-cols-[1.7fr_0.7fr] lg:p-8">
+          <section className="mt-20 grid gap-6 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-6 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
             <div>
-              <blockquote className={`${DISPLAY_FONT_CLASS_NAME} max-w-[840px] text-[clamp(1.8rem,3vw,2.6rem)] leading-[1.08] text-[#171412]`}>
-                &ldquo;{copy.storyQuoteLead} <span className="italic text-[#57514a]">{copy.storyQuoteEmphasis}</span>{" "}
-                {copy.storyQuoteTail}&rdquo;
-              </blockquote>
-              <div className="mt-8">
-                <div className="text-[20px] font-medium tracking-[-0.04em] text-[#171412]">{copy.storyName}</div>
-                <div className="mt-1 text-[15px] text-[#9a9289]">{copy.storyRole}</div>
-              </div>
+              <p className={EYEBROW_CLASS}>
+                {copy.compareEyebrow}
+              </p>
+              <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,3vw,3rem)] leading-[0.96] text-[var(--foreground)]`}>
+                {copy.compareTitle}
+              </h2>
+              <p className="mt-4 max-w-[560px] text-[15px] leading-7 text-[var(--muted)]">
+                {copy.compareBody}
+              </p>
             </div>
-
-            <div className="flex flex-col justify-between gap-6">
-              {copy.storyMetrics.map((metric) => (
-                <div key={metric.label} className="border-t border-[#ece6dc] pt-7 first:border-t-0 first:pt-0">
-                  <div className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(2rem,2.4vw,2.6rem)] leading-none text-[#171412]`}>
-                    {metric.value}
+            <div className="grid gap-4">
+              {copy.compareRows.map((row) => (
+                <div
+                  key={row.title}
+                  className="rounded-[22px] border border-[var(--border-light)] bg-[var(--background-strong)] px-5 py-5"
+                >
+                  <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+                    {row.title}
                   </div>
-                  <div className="mt-2 text-[14px] text-[#a29a92]">{metric.label}</div>
+                  <p className="mt-3 text-[14px] leading-6 text-[var(--muted)]">{row.body}</p>
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-
-        <section id="pricing" className="py-14 lg:py-16">
-          <div className="max-w-[620px]">
-            <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-[#a29a92]">/ {copy.pricingEyebrow}</p>
-            <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,4vw,3.2rem)] leading-[0.98]`}>
-              {copy.pricingTitle}
-            </h2>
-            <p className="mt-5 max-w-[620px] text-[15px] leading-[1.75] tracking-[-0.02em] text-[#5f5851]">
-              {copy.pricingBody}
-            </p>
-          </div>
-
-          <div className="mt-8 overflow-hidden rounded-[24px] border border-[#e3dacc] bg-white shadow-[0_16px_40px_rgba(22,20,18,0.04)]">
-            <div className="grid md:grid-cols-2 xl:grid-cols-4">
+          </section>
+        </PageFrame>
+      );
+    case "workspace":
+      return (
+        <ProductDetailPage
+          activePage={pageId}
+          navItems={navItems}
+          productCards={productCards}
+          footer={copy.footer}
+          loginLabel={copy.navLogin}
+          registerLabel={copy.navRegister}
+          cta={copy.cta}
+          hero={copy.workspaceHero}
+          blocks={copy.workspaceBlocks}
+          visual={<WorkspaceVisual locale={locale} />}
+          locale={locale}
+        />
+      );
+    case "files":
+      return (
+        <ProductDetailPage
+          activePage={pageId}
+          navItems={navItems}
+          productCards={productCards}
+          footer={copy.footer}
+          loginLabel={copy.navLogin}
+          registerLabel={copy.navRegister}
+          cta={copy.cta}
+          hero={copy.filesHero}
+          blocks={copy.filesBlocks}
+          visual={<FilesVisual locale={locale} />}
+          locale={locale}
+        />
+      );
+    case "text":
+      return (
+        <ProductDetailPage
+          activePage={pageId}
+          navItems={navItems}
+          productCards={productCards}
+          footer={copy.footer}
+          loginLabel={copy.navLogin}
+          registerLabel={copy.navRegister}
+          cta={copy.cta}
+          hero={copy.textHero}
+          blocks={copy.textBlocks}
+          visual={<TextTranslationVisual locale={locale} />}
+          locale={locale}
+        />
+      );
+    case "pricing":
+      return (
+        <PageFrame
+          hero={copy.pricingHero}
+          activePage={pageId}
+          navItems={navItems}
+          productCards={productCards}
+          footer={copy.footer}
+          loginLabel={copy.navLogin}
+          registerLabel={copy.navRegister}
+          cta={copy.cta}
+          visual={<PricingVisual locale={locale} />}
+          locale={locale}
+        >
+          <section className="mt-12 rounded-[32px] border border-[var(--border)] bg-[var(--surface)] px-6 py-8 shadow-[0_24px_80px_rgba(17,17,16,0.05)] lg:px-8 lg:py-10">
+            <div className="mx-auto max-w-[720px] text-center">
+              <SectionIntro eyebrow={copy.pricingGridEyebrow} title={copy.pricingGridTitle} body={copy.pricingGridBody} />
+            </div>
+            <div className="mx-auto mt-8 max-w-[720px]">
+              <PricingIntervalToggle
+                locale={locale}
+                value={pricingInterval}
+                onChange={setPricingInterval}
+              />
+            </div>
+            <div className="mt-10 grid gap-5 xl:grid-cols-4">
               {pricingPlans.map((plan) => (
-                <PricingCard key={plan.id} plan={plan} highlighted={Boolean(plan.featured)} />
+                <PricingPlanCard key={plan.id} plan={plan} locale={locale} />
+              ))}
+            </div>
+
+            <section className="mt-8 grid gap-6 lg:grid-cols-3">
+              {copy.pricingNotes.map((note) => (
+                <div
+                  key={note.title}
+                  className="rounded-[24px] border border-[var(--border)] bg-[var(--background-strong)] px-6 py-6"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+                    {note.title}
+                  </p>
+                  <p className="mt-4 text-[14px] leading-7 text-[var(--muted)]">{note.body}</p>
+                </div>
+              ))}
+            </section>
+          </section>
+        </PageFrame>
+      );
+    case "home":
+    default:
+      return (
+        <PageFrame
+          hero={copy.homeHero}
+          activePage={pageId}
+          navItems={navItems}
+          productCards={productCards}
+          footer={copy.footer}
+          loginLabel={copy.navLogin}
+          registerLabel={copy.navRegister}
+          cta={copy.cta}
+          visual={<HomeHeroVisual locale={locale} />}
+          locale={locale}
+          heroVisualLarge
+        >
+          <SectionIntro eyebrow={copy.homeProductsEyebrow} title={copy.homeProductsTitle} body={copy.homeProductsBody} />
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            {productCards.map((card) => (
+              <ProductLaneCard key={card.id} card={card} locale={locale} />
+            ))}
+          </div>
+
+          <section className="mt-20 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_24px_80px_rgba(17,17,16,0.05)]">
+            <div className="grid gap-px bg-[var(--border-light)] md:grid-cols-2 xl:grid-cols-4">
+              {copy.metrics.map((metric) => (
+                <div key={metric.label} className="bg-[var(--surface)] px-6 py-8">
+                  <div className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(2.2rem,3vw,3.1rem)] leading-none text-[var(--foreground)]`}>
+                    {metric.value}
+                  </div>
+                  <div className="mt-3 text-[13px] text-[var(--muted)]">{metric.label}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <SocialProofSection locale={locale} />
+
+          <section className="mt-20 grid gap-6 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_70px_rgba(17,17,16,0.04)] lg:grid-cols-[0.95fr_1.05fr] lg:p-8">
+            <div>
+              <p className={EYEBROW_CLASS}>
+                {copy.homeOperationsEyebrow}
+              </p>
+              <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,3vw,3rem)] leading-[0.96] text-[var(--foreground)]`}>
+                {copy.homeOperationsTitle}
+              </h2>
+              <p className="mt-4 max-w-[520px] text-[15px] leading-7 text-[var(--muted)]">
+                {copy.homeOperationsBody}
+              </p>
+            </div>
+            <div className="grid gap-4">
+              {copy.homeOperationsRows.map((row) => (
+                <div key={row.title} className="grid gap-3 border-b border-[var(--border-light)] pb-4 last:border-b-0 last:pb-0 md:grid-cols-[140px_minmax(0,1fr)]">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+                    {row.title}
+                  </div>
+                  <p className="text-[14px] leading-6 text-[var(--muted)]">{row.body}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-20">
+            <SectionIntro eyebrow={copy.pricingGridEyebrow} title={copy.pricingGridTitle} body={copy.pricingGridBody} />
+            <PricingIntervalToggle
+              locale={locale}
+              value={pricingInterval}
+              onChange={setPricingInterval}
+            />
+            <div className="mt-10 grid gap-5 xl:grid-cols-4">
+              {pricingPlans.map((plan) => (
+                <PricingPlanCard key={plan.id} plan={plan} locale={locale} compact />
+              ))}
+            </div>
+          </section>
+        </PageFrame>
+      );
+  }
+}
+
+function ProductDetailPage({
+  hero,
+  blocks,
+  visual,
+  ...frameProps
+}: Omit<PageFrameProps, "children"> & {
+  blocks: DetailBlock[];
+}) {
+  return (
+    <PageFrame hero={hero} visual={visual} {...frameProps}>
+      <section className="grid gap-5 xl:grid-cols-3">
+        {blocks.map((block) => (
+          <div
+            key={block.title}
+            className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-6 py-6"
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+              {block.eyebrow}
+            </p>
+            <h2 className="mt-4 text-[24px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">
+              {block.title}
+            </h2>
+            <p className="mt-4 text-[14px] leading-7 text-[var(--muted)]">{block.body}</p>
+            <ul className="mt-5 space-y-3 text-[13px] leading-6 text-[var(--foreground)]">
+              {block.points.map((point) => (
+                <li key={point} className="flex gap-3">
+                  <span className="mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--foreground)]" />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+    </PageFrame>
+  );
+}
+
+function PageFrame({
+  hero,
+  activePage,
+  navItems,
+  productCards,
+  footer,
+  loginLabel,
+  registerLabel,
+  cta,
+  children,
+  visual,
+  locale,
+  heroVisualLarge = false
+}: PageFrameProps) {
+  return (
+    <main className="relative min-h-screen overflow-x-hidden bg-[var(--surface)] text-[var(--foreground)]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(26,79,175,0.08),transparent_28%),radial-gradient(circle_at_top_right,rgba(17,17,16,0.06),transparent_24%),radial-gradient(circle_at_50%_35%,rgba(17,17,16,0.05),transparent_34%)]" />
+      <MarketingHeader
+        navItems={navItems}
+        loginLabel={loginLabel}
+        registerLabel={registerLabel}
+      />
+      {activePage === "products" || activePage === "workspace" || activePage === "files" || activePage === "text" ? (
+        <ProductTabs
+          activePage={activePage}
+          cards={productCards}
+        />
+      ) : null}
+
+      <div className="relative mx-auto max-w-[1280px] px-5 pb-24 pt-12 sm:px-7 lg:px-8 lg:pt-20">
+        <section
+          className={[
+            "grid gap-12 border-b border-[var(--border)] pb-20 lg:items-center",
+            heroVisualLarge ? "lg:grid-cols-[0.8fr_1.2fr]" : "lg:grid-cols-[0.92fr_1.08fr]"
+          ].join(" ")}
+        >
+          <div className="max-w-[560px]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted-soft)]">
+              / {hero.eyebrow}
+            </p>
+            <h1 className={`${DISPLAY_FONT_CLASS_NAME} mt-6 text-[clamp(3.4rem,5.8vw,6.2rem)] leading-[0.88] text-[var(--foreground)]`}>
+              {hero.title}
+            </h1>
+            <p className="mt-7 max-w-[520px] text-[18px] leading-9 tracking-[-0.01em] text-[var(--muted)]">
+              {hero.body}
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              {hero.actions.map((action) => (
+                <Link
+                  key={action.href + action.label}
+                  href={action.href}
+                  className={action.tone === "primary" ? PRIMARY_BUTTON_CLASS : SECONDARY_BUTTON_CLASS}
+                >
+                  {action.label}
+                </Link>
               ))}
             </div>
           </div>
+
+          <div className={heroVisualLarge ? "lg:pl-4" : undefined}>{visual}</div>
         </section>
 
-        <section className="py-14 lg:py-16">
-          <div className="max-w-[620px]">
-            <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-[#a29a92]">/ {copy.faqEyebrow}</p>
-            <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,4vw,3.2rem)] leading-[0.98]`}>
-              {copy.faqTitle}
-            </h2>
-            <p className="mt-5 max-w-[620px] text-[15px] leading-[1.75] tracking-[-0.02em] text-[#5f5851]">
-              {copy.faqBody}
-            </p>
-          </div>
+        <div className="pt-20">{children}</div>
 
-          <div className="mt-8 overflow-hidden rounded-[24px] border border-[#e3dacc] bg-white shadow-[0_16px_40px_rgba(22,20,18,0.04)]">
-            {copy.faqs.map((faq, index) => (
-              <FaqRow
-                key={faq.question}
-                faq={faq}
-                isLast={index === copy.faqs.length - 1}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section className="border-t border-[#ece3d8] py-14 lg:py-16">
-          <div className="rounded-[24px] border border-[#e3dacc] bg-white px-6 py-12 text-center shadow-[0_16px_40px_rgba(22,20,18,0.04)] sm:px-10">
-            <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-[#a29a92]">/ {copy.ctaEyebrow}</p>
-            <h2 className={`${DISPLAY_FONT_CLASS_NAME} mx-auto mt-4 max-w-[560px] text-[clamp(2.1rem,4vw,3.3rem)] leading-[0.96]`}>
-              {copy.ctaTitle}
-            </h2>
-            <p className="mx-auto mt-5 max-w-[560px] text-[15px] leading-[1.75] tracking-[-0.02em] text-[#5f5851]">
-              {copy.ctaBody}
-            </p>
-
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+        <section className="mt-28 px-1 py-2 lg:px-2">
+          <div className="grid gap-6 lg:grid-cols-[0.95fr_0.45fr] lg:items-end">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
+                / {cta.eyebrow}
+              </p>
+              <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,3vw,3.1rem)] leading-[0.95] text-[var(--foreground)]`}>
+                {cta.title}
+              </h2>
+              <p className="mt-4 max-w-[620px] text-[15px] leading-7 text-[var(--muted)]">
+                {cta.body}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 lg:justify-end">
               <Link
                 href="/register"
-                className={`inline-flex h-[46px] items-center justify-center rounded-xl px-6 text-[14px] font-medium ${PRIMARY_BUTTON_TONE_CLASS_NAME}`}
+                className={PRIMARY_BUTTON_CLASS}
               >
-                {copy.ctaPrimary}
+                {cta.primary}
               </Link>
               <Link
                 href="/login"
-                className="inline-flex items-center gap-2 text-[14px] font-medium tracking-[-0.02em] text-[#5d5750] transition hover:text-[#2b2723]"
+                className={SECONDARY_BUTTON_CLASS}
               >
-                {copy.ctaSecondary}
-                <span aria-hidden="true">→</span>
+                {cta.secondary}
               </Link>
             </div>
           </div>
         </section>
-
-        <footer className="flex flex-col gap-4 border-t border-[#ece3d8] py-6 text-[14px] text-[#afa69b] sm:flex-row sm:items-center sm:justify-between">
-          <div>{copy.footerCopyright}</div>
-          <div className="flex flex-wrap items-center gap-7">
-            <span>{copy.footerPrivacy}</span>
-            <span>{copy.footerTerms}</span>
-            <span>{copy.footerStatus}</span>
-            <span>{copy.footerBlog}</span>
-          </div>
-        </footer>
       </div>
+
+      <MarketingFooter footer={footer} locale={locale} />
     </main>
   );
 }
 
-function DashboardPreview({
-  projectLabel,
-  newLabel,
-  activeLabel,
-  filesLabel,
-  doneLabel,
-  langsLabel,
-  sidebarProjects,
-  sidebarUsage,
-  sidebarGlossary,
-  sidebarSettings,
-  activeStatus,
-  reviewStatus
+function MarketingHeader({
+  navItems,
+  loginLabel,
+  registerLabel
 }: {
-  projectLabel: string;
-  newLabel: string;
-  activeLabel: string;
-  filesLabel: string;
-  doneLabel: string;
-  langsLabel: string;
-  sidebarProjects: string;
-  sidebarUsage: string;
-  sidebarGlossary: string;
-  sidebarSettings: string;
-  activeStatus: string;
-  reviewStatus: string;
+  navItems: MarketingNavItem[];
+  loginLabel: string;
+  registerLabel: string;
 }) {
-  const metrics = [
-    { value: "4", label: activeLabel },
-    { value: "18", label: filesLabel },
-    { value: "78%", label: doneLabel },
-    { value: "6", label: langsLabel }
-  ];
+  return (
+    <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.9)] backdrop-blur-xl">
+      <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-6 px-5 py-4 sm:px-7 lg:px-8">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--foreground)]">
+            <BrandMark />
+          </span>
+          <span className="text-[16px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">Translayr</span>
+        </Link>
 
-  const rows = [
-    { title: "WPML Platform Refresh", status: activeStatus, tone: "positive", progress: "68%" },
-    { title: "Developer Docs Sync", status: reviewStatus, tone: "review", progress: "84%" },
-    { title: "Help Center Migration", status: activeStatus, tone: "positive", progress: "74%" },
-    { title: "Shopify Launch Kit", status: reviewStatus, tone: "review", progress: "35%" }
-  ] as const;
+        <nav className="hidden items-center gap-8 md:flex">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={[
+                "relative py-2 text-[14px] font-medium transition",
+                item.active
+                  ? "text-[var(--foreground)]"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              ].join(" ")}
+            >
+              {item.label}
+              {item.active ? <span className="absolute inset-x-0 -bottom-4 h-0.5 bg-[var(--foreground)]" /> : null}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
+          >
+            {loginLabel}
+          </Link>
+          <Link
+            href="/register"
+            className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--foreground)] px-5 text-[13px] font-medium text-white transition hover:opacity-90"
+          >
+            {registerLabel}
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function ProductTabs({
+  activePage,
+  cards
+}: {
+  activePage: MarketingPageId;
+  cards: ProductCard[];
+}) {
+  return (
+    <div className="border-b border-[var(--border)] bg-[var(--surface)]">
+      <div className="mx-auto flex max-w-[1280px] gap-8 overflow-x-auto px-5 py-0 sm:px-7 lg:px-8">
+        {cards.map((card) => (
+          <Link
+            key={card.id}
+            href={card.href}
+            className={[
+              "relative shrink-0 py-4 text-[15px] font-medium transition",
+              activePage === card.id
+                ? "text-[var(--foreground)]"
+                : "text-[var(--muted)] hover:text-[var(--foreground)]"
+            ].join(" ")}
+          >
+            {card.label}
+            {activePage === card.id ? <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[var(--foreground)]" /> : null}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SectionIntro({
+  eyebrow,
+  title,
+  body
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="max-w-[680px]">
+      <p className={EYEBROW_CLASS}>/ {eyebrow}</p>
+      <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,3vw,3.2rem)] leading-[0.96] text-[var(--foreground)]`}>
+        {title}
+      </h2>
+      <p className="mt-4 text-[15px] leading-7 text-[var(--muted)]">{body}</p>
+    </div>
+  );
+}
+
+function ProductLaneCard({ card, locale }: { card: ProductCard; locale: "de" | "en" }) {
+  return (
+    <Link
+      href={card.href}
+      className="group flex h-full flex-col rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-6 py-6 shadow-[0_18px_50px_rgba(17,17,16,0.04)] transition hover:-translate-y-0.5 hover:border-[var(--border-strong)]"
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--foreground)]">
+        {card.label}
+      </p>
+      <h3 className={`${DISPLAY_FONT_CLASS_NAME} mt-5 text-[clamp(2rem,2.2vw,2.8rem)] leading-[0.94] text-[var(--foreground)]`}>
+        {card.title}
+      </h3>
+      <p className="mt-4 text-[15px] leading-7 text-[var(--muted)]">{card.body}</p>
+      <ul className="mt-6 space-y-3 text-[13px] leading-6 text-[var(--foreground)]">
+        {card.points.map((point) => (
+          <li key={point} className="flex gap-3">
+            <span className="mt-[2px] inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--foreground)] text-[11px] text-white">
+              ✓
+            </span>
+            <span>{point}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-auto flex items-center gap-3 pt-8 text-[15px] font-medium text-[var(--processing)]">
+        <span>{locale === "de" ? "Mehr erfahren" : "Learn more"}</span>
+        <span className="text-[22px] leading-none transition group-hover:translate-x-0.5">→</span>
+      </div>
+    </Link>
+  );
+}
+
+function PricingPlanCard({
+  plan,
+  locale,
+  compact = false
+}: {
+  plan: PricingPlanView;
+  locale: "de" | "en";
+  compact?: boolean;
+}) {
+  const card = (
+    <div
+      className={[
+        "rounded-[26px] border px-6 py-6",
+        plan.featured
+          ? "border-transparent bg-[linear-gradient(180deg,#fbfdff_0%,#f5f9ff_58%,#f3faf6_100%)] text-[var(--foreground)]"
+          : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]"
+      ].join(" ")}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p
+              className={[
+                "text-[11px] font-semibold uppercase tracking-[0.18em]",
+                plan.featured ? "text-[var(--processing)]" : "text-[var(--muted-soft)]"
+              ].join(" ")}
+            >
+              {plan.name}
+            </p>
+            {plan.featured ? (
+              <span className="rounded-full border border-[var(--processing-border)] bg-[var(--processing-bg)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--processing)]">
+                {locale === "de" ? "Beliebtester Plan" : "Most popular"}
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-4 flex items-end gap-2">
+            <span className={`${DISPLAY_FONT_CLASS_NAME} text-[44px] leading-none`}>
+              {plan.price}
+            </span>
+            <span className="pb-1 text-[var(--muted-soft)]">{plan.suffix}</span>
+          </div>
+          {plan.note ? <p className="mt-2 text-[11px] font-medium text-[var(--processing)]">{plan.note}</p> : null}
+        </div>
+        <span
+          className={[
+            "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]",
+            plan.featured
+              ? "border border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success)]"
+              : "bg-[var(--background-strong)] text-[var(--muted)]"
+          ].join(" ")}
+        >
+          {plan.credits}
+        </span>
+      </div>
+
+      <p className="mt-5 text-[14px] leading-7 text-[var(--muted)]">
+        {plan.description}
+      </p>
+
+      <ul className="mt-6 space-y-3 text-[13px] leading-6">
+        {plan.features.map((feature) => (
+          <li key={feature} className="flex gap-3">
+            <span className={["mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full", plan.featured ? "bg-[var(--processing)]" : "bg-[var(--foreground)]"].join(" ")} />
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+
+      <Link
+        href="/register"
+        className={[
+          "mt-7 inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-medium transition",
+          plan.featured
+            ? "bg-[var(--foreground)] text-white hover:opacity-90"
+            : "border border-[var(--border)] bg-[var(--background-strong)] text-[var(--foreground)] hover:bg-[var(--background)]"
+        ].join(" ")}
+      >
+        {compact
+          ? locale === "de"
+            ? "Plan öffnen"
+            : "Open plan"
+          : locale === "de"
+            ? "Mit diesem Plan starten"
+            : "Start with this plan"}
+      </Link>
+    </div>
+  );
+
+  if (!plan.featured) {
+    return card;
+  }
 
   return (
-    <div className="relative mx-auto w-full max-w-[600px]">
-      <div className="absolute inset-x-12 top-8 h-16 rounded-full bg-[rgba(195,182,164,0.34)] blur-3xl" />
-      <div className="relative overflow-hidden rounded-[20px] border border-[#e5ddd2] bg-white shadow-[0_24px_44px_rgba(20,18,16,0.08)]">
-        <div className="flex items-center gap-3 border-b border-[#eee6dc] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="h-3.5 w-3.5 rounded-full bg-[#ff5f57]" />
-            <span className="h-3.5 w-3.5 rounded-full bg-[#ffbd2e]" />
-            <span className="h-3.5 w-3.5 rounded-full bg-[#28c840]" />
-          </div>
-          <div className="flex-1 rounded-xl border border-[#ece4d9] bg-[#faf7f2] px-4 py-2 text-[12px] text-[#b4aaa0]">
-            app.translayr.io/projects
+    <div className="rounded-[28px] bg-[linear-gradient(135deg,rgba(26,79,175,0.32)_0%,rgba(26,127,75,0.24)_55%,rgba(17,17,16,0.08)_100%)] p-[1px]">
+      {card}
+    </div>
+  );
+}
+
+function PricingIntervalToggle({
+  locale,
+  value,
+  onChange
+}: {
+  locale: "de" | "en";
+  value: PricingInterval;
+  onChange: (value: PricingInterval) => void;
+}) {
+  return (
+    <div className="mt-8 flex items-center justify-between gap-4 rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+          {locale === "de" ? "Abrechnung" : "Billing cadence"}
+        </div>
+        <div className="mt-1 text-[13px] text-[var(--muted)]">
+          {locale === "de" ? "Jährlich zeigt 2 Monate Rabatt für bezahlte Pläne." : "Yearly shows a 2-month discount for paid plans."}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--background-strong)] p-1">
+        {[
+          { id: "monthly", label: locale === "de" ? "Monatlich" : "Monthly" },
+          { id: "yearly", label: locale === "de" ? "Jährlich" : "Yearly" }
+        ].map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(option.id as PricingInterval)}
+            className={[
+              "rounded-full px-4 py-2 text-[12.5px] font-medium transition",
+              value === option.id
+                ? "bg-[var(--processing-bg)] text-[var(--processing)] ring-1 ring-[var(--processing-border)]"
+                : "text-[var(--muted)] hover:bg-[var(--surface)]"
+            ].join(" ")}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SocialProofSection({ locale }: { locale: "de" | "en" }) {
+  const logos = ["Northstar", "Hello", "Sora Labs", "Community", "Wello", "Corresgot", "Clorfito", "nebsiiitt", "pumbel"];
+  const stats =
+    locale === "de"
+      ? [
+          { value: "320+", label: "Teams im aktiven Rollout" },
+          { value: "18", label: "Durchschnittliche Zielsprachen pro Team" },
+          { value: "183", label: "aktive Workflows pro Monat" },
+          { value: "99.9%", label: "Datei-Exporte im ersten Durchlauf" }
+        ]
+      : [
+          { value: "320+", label: "teams shipping actively" },
+          { value: "18", label: "average target locales per team" },
+          { value: "183", label: "active workflows per month" },
+          { value: "99.9%", label: "exports passing on the first handoff" }
+        ];
+
+  return (
+    <section className="mt-24 border-t border-[var(--border)] pt-16">
+      <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+        <div>
+          <p className={EYEBROW_CLASS}>/ {locale === "de" ? "Social proof" : "Social proof"}</p>
+          <div className="mt-8 grid gap-8 sm:grid-cols-3">
+            {logos.map((logo) => (
+              <div key={logo} className="text-[14px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
+                {logo}
+              </div>
+            ))}
           </div>
         </div>
-
-        <div className="grid grid-cols-[124px_1fr] lg:grid-cols-[145px_1fr]">
-          <aside className="border-r border-[#eee6dc] bg-[#fbfaf8] px-3 py-4">
-            <div className="flex items-center gap-2.5 border-b border-[#efebe5] pb-3">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#12100f] text-white">
-                <BrandIcon />
-              </span>
-              <span className="text-[13px] font-semibold tracking-[-0.03em] text-[#161412]">Translayr</span>
-            </div>
-
-            <div className="mt-4 space-y-2 text-[13px] text-[#9f968c]">
-              <div className="rounded-lg bg-[#f1ede7] px-3 py-2 font-medium text-[#161412]">{sidebarProjects}</div>
-              <div className="px-3 py-1">{sidebarUsage}</div>
-              <div className="px-3 py-1">{sidebarGlossary}</div>
-              <div className="px-3 py-1">{sidebarSettings}</div>
-            </div>
-          </aside>
-
-          <div className="px-4 py-4 lg:px-5">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <h3 className="text-[15px] font-semibold tracking-[-0.03em] text-[#161412]">{projectLabel}</h3>
-              <button
-                type="button"
-                className="inline-flex h-7 items-center justify-center rounded-lg bg-[#34302b] px-3 text-[11px] font-medium text-white"
+        <div className="grid gap-8 sm:grid-cols-2">
+          {stats.map((stat, index) => (
+            <div key={stat.label}>
+              <div
+                className={[
+                  "text-[clamp(3rem,5vw,4.5rem)] font-semibold leading-none tracking-[-0.08em]",
+                  index === 0
+                    ? "text-[var(--foreground)]"
+                    : index === 1
+                      ? "text-[var(--foreground)]"
+                      : index === 2
+                        ? "text-[var(--processing)]"
+                        : "text-[var(--success)]"
+                ].join(" ")}
               >
-                {newLabel}
-              </button>
+                {stat.value}
+              </div>
+              <div className="mt-3 max-w-[220px] text-[14px] leading-7 text-[var(--muted)]">{stat.label}</div>
             </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
-            <div className="grid gap-3 md:grid-cols-4">
-              {metrics.map((metric) => (
-                <div key={metric.label} className="rounded-xl border border-[#eee5db] bg-[#fbfaf8] p-2.5">
-                  <div className="text-[19px] font-semibold tracking-[-0.05em] text-[#161412]">{metric.value}</div>
-                  <div className="mt-1 text-[11px] text-[#b2a89e]">{metric.label}</div>
-                </div>
-              ))}
+function MarketingFooter({ footer, locale }: { footer: MarketingFooterCopy; locale: "de" | "en" }) {
+  return (
+    <footer className="mt-24 border-t border-[var(--border)] bg-[var(--surface)]">
+      <div className="mx-auto grid max-w-[1280px] gap-10 px-5 py-12 sm:px-7 lg:grid-cols-[1fr_0.7fr_0.7fr_1fr] lg:px-8">
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--foreground)]">
+              <BrandMark />
+            </span>
+            <div>
+              <div className="text-[16px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">Translayr</div>
             </div>
+          </div>
+          <p className="mt-4 max-w-[320px] text-[13px] leading-6 text-[var(--muted)]">
+            {locale === "de"
+              ? "Translayr ist die operative Übersetzungsfläche für Releases, Review und Export."
+              : "Translayr is the operating translation surface for releases, review, and export."}
+          </p>
+          <div className="mt-5 flex flex-wrap gap-4 text-[13px]">
+            <a href="https://www.linkedin.com" target="_blank" rel="noreferrer" className="transition hover:text-[var(--processing)]">LinkedIn</a>
+            <a href="https://x.com" target="_blank" rel="noreferrer" className="transition hover:text-[var(--processing)]">X</a>
+            <a href="https://github.com" target="_blank" rel="noreferrer" className="transition hover:text-[var(--processing)]">GitHub</a>
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
+            {locale === "de" ? "Home" : "Home"}
+          </div>
+          <div className="mt-4 flex flex-col gap-3 text-[13px] text-[var(--muted)]">
+            <Link href="/" className="transition hover:text-[var(--processing)]">{locale === "de" ? "Overview" : "Overview"}</Link>
+            <Link href="/products" className="transition hover:text-[var(--processing)]">{locale === "de" ? "Produkte" : "Products"}</Link>
+            <Link href="/pricing" className="transition hover:text-[var(--processing)]">{locale === "de" ? "Pricing" : "Pricing"}</Link>
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
+            {locale === "de" ? "Company" : "Company"}
+          </div>
+          <div className="mt-4 flex flex-col gap-3 text-[13px] text-[var(--muted)]">
+            <Link href="/blog" className="transition hover:text-[var(--processing)]">Blog</Link>
+            <Link href="/docs" className="transition hover:text-[var(--processing)]">Docs</Link>
+            <Link href="/" className="transition hover:text-[var(--processing)]">{locale === "de" ? "Kontakt" : "Contact"}</Link>
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
+            {locale === "de" ? "Legal" : "Legal"}
+          </div>
+          <div className="mt-4 flex flex-col gap-3 text-[13px] text-[var(--muted)]">
+            <Link href="/" className="transition hover:text-[var(--processing)]">{footer.terms}</Link>
+            <Link href="/" className="transition hover:text-[var(--processing)]">{footer.privacy}</Link>
+            <Link href="/" className="transition hover:text-[var(--processing)]">{footer.status}</Link>
+          </div>
+          <div className="mt-6 text-[12px] text-[var(--muted-soft)]">{footer.copyright}</div>
+        </div>
+      </div>
+    </footer>
+  );
+}
 
-            <div className="mt-4 overflow-hidden rounded-[18px] border border-[#efe6dc]">
-              {rows.map((row, index) => (
-                <div
-                  key={row.title}
-                  className={[
-                    "grid grid-cols-[minmax(0,1fr)_62px_62px] items-center gap-3 px-3.5 py-3",
-                    index === rows.length - 1 ? "" : "border-b border-[#f1ebe4]"
-                  ].join(" ")}
-                >
-                  <div className="text-[12px] font-medium tracking-[-0.02em] text-[#171412]">{row.title}</div>
-                  <div
-                    className={[
-                      "text-right text-[11px] font-medium",
-                      row.tone === "positive" ? "text-[#328156]" : "text-[#9b6a15]"
-                    ].join(" ")}
-                  >
-                    {row.status}
+function HomeHeroVisual({ locale }: { locale: "de" | "en" }) {
+  const segments =
+    locale === "de"
+      ? [
+          {
+            source: "Update pricing copy in checkout",
+            target: "Pricing-Texte im Checkout aktualisieren"
+          },
+          {
+            source: "Refresh onboarding release notes",
+            target: "Release Notes für das Onboarding aktualisieren"
+          },
+          {
+            source: "Translate support macro for refunds",
+            target: "Support-Makro für Erstattungen übersetzen"
+          },
+          {
+            source: "Export DE and FR handoff package",
+            target: "DE- und FR-Übergabepaket exportieren"
+          }
+        ]
+      : [
+          {
+            source: "Update pricing copy in checkout",
+            target: "Pricing copy updated in checkout"
+          },
+          {
+            source: "Refresh onboarding release notes",
+            target: "Onboarding release notes refreshed"
+          },
+          {
+            source: "Translate support macro for refunds",
+            target: "Refund support macro translated"
+          },
+          {
+            source: "Export DE and FR handoff package",
+            target: "DE and FR handoff package exported"
+          }
+        ];
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setFrame((current) => (current + 1) % (segments.length + 1));
+    }, 1300);
+
+    return () => window.clearInterval(interval);
+  }, [segments.length]);
+
+  const translatedCount = Math.min(frame, segments.length);
+  const progress = `${Math.max((translatedCount / segments.length) * 100, 8)}%`;
+
+  return (
+    <div className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_40px_120px_rgba(17,17,16,0.08)]">
+      <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-3">
+        <span className="h-2.5 w-2.5 rounded-full bg-[var(--border)]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[var(--border)]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[var(--border)]" />
+        <div className="ml-3 text-[11px] uppercase tracking-[0.14em] text-[var(--muted-soft)]">
+          {locale === "de" ? "Workspace preview" : "Workspace preview"}
+        </div>
+      </div>
+      <div className="grid min-h-[560px] grid-cols-[94px_minmax(0,1fr)]">
+        <aside className="border-r border-[var(--border)] bg-[var(--background-strong)] px-3 py-4">
+          <div className="space-y-2">
+            {[
+              locale === "de" ? "Dashboard" : "Dashboard",
+              locale === "de" ? "Projekte" : "Projects",
+              locale === "de" ? "Reports" : "Reports",
+              locale === "de" ? "Usage" : "Usage"
+            ].map((item, index) => (
+              <div
+                key={item}
+                className={[
+                  "rounded-[12px] px-3 py-2 text-[11px] font-medium",
+                  index === 0 ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm" : "text-[var(--muted)]"
+                ].join(" ")}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        </aside>
+        <div className="bg-[linear-gradient(180deg,var(--surface)_0%,#fbfbfa_100%)] p-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
+              {locale === "de" ? "Dashboard" : "Dashboard"}
+            </h3>
+            <span className="rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--success)]">
+              Live
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+                {locale === "de" ? "Usage this month" : "Usage this month"}
+              </div>
+              <div className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">$1,759</div>
+              <div className="mt-4 space-y-3">
+                {[
+                  { label: locale === "de" ? "Wörter" : "Words", value: "200", tone: "bg-[var(--processing)]" },
+                  { label: locale === "de" ? "Dateien" : "Files", value: "48", tone: "bg-[var(--success)]" },
+                  { label: locale === "de" ? "Dokumente" : "Documents", value: "12", tone: "bg-[var(--review)]" },
+                  { label: locale === "de" ? "OCR" : "OCR", value: "8", tone: "bg-[var(--border-strong)]" }
+                ].map((item) => (
+                  <div key={item.label} className="grid grid-cols-[72px_minmax(0,1fr)_32px] items-center gap-3 text-[11px] text-[var(--muted)]">
+                    <span>{item.label}</span>
+                    <div className="h-2 rounded-full bg-[var(--background-strong)]">
+                      <div className={`h-full rounded-full ${item.tone}`} style={{ width: `${Math.max(Number(item.value), 8)}%` }} />
+                    </div>
+                    <span className="text-right">{item.value}</span>
                   </div>
-                  <div className="h-[3px] rounded-full bg-[#efe8df]">
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+                {locale === "de" ? "Wordflow now" : "Wordflow now"}
+              </div>
+              <div className="mt-4 flex h-[150px] items-end justify-between gap-3">
+                {[34, 52, 73, 46, 67].map((bar, index) => (
+                  <div key={bar} className="flex flex-1 flex-col items-center gap-2">
                     <div
                       className={[
-                        "h-[3px] rounded-full",
-                        row.tone === "positive" ? "bg-[#3a8e62]" : "bg-[#b38a42]"
+                        "w-full rounded-t-[10px]",
+                        index === 1 ? "bg-[var(--processing)]" : index === 2 ? "bg-[var(--success)]" : "bg-[var(--border)]"
                       ].join(" ")}
-                      style={{ width: row.progress }}
+                      style={{ height: `${bar}%` }}
                     />
+                    <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--muted-soft)]">
+                      {["Mon", "Tue", "Wed", "Thu", "Fri"][index]}
+                    </span>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+                {locale === "de" ? "Live translation queue" : "Live translation queue"}
+              </div>
+              <div className="text-[11px] text-[var(--muted-soft)]">EN → DE · FR</div>
+            </div>
+            <div className="mt-4 space-y-2">
+              {segments.map((segment, index) => {
+                const isDone = index < translatedCount;
+                const isActive = index === translatedCount && translatedCount < segments.length;
+
+                return (
+                  <div key={segment.source} className="grid grid-cols-[1.4fr_1fr_88px] items-center gap-3 rounded-[12px] border border-[var(--border-light)] px-3 py-2.5 text-[12px]">
+                    <div className="truncate text-[var(--foreground)]">{segment.source}</div>
+                    <div className="truncate text-[var(--muted)]">{isDone ? segment.target : locale === "de" ? "Wird übersetzt…" : "Translating…"}</div>
+                    <div className="flex justify-end">
+                      <span
+                        className={[
+                          "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]",
+                          isDone
+                            ? "border border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success)]"
+                            : isActive
+                              ? "border border-[var(--processing-border)] bg-[var(--processing-bg)] text-[var(--processing)]"
+                              : "border border-[var(--border)] bg-[var(--background-strong)] text-[var(--muted-soft)]"
+                        ].join(" ")}
+                      >
+                        {isDone ? "Done" : isActive ? "Live" : "Queued"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 h-2 rounded-full bg-[var(--background-strong)]">
+              <div className="h-full rounded-full bg-[linear-gradient(90deg,var(--processing)_0%,var(--success)_100%)] transition-all duration-700" style={{ width: progress }} />
             </div>
           </div>
         </div>
@@ -931,176 +1063,884 @@ function DashboardPreview({
   );
 }
 
-function FeatureCard({ index, feature }: { index: number; feature: FeatureItem }) {
-  const icons = [UploadIcon, ProgressIcon, ExportIcon, GridIcon, HomeIcon, VersionIcon];
-  const Icon = icons[index] ?? UploadIcon;
-
+function ProductsOverviewVisual({ locale }: { locale: "de" | "en" }) {
   return (
-    <article className="border-b border-[#e9e1d5] p-5 md:border-r md:[&:nth-child(2n)]:border-r-0 xl:[&:nth-child(2n)]:border-r xl:[&:nth-child(3n)]:border-r-0 [&:nth-last-child(-n+1)]:border-b-0 md:[&:nth-last-child(-n+2)]:border-b-0 xl:[&:nth-last-child(-n+3)]:border-b-0">
-      <div className="text-[12px] font-medium tracking-[0.14em] text-[#b0a69c]">{String(index + 1).padStart(2, "0")}</div>
-      <div className="mt-4 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#ebe2d6] bg-[#fbfaf8] text-[#5d554e] shadow-[0_8px_18px_rgba(21,18,14,0.04)]">
-        <Icon />
-      </div>
-      <h3 className="mt-5 text-[22px] font-medium tracking-[-0.045em] text-[#171412]">{feature.title}</h3>
-      <p className="mt-3 max-w-[320px] text-[14px] leading-[1.75] tracking-[-0.02em] text-[#655d56]">{feature.description}</p>
-    </article>
-  );
-}
-
-function HowItWorksCard({
-  index,
-  step
-}: {
-  index: number;
-  step: StepItem;
-}) {
-  return (
-    <article className="relative pt-5">
-      <div className="relative z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ddd4c9] bg-white text-[18px] font-medium text-[#171412] shadow-[0_8px_22px_rgba(21,18,14,0.04)]">
-        {index + 1}
-      </div>
-      <h3 className="mt-4 text-[22px] font-medium tracking-[-0.045em] text-[#171412]">{step.title}</h3>
-      <p className="mt-3 max-w-[320px] text-[14px] leading-[1.75] tracking-[-0.02em] text-[#655d56]">{step.description}</p>
-    </article>
-  );
-}
-
-function FaqRow({ faq, isLast }: { faq: FaqItem; isLast: boolean }) {
-  return (
-    <details className={["group px-5 py-5", isLast ? "" : "border-b border-[#ece3d8]"].join(" ")}>
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-medium tracking-[-0.02em] text-[#171412] [&::-webkit-details-marker]:hidden">
-        <span>{faq.question}</span>
-        <span className="text-[18px] text-[#9a9085] transition group-open:rotate-45">+</span>
-      </summary>
-      <p className="max-w-[760px] pt-3 text-[14px] leading-[1.75] tracking-[-0.02em] text-[#655d56]">
-        {faq.answer}
-      </p>
-    </details>
-  );
-}
-
-function PricingCard({ plan, highlighted }: { plan: PricePlan; highlighted: boolean }) {
-  const eyebrowClassName = highlighted ? "text-[#8f857a]" : "text-[#a59b90]";
-  const suffixClassName = highlighted ? "text-[#8f857a]" : "text-[#9d9489]";
-  const descriptionClassName = highlighted ? "text-[#615851]" : "text-[#685f58]";
-  const featureTextClassName = highlighted ? "text-[#534b45]" : "text-[#5f5750]";
-
-  return (
-    <article
-      className={[
-        "flex h-full flex-col border-b border-[#ece3d8] p-6 lg:border-b-0 lg:border-r",
-        highlighted
-          ? "border-[#ddd4c8] bg-[#f4efe8] text-[#171412]"
-          : "border-[#ece3d8] bg-white text-[#171412]",
-        "last:border-r-0"
-      ].join(" ")}
-    >
-      <div className={`text-[11px] font-medium uppercase tracking-[0.16em] ${eyebrowClassName}`}>{plan.name}</div>
-      <div className="mt-5 flex items-end gap-2">
-        <span className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(2.6rem,3vw,3.4rem)] leading-none`}>
-          {plan.price}
-        </span>
-        {plan.suffix ? <span className={`pb-1 text-[14px] ${suffixClassName}`}>{plan.suffix}</span> : null}
-      </div>
-      <p className={`mt-4 max-w-[260px] text-[14px] leading-[1.7] tracking-[-0.02em] ${descriptionClassName}`}>
-        {plan.description}
-      </p>
-
-      <ul className="mt-7 space-y-3">
-        {plan.features.map((feature) => (
-          <li key={feature} className={`flex items-start gap-3 text-[14px] leading-[1.6] ${featureTextClassName}`}>
-            <span
-              className={[
-                "mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px]",
-                highlighted ? "border-[#ddd2c7] bg-white text-[#34302b]" : "border-[#e7ddd0] bg-[#fbfaf8] text-[#34302b]"
-              ].join(" ")}
-            >
-              ✓
-            </span>
-            <span>{feature}</span>
-          </li>
+    <div className="overflow-hidden rounded-[30px] border border-[var(--border)] bg-[var(--surface)]">
+      <div className="grid gap-px bg-[var(--border-light)] md:grid-cols-3">
+        {[
+          locale === "de"
+            ? { title: "Workspace", body: "Projekte, Review und Billing in einer Fläche." }
+            : { title: "Workspace", body: "Projects, review, and billing in one surface." },
+          locale === "de"
+            ? { title: "Files", body: "Format-sichere Uploads und Exporte." }
+            : { title: "Files", body: "Format-safe uploads and exports." },
+          locale === "de"
+            ? { title: "Text", body: "Direkte Übersetzung für schnelle Inhalte." }
+            : { title: "Text", body: "Direct translation for fast content output." }
+        ].map((item) => (
+          <div key={item.title} className="bg-[var(--background-strong)] px-5 py-8">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
+              {item.title}
+            </div>
+            <p className="mt-4 text-[14px] leading-7 text-[var(--muted)]">{item.body}</p>
+          </div>
         ))}
-      </ul>
-
-      <div className="mt-auto pt-8">
-        <Link
-          href={plan.buttonHref}
-          className={[
-            "inline-flex h-[44px] w-full items-center justify-center rounded-xl border text-[14px] font-medium transition",
-            highlighted
-              ? "border-[#dcd3c8] bg-white text-[#34302b] hover:bg-[#faf7f2]"
-              : "border-[#d8d0c5] bg-[#faf7f2] text-[#34302b] hover:bg-[#f3ede5]"
-          ].join(" ")}
-        >
-          {plan.buttonLabel}
-        </Link>
       </div>
-    </article>
+    </div>
   );
 }
 
-function BrandIcon() {
+function WorkspaceVisual({ locale }: { locale: "de" | "en" }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px] fill-current">
-      <path d="M5 6.8A2.8 2.8 0 0 1 7.8 4h8.4A2.8 2.8 0 0 1 19 6.8v10.4A2.8 2.8 0 0 1 16.2 20H7.8A2.8 2.8 0 0 1 5 17.2V6.8Zm4.3 1.2v1.8h5.4V8H9.3Zm0 3.6v1.8h5.4v-1.8H9.3Zm0 3.6V17h3.6v-1.8H9.3Z" />
+    <div className="overflow-hidden rounded-[30px] border border-[var(--border)] bg-[var(--surface)]">
+      <div className="grid min-h-[420px] lg:grid-cols-[180px_minmax(0,1fr)]">
+        <div className="border-b border-[var(--border)] bg-[var(--background-strong)] p-4 lg:border-b-0 lg:border-r">
+          <div className="space-y-2">
+            {[
+              locale === "de" ? "Dashboard" : "Dashboard",
+              locale === "de" ? "Projekte" : "Projects",
+              locale === "de" ? "Usage" : "Usage",
+              locale === "de" ? "Glossar" : "Glossary"
+            ].map((item, index) => (
+              <div
+                key={item}
+                className={[
+                  "rounded-[14px] px-3 py-2.5 text-[12.5px] font-medium",
+                  index === 1 ? "bg-[var(--foreground)] text-white" : "text-[var(--muted)]"
+                ].join(" ")}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              locale === "de" ? "Wörter diesen Monat" : "Words this month",
+              locale === "de" ? "Review offen" : "In review",
+              locale === "de" ? "Kosten aktuell" : "Current spend"
+            ].map((item, index) => (
+              <div key={item} className="rounded-[18px] border border-[var(--border)] bg-[var(--background-strong)] px-4 py-4">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">{item}</div>
+                <div className="mt-3 text-[26px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">
+                  {index === 0 ? "48K" : index === 1 ? "12" : "€49"}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 space-y-3">
+            {[
+              locale === "de" ? "Mobile App strings" : "Mobile app strings",
+              locale === "de" ? "Help Center update" : "Help center update",
+              locale === "de" ? "Website checkout" : "Website checkout"
+            ].map((item, index) => (
+              <div key={item} className="flex items-center justify-between rounded-[18px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                <div>
+                  <div className="text-[13px] font-medium text-[var(--foreground)]">{item}</div>
+                  <div className="mt-1 text-[11.5px] text-[var(--muted-soft)]">EN → DE, FR, ES</div>
+                </div>
+                <span
+                  className={[
+                    "rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                    index === 0
+                      ? "border border-[var(--processing-border)] bg-[var(--processing-bg)] text-[var(--processing)]"
+                      : index === 1
+                        ? "border border-[var(--review-border)] bg-[var(--review-bg)] text-[var(--review)]"
+                        : "border border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success)]"
+                  ].join(" ")}
+                >
+                  {index === 0 ? "Processing" : index === 1 ? "Review" : "Done"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilesVisual({ locale }: { locale: "de" | "en" }) {
+  return (
+    <div className="overflow-hidden rounded-[30px] border border-[var(--border)] bg-[var(--surface)]">
+      <div className="border-b border-[var(--border)] bg-[var(--background-strong)] px-5 py-4">
+        <div className="flex flex-wrap gap-2">
+          {["XLIFF", "PO", "STRINGS", "RESX", "CSV", "TXT", "DOCX", "PPTX"].map((format) => (
+            <span key={format} className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] text-[var(--muted)]">
+              {format}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="grid gap-5 p-5 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[var(--background-strong)] p-5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
+            {locale === "de" ? "Upload" : "Upload"}
+          </div>
+          <div className="mt-5 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] px-4 py-8 text-center text-[14px] text-[var(--muted)]">
+            {locale === "de" ? "Dateien hier hineinziehen" : "Drop files here"}
+          </div>
+          <div className="mt-4 text-[12px] text-[var(--muted-soft)]">
+            {locale === "de" ? "Struktur und Tags bleiben erhalten." : "Structure and tags stay intact."}
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          <div className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[13px] font-medium text-[var(--foreground)]">
+                  {locale === "de" ? "sample-word-document.docx" : "sample-word-document.docx"}
+                </div>
+                <div className="mt-1 text-[11.5px] text-[var(--muted-soft)]">EN → DE</div>
+              </div>
+              <span className="rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--success)]">
+                Done
+              </span>
+            </div>
+          </div>
+          <div className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-[16px] border border-[var(--border)] bg-[var(--background-strong)] px-4 py-4">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+                  {locale === "de" ? "Quelle" : "Source"}
+                </div>
+                <div className="mt-3 space-y-2 text-[12.5px] text-[var(--muted)]">
+                  <div>Release notes for onboarding</div>
+                  <div>New billing cycle logic</div>
+                  <div>Review state improvements</div>
+                </div>
+              </div>
+              <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+                  {locale === "de" ? "Übersetzung" : "Translation"}
+                </div>
+                <div className="mt-3 space-y-2 text-[12.5px] text-[var(--foreground)]">
+                  <div>Versionshinweise für Onboarding</div>
+                  <div>Neue Billing-Cycle-Logik</div>
+                  <div>Verbesserte Review-Zustände</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TextTranslationVisual({ locale }: { locale: "de" | "en" }) {
+  return (
+    <div className="overflow-hidden rounded-[30px] border border-[var(--border)] bg-[var(--surface)]">
+      <div className="grid min-h-[420px] gap-px bg-[var(--border-light)] lg:grid-cols-2">
+        <div className="bg-[var(--background-strong)] p-5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+              {locale === "de" ? "Original" : "Original"}
+            </span>
+            <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+              EN
+            </span>
+          </div>
+          <div className="mt-5 rounded-[20px] border border-[var(--border)] bg-[var(--surface)] px-4 py-5 text-[14px] leading-7 text-[var(--muted)]">
+            Launch copy for a pricing update, weekly release notes, or short customer support replies can move through the same surface without opening a project first.
+          </div>
+        </div>
+        <div className="bg-[var(--surface)] p-5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+              {locale === "de" ? "Ergebnis" : "Output"}
+            </span>
+            <span className="rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--success)]">
+              DE
+            </span>
+          </div>
+          <div className="mt-5 rounded-[20px] border border-[var(--border)] bg-[var(--background-strong)] px-4 py-5 text-[14px] leading-7 text-[var(--foreground)]">
+            Texte fur ein Pricing-Update, wochentliche Release Notes oder kurze Support-Antworten laufen durch dieselbe Flache, ohne zuerst ein Projekt anlegen zu mussen.
+          </div>
+          <div className="mt-4 flex gap-2">
+            {[
+              locale === "de" ? "Auto detect" : "Auto detect",
+              locale === "de" ? "Formal" : "Formal",
+              locale === "de" ? "TXT export" : "TXT export"
+            ].map((item) => (
+              <span key={item} className="rounded-full border border-[var(--border)] bg-[var(--background-strong)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PricingVisual({ locale }: { locale: "de" | "en" }) {
+  return (
+    <div className="overflow-hidden rounded-[30px] border border-[var(--border)] bg-[var(--surface)]">
+      <div className="grid gap-px bg-[var(--border-light)] md:grid-cols-2">
+        <div className="bg-[var(--background-strong)] px-5 py-8">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted-soft)]">
+            {locale === "de" ? "Credits = Wörter" : "Credits = words"}
+          </div>
+          <div className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[40px] leading-none text-[var(--foreground)]`}>
+            1K → 700K
+          </div>
+          <p className="mt-4 text-[14px] leading-7 text-[var(--muted)]">
+            {locale === "de"
+              ? "Von Free bis Scale bleibt dieselbe Logik bestehen: monatliche Credits orientieren sich direkt am Übersetzungsvolumen."
+              : "From Free to Scale the same logic holds: monthly credits map directly to translation volume."}
+          </p>
+        </div>
+        <div className="bg-[var(--surface)] px-5 py-8">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted-soft)]">
+            {locale === "de" ? "Skalierung" : "Scaling"}
+          </div>
+          <div className="mt-4 space-y-3">
+            {["Free", "Starter", "Pro", "Scale"].map((item, index) => (
+              <div key={item} className="flex items-center justify-between rounded-[18px] border border-[var(--border)] bg-[var(--background-strong)] px-4 py-3">
+                <span className="text-[13px] font-medium text-[var(--foreground)]">{item}</span>
+                <span className="text-[12px] text-[var(--muted)]">
+                  {index === 0 ? "1K" : index === 1 ? "50K" : index === 2 ? "200K" : "700K"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BrandMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="M3 4.2C3 3.53726 3.53726 3 4.2 3H13.8C14.4627 3 15 3.53726 15 4.2V6.3C15 6.96274 14.4627 7.5 13.8 7.5H4.2C3.53726 7.5 3 6.96274 3 6.3V4.2Z"
+        fill="currentColor"
+      />
+      <path
+        d="M3 11.7C3 11.0373 3.53726 10.5 4.2 10.5H9.15C9.81274 10.5 10.35 11.0373 10.35 11.7V13.8C10.35 14.4627 9.81274 15 9.15 15H4.2C3.53726 15 3 14.4627 3 13.8V11.7Z"
+        fill="currentColor"
+        opacity="0.78"
+      />
+      <path
+        d="M11.55 11.7C11.55 11.0373 12.0873 10.5 12.75 10.5H13.8C14.4627 10.5 15 11.0373 15 11.7V13.8C15 14.4627 14.4627 15 13.8 15H12.75C12.0873 15 11.55 14.4627 11.55 13.8V11.7Z"
+        fill="currentColor"
+        opacity="0.48"
+      />
     </svg>
   );
 }
 
-function UploadIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.8">
-      <path d="M6 16.5v1.2A1.3 1.3 0 0 0 7.3 19h9.4A1.3 1.3 0 0 0 18 17.7v-1.2" />
-      <path d="M12 5v10.5" />
-      <path d="m8.5 8.5 3.5-3.5 3.5 3.5" />
-    </svg>
-  );
+function getPricingPlans(locale: "de" | "en", interval: PricingInterval): PricingPlanView[] {
+  const numberFormatter = new Intl.NumberFormat(locale === "de" ? "de-DE" : "en-US", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0
+  });
+
+  return BILLING_PLANS.map((plan) => ({
+    id: plan.id,
+    name: plan.name,
+    price: numberFormatter.format(
+      (interval === "yearly" && plan.paid ? plan.basePriceCents * 10 : plan.basePriceCents) / 100
+    ),
+    suffix:
+      interval === "yearly" && plan.paid
+        ? locale === "de"
+          ? "pro Jahr"
+          : "per year"
+        : locale === "de"
+          ? "pro Monat"
+          : "per month",
+    note:
+      interval === "yearly" && plan.paid
+        ? locale === "de"
+          ? "2 Monate gratis bei jährlicher Abrechnung"
+          : "2 months free on annual billing"
+        : undefined,
+    credits: `${new Intl.NumberFormat(locale === "de" ? "de-DE" : "en-US", {
+      notation: "compact",
+      maximumFractionDigits: 0
+    }).format(plan.creditsLimit)} ${locale === "de" ? "Credits" : "credits"}`,
+    description: plan.description,
+    features: localizePlanFeatures(plan.id, locale),
+    featured: plan.id === "pro"
+  }));
 }
 
-function ProgressIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="8" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
+function localizePlanFeatures(
+  planId: (typeof BILLING_PLANS)[number]["id"],
+  locale: "de" | "en"
+) {
+  if (locale === "en") {
+    return BILLING_PLANS.find((plan) => plan.id === planId)?.features ?? [];
+  }
+
+  switch (planId) {
+    case "free":
+      return ["1k monatliche Wörter", "Kern-Workspace für Übersetzungen", "Glossar-Basics"];
+    case "starter":
+      return ["50k monatliche Wörter", "Projekt-Workspaces", "Review-fähige Exporte"];
+    case "pro":
+      return ["200k monatliche Wörter", "Review-Workflow", "Priorisierte Glossar-Injektion"];
+    case "scale":
+      return ["700k monatliche Wörter", "Höherer Durchsatz", "Gemeinsame Team-Operationen"];
+    default:
+      return [];
+  }
 }
 
-function ExportIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.8">
-      <path d="M6 12h10" />
-      <path d="m12 8 4 4-4 4" />
-      <path d="M6 5h10a3 3 0 0 1 3 3v8" />
-    </svg>
-  );
+function getGermanMarketingCopy() {
+  const productCards: ProductCard[] = [
+    {
+      id: "workspace",
+      href: "/products/workspace",
+      label: "Translation Workspace",
+      title: "Die operative Fläche für Projekte, Review und Billing.",
+      body: "Translayr bündelt Projektstatus, letzte Übersetzungen, Glossar und Verbrauch in einer klaren Oberfläche.",
+      points: [
+        "Dashboard, Projekte und Usage in einem Ablauf",
+        "Review-Status und Fortschritt direkt sichtbar",
+        "Billing und Credits ohne Seitensprünge"
+      ]
+    },
+    {
+      id: "files",
+      href: "/products/file-translation",
+      label: "File Translation",
+      title: "Dateiübersetzung für reale Release-Dateien statt Demo-Uploads.",
+      body: "Arbeite mit XLIFF, PO, STRINGS, RESX, CSV, TXT, DOCX und PPTX, ohne Struktur manuell neu aufzubauen.",
+      points: [
+        "Mehrformat-Upload mit wortbasiertem Credit-Modell",
+        "Side-by-side Review und Download im Originalformat",
+        "Tag- und Struktur-Schutz für Lokalisierungsdateien"
+      ]
+    },
+    {
+      id: "text",
+      href: "/products/text-translation",
+      label: "Text Translation",
+      title: "Schnelle Textübersetzung für Copy, Support und kurze Freigaben.",
+      body: "Wenn kein Projekt nötig ist, läuft die Übersetzung direkt über eine schlanke Textfläche mit Tonalität und Export.",
+      points: [
+        "Auto-Detect, Zielsprache und Tonalität",
+        "Copy, TXT-Export und sofortige Ausgabe",
+        "Nutzung läuft in dieselbe Credit-Logik"
+      ]
+    }
+  ];
+
+  return {
+    navHome: "Overview",
+    navProducts: "Produkte",
+    navPricing: "Preise",
+    navLogin: "Anmelden",
+    navRegister: "Kostenlos starten",
+    footer: {
+      copyright: "© 2026 Translayr. Alle Rechte vorbehalten.",
+      privacy: "Datenschutz",
+      terms: "AGB",
+      status: "Status"
+    },
+    cta: {
+      eyebrow: "Start",
+      title: "Baue deinen Release-Flow um die Übersetzung herum, nicht um Dateien.",
+      body: "Starte kostenlos, lade echte Release-Dateien hoch und bring Review, Verbrauch und Export in dieselbe Oberfläche.",
+      primary: "Kostenlos starten",
+      secondary: "Anmelden"
+    },
+    productCards,
+    homeHero: {
+      eyebrow: "Language operations",
+      title: "Übersetzung als Produktfläche, nicht als Ordnerstruktur.",
+      body: "Translayr bringt Projekte, Dateien, direkte Textübersetzung und Credits in ein sauberes System. Statt One-off-Uploads arbeitest du in einem klaren Release-Flow.",
+      actions: [
+        { href: "/register", label: "Kostenlos starten", tone: "primary" as const },
+        { href: "/products", label: "Produkte ansehen", tone: "secondary" as const }
+      ]
+    },
+    homeProductsEyebrow: "Produktfamilie",
+    homeProductsTitle: "Nicht eine Scrollseite, sondern eine echte Produktstruktur.",
+    homeProductsBody: "Die Startseite führt in die drei Kernflächen. Jede Produktseite erklärt einen klaren Job statt alles in einen langen One-Pager zu drücken.",
+    metrics: [
+      { value: "1K–700K", label: "Monatliche Credits über die Planleiter" },
+      { value: "8+", label: "Produktive Dateiformate im Live-Flow" },
+      { value: "3", label: "Klare Flächen für Workspace, Files und Text" },
+      { value: "1", label: "Konsistente Credit-Logik über alle Wege" }
+    ],
+    homeOperationsEyebrow: "Release-Realität",
+    homeOperationsTitle: "Gebaut für Teams, die Übersetzung operativ steuern müssen.",
+    homeOperationsBody: "Die Site erklärt Translayr jetzt wie ein Produkt: mit eigener Home, eigenen Produktseiten und einer separaten Pricing-Fläche. Das wirkt klarer, glaubwürdiger und näher an echten SaaS-Navigationsmustern.",
+    homeOperationsRows: [
+      {
+        title: "Launches",
+        body: "Mehrere Zielsprachen und mehrere Dateien bleiben im selben Projektkontext statt in Einzelaktionen."
+      },
+      {
+        title: "Review",
+        body: "Fortschritt, offene Prüfungen und letzte Übersetzungen sind keine versteckten Zustände, sondern eigene Produktflächen."
+      },
+      {
+        title: "Finance",
+        body: "Credits, monatliche Limits und aktuelle Kosten hängen direkt an derselben operativen Oberfläche."
+      }
+    ],
+    productsHero: {
+      eyebrow: "Products",
+      title: "Drei Flächen, drei Aufgaben, ein zusammenhängender Release-Flow.",
+      body: "Statt alles auf die Homepage zu legen, hat Translayr jetzt eigene Seiten für Workspace, Dateiübersetzung und schnelle Textübersetzung.",
+      actions: [
+        { href: "/products/workspace", label: "Workspace öffnen", tone: "primary" as const },
+        { href: "/pricing", label: "Preise ansehen", tone: "secondary" as const }
+      ]
+    },
+    productsGridEyebrow: "Produktseiten",
+    productsGridTitle: "Jede Seite erklärt einen klaren Job im Produkt.",
+    productsGridBody: "Das ist näher an DeepL-ähnlichen Produktseiten: separate Flächen mit eigenem Fokus statt alles als Scroll-Stack.",
+    compareEyebrow: "Vergleich",
+    compareTitle: "So greifen die drei Flächen ineinander.",
+    compareBody: "Workspace ist der operative Kern. Files bringt strukturierte Assets hinein. Text deckt die schnellen Einzel-Outputs ab, die keinen Projektcontainer brauchen.",
+    compareRows: [
+      {
+        title: "Workspace",
+        body: "Für Projektstatus, Review, letzte Übersetzungen, Billing und Team-Kontext."
+      },
+      {
+        title: "Files",
+        body: "Für echte Lokalisierungsdateien mit Upload, Fortschritt, Wortzählung und Export."
+      },
+      {
+        title: "Text",
+        body: "Für Copy, Support und kleine Inhalte, die direkt übersetzt und exportiert werden sollen."
+      }
+    ],
+    workspaceHero: {
+      eyebrow: "Workspace",
+      title: "Die Übersetzungszentrale für laufende Produktarbeit.",
+      body: "Der Workspace hält Projekte, Fortschritt, Review, Usage, Glossar und Billing an derselben Stelle. Genau dort, wo Teams täglich Entscheidungen treffen.",
+      actions: [
+        { href: "/register", label: "Workspace testen", tone: "primary" as const },
+        { href: "/dashboard", label: "Dashboard ansehen", tone: "secondary" as const }
+      ]
+    },
+    workspaceBlocks: [
+      {
+        eyebrow: "Operativ",
+        title: "Ein Dashboard statt vier Nebentools.",
+        body: "Monatsverbrauch, letzte Übersetzungen, Zielsprachen und Projektstatus liegen an einem Ort und müssen nicht aus mehreren Systemen zusammengesucht werden.",
+        points: [
+          "Wörter diesen Monat, Spend und Savings sichtbar",
+          "Letzte Übersetzungen direkt auf der Startfläche",
+          "Zielsprachen und Projektaktivität ohne Kontextwechsel"
+        ]
+      },
+      {
+        eyebrow: "Review",
+        title: "Projektarbeit mit sichtbarem Prüfzustand.",
+        body: "Nicht nur hochladen und hoffen: Review, Qualitätsstatus und offene Dateien bleiben im Projektkontext verankert.",
+        points: [
+          "Review-Warteschlange im Dashboard",
+          "Projekt-Workspace mit Datei-Status und Fortschritt",
+          "Download und Review bleiben im selben Ablauf"
+        ]
+      },
+      {
+        eyebrow: "Kontrolle",
+        title: "Credits, Limits und Billing ohne Black Box.",
+        body: "Verbrauch, verbleibende Credits und Upgrade-Pfade sind direkt im Produkt sichtbar. Das macht Translayr operativ steuerbar statt nur technisch funktionsfähig.",
+        points: [
+          "Credit-Checks vor jeder Übersetzung",
+          "Usage- und Billing-Flächen mit echten Summen",
+          "Planleiter von Free bis Scale im selben System"
+        ]
+      }
+    ],
+    filesHero: {
+      eyebrow: "File translation",
+      title: "Mehrformat-Übersetzung für die Dateien, mit denen Teams wirklich releasen.",
+      body: "Translayr ist nicht mehr nur XLIFF-first. Die Produktseite erklärt jetzt klar den Flow für strukturierte Dateien, Review und Exporte.",
+      actions: [
+        { href: "/register", label: "Datei hochladen", tone: "primary" as const },
+        { href: "/products/text-translation", label: "Textfläche ansehen", tone: "secondary" as const }
+      ]
+    },
+    filesBlocks: [
+      {
+        eyebrow: "Formate",
+        title: "Von Lokalisierungsdateien bis Office-Dokumente.",
+        body: "Die Dateifläche nimmt reale Formate an und hält dabei das Credit-Modell und die Dateistruktur konsistent.",
+        points: [
+          "XLIFF, XLF, PO, STRINGS, RESX, XML",
+          "CSV, TXT, DOCX und PPTX",
+          "Wortzählung vor der Übersetzung"
+        ]
+      },
+      {
+        eyebrow: "Prozess",
+        title: "Upload, Übersetzung, Review, Export.",
+        body: "Die Dateiübersetzung ist als echter Ablauf dargestellt, nicht als generischer Demo-Upload mit einem einzigen Button.",
+        points: [
+          "Drag-and-drop Upload mit Status",
+          "Zielsprache und Dateifortschritt je Artefakt",
+          "Download im übersetzten Originalformat"
+        ]
+      },
+      {
+        eyebrow: "Sicherheit",
+        title: "Struktur und Tags bleiben unter Kontrolle.",
+        body: "Gerade bei strukturierten Dateiformaten ist die Sicherheit im Workflow entscheidend. Die Seite macht diesen Aspekt klar sichtbar.",
+        points: [
+          "Tag-Schutz im Übersetzungsprozess",
+          "Side-by-side Review für Dateiinhalt",
+          "Kein manuelles Reformatting vor dem Release"
+        ]
+      }
+    ],
+    textHero: {
+      eyebrow: "Text translation",
+      title: "Direkte Übersetzung für kurze Inhalte, ohne erst ein Projekt anzulegen.",
+      body: "Nicht jede Übersetzung beginnt mit einer Datei. Für Copy, Support oder schnelle Freigaben gibt es eine eigene Textfläche mit Auto-Detect, Tonalität und Export.",
+      actions: [
+        { href: "/translate", label: "Text übersetzen", tone: "primary" as const },
+        { href: "/products/file-translation", label: "Dateifläche ansehen", tone: "secondary" as const }
+      ]
+    },
+    textBlocks: [
+      {
+        eyebrow: "Speed",
+        title: "Schneller Output für operative Texte.",
+        body: "Die Textfläche ist für kurze Inhalte gedacht, die nicht erst in eine Projektstruktur umgebaut werden müssen.",
+        points: [
+          "Copy/Paste ohne Setup",
+          "Auto-Detect der Quellsprache",
+          "Sofortige Ausgabe im selben Screen"
+        ]
+      },
+      {
+        eyebrow: "Steuerung",
+        title: "Tonalität und Zielsprache bleiben steuerbar.",
+        body: "Auch schnelle Übersetzungen brauchen Kontrolle. Deshalb bleibt die Auswahl von Sprache und Stil im Flow sichtbar.",
+        points: [
+          "Zielsprache mit bevorzugten Sprachen oben",
+          "Tone-Optionen für formell, informell und technisch",
+          "Copy und TXT-Export für den direkten Weiterweg"
+        ]
+      },
+      {
+        eyebrow: "Verbrauch",
+        title: "Dieselbe Credit-Logik wie im Rest des Produkts.",
+        body: "Textübersetzungen laufen nicht nebenher, sondern in dieselbe Usage- und Credit-Logik wie Dateiübersetzungen.",
+        points: [
+          "Wortzählung vor dem Start",
+          "Credit-Check vor der Übersetzung",
+          "Monatsverbrauch auf derselben Billing-Grundlage"
+        ]
+      }
+    ],
+    pricingHero: {
+      eyebrow: "Pricing",
+      title: "Eine klare Planleiter statt einer langen Scrollsektion.",
+      body: "Preise leben jetzt auf einer eigenen Seite. Das wirkt sauberer, verständlicher und näher an einer echten Produktseite mit eigenem Fokus.",
+      actions: [
+        { href: "/register", label: "Free starten", tone: "primary" as const },
+        { href: "/products", label: "Produktseiten ansehen", tone: "secondary" as const }
+      ]
+    },
+    pricingGridEyebrow: "Planleiter",
+    pricingGridTitle: "Von Free bis Scale mit echten Monats-Credits.",
+    pricingGridBody: "Die Preise kommen direkt aus euren echten Produktplänen. Kein Demo-Pricing mehr auf der Landingpage.",
+    pricingNotes: [
+      {
+        title: "Credits",
+        body: "Ein Credit entspricht in der Produktlogik einem Wort. Dadurch bleibt Pricing direkt mit der echten Nutzung verknüpft."
+      },
+      {
+        title: "Upgrade",
+        body: "Wenn das Volumen größer wird als das aktuelle Paket erlaubt, bleibt der Upgrade-Pfad im Produkt und auf der Pricing-Seite konsistent."
+      },
+      {
+        title: "Positionierung",
+        body: "Die Pricing-Seite steht jetzt als eigene Fläche und muss nicht mehr in derselben Scrollstrecke wie Features und Story mitschwingen."
+      }
+    ]
+  };
 }
 
-function GridIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.8">
-      <rect x="5" y="5" width="5" height="5" rx="1.2" />
-      <rect x="14" y="5" width="5" height="5" rx="1.2" />
-      <rect x="5" y="14" width="5" height="5" rx="1.2" />
-      <rect x="14" y="14" width="5" height="5" rx="1.2" />
-    </svg>
-  );
-}
+function getEnglishMarketingCopy() {
+  const productCards: ProductCard[] = [
+    {
+      id: "workspace",
+      href: "/products/workspace",
+      label: "Translation workspace",
+      title: "The operating surface for projects, review, and billing.",
+      body: "Translayr pulls project state, recent translations, glossary context, and usage into one clean surface.",
+      points: [
+        "Dashboard, projects, and usage in one flow",
+        "Review state and progress visible at a glance",
+        "Billing and credits without leaving the product"
+      ]
+    },
+    {
+      id: "files",
+      href: "/products/file-translation",
+      label: "File translation",
+      title: "File translation for real release assets, not demo uploads.",
+      body: "Work with XLIFF, PO, STRINGS, RESX, CSV, TXT, DOCX, and PPTX without manually rebuilding structure.",
+      points: [
+        "Multi-format upload with word-based credits",
+        "Side-by-side review and original-format download",
+        "Tag and structure protection for localization files"
+      ]
+    },
+    {
+      id: "text",
+      href: "/products/text-translation",
+      label: "Text translation",
+      title: "Fast text translation for copy, support, and short approval loops.",
+      body: "When you do not need a project wrapper, translation runs through a dedicated text surface with tone control and export.",
+      points: [
+        "Auto-detect, target language, and tone",
+        "Copy, TXT export, and immediate output",
+        "Usage tracked inside the same credit model"
+      ]
+    }
+  ];
 
-function HomeIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.8">
-      <path d="m5 10.5 7-5.5 7 5.5v7.7a.8.8 0 0 1-.8.8H5.8a.8.8 0 0 1-.8-.8v-7.7Z" />
-      <path d="M9.8 19v-5.8h4.4V19" />
-    </svg>
-  );
-}
-
-function VersionIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.8">
-      <path d="M6 12a6 6 0 1 0 2-4.5" />
-      <path d="M6 5v4h4" />
-    </svg>
-  );
+  return {
+    navHome: "Overview",
+    navProducts: "Products",
+    navPricing: "Pricing",
+    navLogin: "Sign in",
+    navRegister: "Start free",
+    footer: {
+      copyright: "© 2026 Translayr. All rights reserved.",
+      privacy: "Privacy",
+      terms: "Terms",
+      status: "Status"
+    },
+    cta: {
+      eyebrow: "Start",
+      title: "Build your release flow around translation, not around files.",
+      body: "Start free, upload real release assets, and keep review, usage, and export inside one surface.",
+      primary: "Start free",
+      secondary: "Sign in"
+    },
+    productCards,
+    homeHero: {
+      eyebrow: "Language operations",
+      title: "Translation as a product surface, not a folder structure.",
+      body: "Translayr brings projects, files, direct text translation, and credits into one coherent system. Instead of one-off uploads, teams work in a release-ready flow.",
+      actions: [
+        { href: "/register", label: "Start free", tone: "primary" as const },
+        { href: "/products", label: "Explore products", tone: "secondary" as const }
+      ]
+    },
+    homeProductsEyebrow: "Product family",
+    homeProductsTitle: "Not one long scroll page, but a real product structure.",
+    homeProductsBody: "The homepage now introduces the core surfaces. Each product page explains a distinct job instead of cramming everything into one long landing page.",
+    metrics: [
+      { value: "1K–700K", label: "Monthly credits across the plan ladder" },
+      { value: "8+", label: "Production file formats in the live flow" },
+      { value: "3", label: "Clear surfaces for workspace, files, and text" },
+      { value: "1", label: "Consistent credit logic across every route" }
+    ],
+    homeOperationsEyebrow: "Release reality",
+    homeOperationsTitle: "Built for teams that need to operate translation, not just trigger it.",
+    homeOperationsBody: "The site now explains Translayr like a product: a real home page, dedicated product pages, and a separate pricing page. That feels clearer, more credible, and closer to how mature SaaS sites are structured.",
+    homeOperationsRows: [
+      {
+        title: "Launches",
+        body: "Multiple languages and multiple assets stay in one project context instead of scattered one-off actions."
+      },
+      {
+        title: "Review",
+        body: "Progress, open review states, and recent translations are not hidden states but explicit product surfaces."
+      },
+      {
+        title: "Finance",
+        body: "Credits, monthly limits, and current spend stay directly connected to the same operational experience."
+      }
+    ],
+    productsHero: {
+      eyebrow: "Products",
+      title: "Three surfaces, three jobs, one connected release flow.",
+      body: "Instead of putting everything on the homepage, Translayr now has dedicated pages for workspace, file translation, and direct text translation.",
+      actions: [
+        { href: "/products/workspace", label: "Open workspace page", tone: "primary" as const },
+        { href: "/pricing", label: "View pricing", tone: "secondary" as const }
+      ]
+    },
+    productsGridEyebrow: "Product pages",
+    productsGridTitle: "Each page explains one distinct job in the product.",
+    productsGridBody: "This is closer to a DeepL-style product site: separate surfaces with their own focus instead of one giant scroll stack.",
+    compareEyebrow: "Comparison",
+    compareTitle: "How the three surfaces fit together.",
+    compareBody: "Workspace is the operating core. Files bring structured assets into the system. Text handles fast one-off outputs that do not need a project wrapper.",
+    compareRows: [
+      {
+        title: "Workspace",
+        body: "For project state, review, recent translations, billing, and team context."
+      },
+      {
+        title: "Files",
+        body: "For real localization assets with upload, progress, word counts, and export."
+      },
+      {
+        title: "Text",
+        body: "For copy, support, and short content that should be translated and exported immediately."
+      }
+    ],
+    workspaceHero: {
+      eyebrow: "Workspace",
+      title: "The translation command center for ongoing product work.",
+      body: "The workspace keeps projects, progress, review, usage, glossary, and billing in one place. Right where teams actually make daily decisions.",
+      actions: [
+        { href: "/register", label: "Try the workspace", tone: "primary" as const },
+        { href: "/dashboard", label: "View dashboard", tone: "secondary" as const }
+      ]
+    },
+    workspaceBlocks: [
+      {
+        eyebrow: "Operations",
+        title: "One dashboard instead of four side tools.",
+        body: "Monthly usage, recent translations, target languages, and project state live in one place instead of being stitched together from multiple tools.",
+        points: [
+          "Words this month, spend, and savings on one surface",
+          "Recent translations visible on the home screen",
+          "Target languages and project activity without context switching"
+        ]
+      },
+      {
+        eyebrow: "Review",
+        title: "Project work with visible review state.",
+        body: "Not just upload and hope: review, quality signals, and open files stay anchored to the project context.",
+        points: [
+          "Review queue visible in the dashboard",
+          "Project workspaces with file status and progress",
+          "Download and review stay in the same flow"
+        ]
+      },
+      {
+        eyebrow: "Control",
+        title: "Credits, limits, and billing without a black box.",
+        body: "Usage, remaining credits, and upgrade paths are visible directly in the product. That makes Translayr operationally manageable instead of merely technically functional.",
+        points: [
+          "Credit checks before every translation",
+          "Usage and billing surfaces with real totals",
+          "Plan ladder from Free to Scale inside one system"
+        ]
+      }
+    ],
+    filesHero: {
+      eyebrow: "File translation",
+      title: "Multi-format translation for the files teams actually release.",
+      body: "Translayr is no longer framed as only XLIFF-first. This page clearly explains the flow for structured files, review, and export.",
+      actions: [
+        { href: "/register", label: "Upload a file", tone: "primary" as const },
+        { href: "/products/text-translation", label: "See text translation", tone: "secondary" as const }
+      ]
+    },
+    filesBlocks: [
+      {
+        eyebrow: "Formats",
+        title: "From localization assets to Office documents.",
+        body: "The file surface accepts real formats while keeping the credit model and file structure consistent.",
+        points: [
+          "XLIFF, XLF, PO, STRINGS, RESX, XML",
+          "CSV, TXT, DOCX, and PPTX",
+          "Word counts before translation begins"
+        ]
+      },
+      {
+        eyebrow: "Process",
+        title: "Upload, translate, review, export.",
+        body: "File translation is presented as a real product workflow, not as a generic demo upload with a single button.",
+        points: [
+          "Drag-and-drop upload with state",
+          "Target language and progress per asset",
+          "Download in the translated original format"
+        ]
+      },
+      {
+        eyebrow: "Safety",
+        title: "Structure and tags stay under control.",
+        body: "For structured formats, workflow safety matters as much as speed. This page makes that explicit.",
+        points: [
+          "Tag protection during translation",
+          "Side-by-side review for translated content",
+          "No manual reformatting before release"
+        ]
+      }
+    ],
+    textHero: {
+      eyebrow: "Text translation",
+      title: "Direct translation for short-form content without creating a project first.",
+      body: "Not every translation starts as a file. For copy, support, or quick approvals, there is a dedicated text surface with auto-detect, tone, and export.",
+      actions: [
+        { href: "/translate", label: "Translate text", tone: "primary" as const },
+        { href: "/products/file-translation", label: "See file translation", tone: "secondary" as const }
+      ]
+    },
+    textBlocks: [
+      {
+        eyebrow: "Speed",
+        title: "Fast output for operational text.",
+        body: "The text surface is made for short content that should not be forced into a project wrapper first.",
+        points: [
+          "Copy and paste without setup",
+          "Automatic source detection",
+          "Immediate output in the same screen"
+        ]
+      },
+      {
+        eyebrow: "Control",
+        title: "Tone and target language stay explicit.",
+        body: "Even fast translations need control. Language and style stay visible inside the workflow.",
+        points: [
+          "Target language with preferred languages surfaced first",
+          "Tone options for formal, informal, and technical output",
+          "Copy and TXT export for immediate follow-up"
+        ]
+      },
+      {
+        eyebrow: "Usage",
+        title: "The same credit model as the rest of the product.",
+        body: "Text translation is not an isolated side feature. It runs through the same usage and credit logic as file translation.",
+        points: [
+          "Word count before start",
+          "Credit validation before translation",
+          "Monthly usage tied to the same billing logic"
+        ]
+      }
+    ],
+    pricingHero: {
+      eyebrow: "Pricing",
+      title: "A clear plan ladder instead of a long landing page section.",
+      body: "Pricing now lives on its own page. That feels cleaner, more focused, and closer to a real product site with dedicated intent.",
+      actions: [
+        { href: "/register", label: "Start Free", tone: "primary" as const },
+        { href: "/products", label: "Browse products", tone: "secondary" as const }
+      ]
+    },
+    pricingGridEyebrow: "Plan ladder",
+    pricingGridTitle: "From Free to Scale with real monthly credits.",
+    pricingGridBody: "Pricing is now sourced directly from your live product plans. No more demo pricing on the landing page.",
+    pricingNotes: [
+      {
+        title: "Credits",
+        body: "In the current product model, one credit maps to one word. That keeps pricing tied directly to real usage."
+      },
+      {
+        title: "Upgrade",
+        body: "When volume outgrows the current package, the upgrade path stays consistent across the product and the pricing page."
+      },
+      {
+        title: "Positioning",
+        body: "Pricing now stands as its own surface instead of being squeezed into the same scroll flow as features and story."
+      }
+    ]
+  };
 }
