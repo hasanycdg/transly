@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 
+import { parseCsvDocument, serializeTranslatedCsv, type ParsedCsvDocument } from "@/lib/file-formats/csv";
+import {
+  parseOfficeDocument,
+  serializeTranslatedOffice,
+  type OfficeArchiveFormat
+} from "@/lib/file-formats/office";
 import { parsePoDocument, serializeTranslatedPo, type ParsedPoDocument } from "@/lib/file-formats/po";
 import { parseResxDocument, serializeTranslatedResx, type ParsedResxDocument } from "@/lib/file-formats/resx";
 import { parseStringsDocument, serializeTranslatedStrings, type ParsedStringsDocument } from "@/lib/file-formats/strings";
@@ -49,13 +55,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const originalContent = await fileEntry.text();
     const detectedFormat = detectTranslationFileFormat(fileEntry.name);
 
     if (!detectedFormat) {
       throw new TranslationPipelineError(
         "validation_error",
-        "Supported formats are .xliff, .xlf, .po, .strings, .resx, .xml, and .txt.",
+        "Supported formats are .xliff, .xlf, .po, .strings, .resx, .xml, .csv, .txt, .docx, and .pptx.",
         400
       );
     }
@@ -63,6 +68,23 @@ export async function POST(request: Request) {
     const provider = new OpenAITranslationProvider({
       model: runtimeSettings.translationModel
     });
+
+    if (detectedFormat === "docx" || detectedFormat === "pptx") {
+      return NextResponse.json(
+        await translateOfficeDocument({
+          fileName: fileEntry.name,
+          originalBuffer: await fileEntry.arrayBuffer(),
+          format: detectedFormat,
+          projectSlug,
+          targetLanguage,
+          sourceLanguageFallback,
+          provider,
+          runtimeSettings
+        })
+      );
+    }
+
+    const originalContent = await fileEntry.text();
 
     if (detectedFormat === "xliff") {
       return NextResponse.json(
@@ -200,7 +222,7 @@ async function translateXliffDocument(input: {
 async function translateGenericDocument(input: {
   fileName: string;
   originalContent: string;
-  detectedFormat: Exclude<ReturnType<typeof detectTranslationFileFormat>, "xliff" | null>;
+  detectedFormat: Exclude<ReturnType<typeof detectTranslationFileFormat>, "xliff" | "docx" | "pptx" | null>;
   projectSlug?: string;
   targetLanguage: string;
   sourceLanguageFallback?: string;
@@ -246,6 +268,68 @@ async function translateGenericDocument(input: {
       input.projectSlug ?? input.runtimeSettings.workspaceSlug
     ),
     translatedContent,
+    warnings: [],
+    detectedSourceLanguage,
+    detectedTargetLanguage: input.targetLanguage,
+    xliffVersion: "unknown",
+    translatedUnitCount: writebacks.length,
+    autoDownloadAfterTranslation: input.runtimeSettings.autoDownloadAfterTranslation
+  };
+}
+
+async function translateOfficeDocument(input: {
+  fileName: string;
+  originalBuffer: ArrayBuffer;
+  format: OfficeArchiveFormat;
+  projectSlug?: string;
+  targetLanguage: string;
+  sourceLanguageFallback?: string;
+  provider: OpenAITranslationProvider;
+  runtimeSettings: Awaited<ReturnType<typeof getTranslationRuntimeSettings>>;
+}): Promise<TranslationApiSuccess> {
+  const detectedSourceLanguage = input.sourceLanguageFallback;
+
+  if (!detectedSourceLanguage) {
+    throw new TranslationPipelineError(
+      "missing_source_language",
+      `Select a source language before translating ${input.format.toUpperCase()} files.`,
+      422
+    );
+  }
+
+  const parsedDocument = await parseOfficeDocument(input.originalBuffer, input.format);
+  const writebacks = await translateUnits({
+    units: parsedDocument.units.map((unit) => ({
+      id: unit.id,
+      sourceText: unit.sourceText,
+      sourceLookupText: unit.sourceText
+    })),
+    sourceLanguage: detectedSourceLanguage,
+    targetLanguage: input.targetLanguage,
+    provider: input.provider,
+    runtimeSettings: input.runtimeSettings
+  });
+  const translatedArchive = await serializeTranslatedOffice(
+    input.originalBuffer,
+    parsedDocument,
+    new Map(writebacks.map((writeback) => [writeback.id, writeback.value]))
+  );
+
+  return {
+    fileName: buildOutputFileName(
+      input.fileName,
+      detectedSourceLanguage,
+      input.targetLanguage,
+      input.runtimeSettings.defaultFilenameFormat,
+      input.projectSlug ?? input.runtimeSettings.workspaceSlug
+    ),
+    translatedContent: null,
+    translatedBinaryBase64: Buffer.from(translatedArchive).toString("base64"),
+    mimeType:
+      input.format === "docx"
+        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        : "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    reviewContent: parsedDocument.previewText,
     warnings: [],
     detectedSourceLanguage,
     detectedTargetLanguage: input.targetLanguage,
@@ -366,12 +450,14 @@ async function translateUnits(input: {
 }
 
 function parseGenericDocument(
-  format: Exclude<ReturnType<typeof detectTranslationFileFormat>, "xliff" | null>,
+  format: Exclude<ReturnType<typeof detectTranslationFileFormat>, "xliff" | "docx" | "pptx" | null>,
   content: string
 ) {
   switch (format) {
     case "po":
       return parsePoDocument(content);
+    case "csv":
+      return parseCsvDocument(content);
     case "strings":
       return parseStringsDocument(content);
     case "resx":
@@ -382,7 +468,7 @@ function parseGenericDocument(
 }
 
 function serializeGenericDocument(
-  format: Exclude<ReturnType<typeof detectTranslationFileFormat>, "xliff" | null>,
+  format: Exclude<ReturnType<typeof detectTranslationFileFormat>, "xliff" | "docx" | "pptx" | null>,
   originalContent: string,
   parsedDocument: ReturnType<typeof parseGenericDocument>,
   translations: Map<string, string>
@@ -390,6 +476,8 @@ function serializeGenericDocument(
   switch (format) {
     case "po":
       return serializeTranslatedPo(originalContent, parsedDocument as ParsedPoDocument, translations);
+    case "csv":
+      return serializeTranslatedCsv(parsedDocument as ParsedCsvDocument, translations);
     case "strings":
       return serializeTranslatedStrings(originalContent, parsedDocument as ParsedStringsDocument, translations);
     case "resx":
@@ -416,6 +504,18 @@ function detectTranslationFileFormat(fileName: string) {
 
   if (/\.po$/i.test(fileName)) {
     return "po" as const;
+  }
+
+  if (/\.csv$/i.test(fileName)) {
+    return "csv" as const;
+  }
+
+  if (/\.docx$/i.test(fileName)) {
+    return "docx" as const;
+  }
+
+  if (/\.pptx$/i.test(fileName)) {
+    return "pptx" as const;
   }
 
   if (/\.strings$/i.test(fileName)) {

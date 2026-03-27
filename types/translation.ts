@@ -64,7 +64,10 @@ export interface TranslationContext {
 
 export interface TranslationApiSuccess {
   fileName: string;
-  translatedContent: string;
+  translatedContent: string | null;
+  translatedBinaryBase64?: string | null;
+  mimeType?: string;
+  reviewContent?: string | null;
   warnings: XliffWarning[];
   detectedSourceLanguage: string;
   detectedTargetLanguage: string;

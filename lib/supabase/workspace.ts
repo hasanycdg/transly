@@ -172,7 +172,7 @@ type ProjectFileRow = {
   id: string;
   project_id: string;
   name: string;
-  file_format?: "xliff" | "xlf" | "po" | "strings" | "resx" | "xml" | "txt";
+  file_format?: "xliff" | "xlf" | "po" | "strings" | "resx" | "xml" | "csv" | "txt" | "docx" | "pptx";
   source_language: string;
   target_language: string;
   status: "queued" | "processing" | "review" | "done" | "error";
@@ -2473,6 +2473,18 @@ function getFileFormat(fileName: string): NonNullable<ProjectFileRow["file_forma
 
   if (/\.xml$/i.test(fileName)) {
     return "xml";
+  }
+
+  if (/\.csv$/i.test(fileName)) {
+    return "csv";
+  }
+
+  if (/\.docx$/i.test(fileName)) {
+    return "docx";
+  }
+
+  if (/\.pptx$/i.test(fileName)) {
+    return "pptx";
   }
 
   if (/\.txt$/i.test(fileName)) {

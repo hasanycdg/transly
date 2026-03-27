@@ -16,7 +16,7 @@ export type ExpandedProjectUploadSelection = {
 };
 
 const ZIP_FILE_PATTERN = /\.zip$/i;
-const PROJECT_UPLOAD_FILE_PATTERN = /\.(xliff|xlf|po|strings|resx|xml|txt)$/i;
+const PROJECT_UPLOAD_FILE_PATTERN = /\.(xliff|xlf|po|strings|resx|xml|csv|txt|docx|pptx)$/i;
 
 export function isZipFileName(fileName: string) {
   return ZIP_FILE_PATTERN.test(fileName);
@@ -232,6 +232,18 @@ function getMimeType(fileName: string) {
 
   if (/\.xml$/i.test(fileName)) {
     return "application/xml";
+  }
+
+  if (/\.csv$/i.test(fileName)) {
+    return "text/csv";
+  }
+
+  if (/\.docx$/i.test(fileName)) {
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  }
+
+  if (/\.pptx$/i.test(fileName)) {
+    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
   }
 
   if (/\.txt$/i.test(fileName)) {

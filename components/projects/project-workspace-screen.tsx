@@ -44,7 +44,7 @@ type UploadedSourceFile = {
   id: string;
   file: File;
   name: string;
-  content: string;
+  content: string | null;
   words: number;
   lastUpdated: string;
   sourceArchiveName?: string;
@@ -132,12 +132,16 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           originalUnavailable: "Original nicht verfügbar",
           originalUnavailableDesc:
             "Lade diese Datei in der aktuellen Sitzung hoch oder wähle sie erneut aus, um den Originalinhalt hier zu prüfen.",
+          originalPreviewUnavailableDesc:
+            "Für DOCX- und PPTX-Dateien ist aktuell keine Original-Vorschau im Browser verfügbar. Die Übersetzung und der Download funktionieren trotzdem.",
           translated: "Übersetzt",
           translatedHelper: (targetLanguage: string) => `Erzeugte Ausgabe für ${targetLanguage.toUpperCase()}.`,
           translatedUnavailableHelper: "Übersetzter Inhalt ist nach einem erfolgreichen Übersetzungslauf verfügbar.",
           translatedUnavailable: "Übersetzung nicht verfügbar",
           translatedUnavailableDesc:
             "Starte die Übersetzung für diese Datei in der aktuellen Sitzung, um die übersetzte Ausgabe hier zu prüfen.",
+          translatedPreviewUnavailableDesc:
+            "Für dieses Dateiformat ist noch keine Browser-Vorschau verfügbar. Lade die fertige Datei herunter, um sie in Word oder PowerPoint zu prüfen.",
           workspaceStats: "/ Workspace-Statistiken",
           glossaryEnabled: "Glossar aktiv",
           yes: "Ja",
@@ -156,7 +160,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           selectFiles: "Wähle in Upload Files eine oder mehrere Übersetzungsdateien aus, bevor du einen Übersetzungslauf startest.",
           filesStillPreparing: "Dateien werden noch vorbereitet. Bitte in einem Moment erneut versuchen.",
           unsupportedFiles: (names: string) =>
-            `Aktuell unterstützt sind .xliff, .xlf, .po, .strings, .resx, .xml und .txt. Nicht unterstützte Dateien: ${names}.`,
+            `Aktuell unterstützt sind .xliff, .xlf, .po, .strings, .resx, .xml, .csv, .txt, .docx und .pptx. Nicht unterstützte Dateien: ${names}.`,
           noTargets: "Für dieses Projekt sind noch keine Zielsprachen konfiguriert.",
           translationFailed: "Übersetzung fehlgeschlagen.",
           translationSummary: (failed: number, succeeded: number) =>
@@ -214,11 +218,15 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           originalUnavailableHelper: "Original content is only available after uploading this file in the current session.",
           originalUnavailable: "Original unavailable",
           originalUnavailableDesc: "Upload or re-select this file in the current session to inspect the original source content here.",
+          originalPreviewUnavailableDesc:
+            "Original preview is not available in-browser yet for DOCX and PPTX. Translation and download still work.",
           translated: "Translated",
           translatedHelper: (targetLanguage: string) => `Generated output for ${targetLanguage.toUpperCase()}.`,
           translatedUnavailableHelper: "Translated content is available after a successful translation run.",
           translatedUnavailable: "Translation unavailable",
           translatedUnavailableDesc: "Run the translation for this file in the current session to inspect the translated output here.",
+          translatedPreviewUnavailableDesc:
+            "Browser preview is not available for this file type yet. Download the finished file to review it in Word or PowerPoint.",
           workspaceStats: "/ Workspace Stats",
           glossaryEnabled: "Glossary enabled",
           yes: "Yes",
@@ -237,7 +245,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
           selectFiles: "Select one or more translation files in Upload Files before starting a translation run.",
           filesStillPreparing: "Files are still being prepared. Try again in a second.",
           unsupportedFiles: (names: string) =>
-            `Currently supported formats are .xliff, .xlf, .po, .strings, .resx, .xml, and .txt. Unsupported files: ${names}.`,
+            `Currently supported formats are .xliff, .xlf, .po, .strings, .resx, .xml, .csv, .txt, .docx, and .pptx. Unsupported files: ${names}.`,
           noTargets: "This project has no target languages configured yet.",
           translationFailed: "Translation failed.",
           translationSummary: (failed: number, succeeded: number) =>
@@ -259,7 +267,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
       }
 
       autoDownloadedOutputIdsRef.current.add(output.id);
-      downloadTextFile(output.fileName, output.translatedContent, "application/xml;charset=utf-8");
+      downloadTranslationOutput(output);
     }
   }, [translationOutputs]);
 
@@ -294,14 +302,14 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
 
       const sourceSnapshots = await Promise.all(
         expandedSelection.files.map(async (file) => {
-          const content = await file.file.text();
+          const content = isOfficeTranslationFile(file.name) ? null : await file.file.text();
 
           return {
             id: getClientFileId(file.name, file.file),
             file: file.file,
             name: file.name,
             content,
-            words: estimateTranslationFileWordCount(file.name, content),
+            words: content ? estimateTranslationFileWordCount(file.name, content) : 0,
             lastUpdated: new Date(file.file.lastModified || Date.now()).toISOString(),
             sourceArchiveName: file.sourceArchiveName
           } satisfies UploadedSourceFile;
@@ -672,7 +680,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
   }
 
   function handleDownloadOutput(output: ProjectTranslationOutput) {
-    downloadTextFile(output.fileName, output.translatedContent, "application/xml;charset=utf-8");
+    downloadTranslationOutput(output);
   }
 
   function handleDownloadAllOutputs() {
@@ -698,7 +706,14 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
       );
 
       translationOutputs.forEach((output, index) => {
-        zip.file(archivePaths[index] ?? output.fileName, output.translatedContent);
+        const archivePath = archivePaths[index] ?? output.fileName;
+
+        if (output.translatedBinaryBase64) {
+          zip.file(archivePath, base64ToUint8Array(output.translatedBinaryBase64));
+          return;
+        }
+
+        zip.file(archivePath, output.translatedContent ?? "");
       });
 
       const bundle = await zip.generateAsync({ type: "blob" });
@@ -1016,7 +1031,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                       }
                       content={reviewSourceFile?.content ?? null}
                       emptyTitle={copy.originalUnavailable}
-                      emptyText={copy.originalUnavailableDesc}
+                      emptyText={isOfficeTranslationFile(reviewFile.name) ? copy.originalPreviewUnavailableDesc : copy.originalUnavailableDesc}
                     />
 
                     <ReviewContentPanel
@@ -1026,9 +1041,9 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
                           ? copy.translatedHelper(reviewFile.targetLanguage)
                           : copy.translatedUnavailableHelper
                       }
-                      content={reviewOutput?.translatedContent ?? null}
+                      content={reviewOutput?.reviewContent ?? reviewOutput?.translatedContent ?? null}
                       emptyTitle={copy.translatedUnavailable}
-                      emptyText={copy.translatedUnavailableDesc}
+                      emptyText={isOfficeTranslationFile(reviewFile.name) ? copy.translatedPreviewUnavailableDesc : copy.translatedUnavailableDesc}
                     />
                   </div>
                 </div>
@@ -1095,7 +1110,11 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
 }
 
 function isSupportedTranslationFile(fileName: string) {
-  return /\.(xliff|xlf|po|strings|resx|xml|txt)$/i.test(fileName);
+  return /\.(xliff|xlf|po|strings|resx|xml|csv|txt|docx|pptx)$/i.test(fileName);
+}
+
+function isOfficeTranslationFile(fileName: string) {
+  return /\.(docx|pptx)$/i.test(fileName);
 }
 
 function buildRuntimeFileId(sourceFileId: string, targetLanguage: string) {
@@ -1160,7 +1179,7 @@ function buildProjectFileSyncPayload(
       return {
         clientId: sourceFile.id,
         name: sourceFile.name,
-        content: sourceFile.content,
+        content: sourceFile.content ?? undefined,
         sourceLanguage: project.sourceLanguage,
         targetLanguage,
         words: runtimeState?.words ?? sourceFile.words,
@@ -1203,6 +1222,27 @@ function buildTranslationBundleFileName(projectId: string) {
 function downloadTextFile(fileName: string, content: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
   downloadBlob(fileName, blob);
+}
+
+function downloadTranslationOutput(output: ProjectTranslationOutput) {
+  if (output.translatedBinaryBase64) {
+    const mimeType = output.mimeType ?? "application/octet-stream";
+    downloadBlob(output.fileName, new Blob([base64ToUint8Array(output.translatedBinaryBase64)], { type: mimeType }));
+    return;
+  }
+
+  downloadTextFile(output.fileName, output.translatedContent ?? "", output.mimeType ?? "application/xml;charset=utf-8");
+}
+
+function base64ToUint8Array(value: string) {
+  const decoded = atob(value);
+  const result = new Uint8Array(decoded.length);
+
+  for (let index = 0; index < decoded.length; index += 1) {
+    result[index] = decoded.charCodeAt(index);
+  }
+
+  return result;
 }
 
 function downloadBlob(fileName: string, blob: Blob) {
