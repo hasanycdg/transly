@@ -17,7 +17,8 @@ import {
   assertWorkspaceHasCredits,
   getExactGlossaryTranslations,
   getTranslationRuntimeSettings,
-  recordFileTranslationUsage
+  recordFileTranslationUsage,
+  syncProjectFiles
 } from "@/lib/supabase/workspace";
 import { parseXliffDocument } from "@/lib/xliff/parser";
 import { serializeTranslatedXliff } from "@/lib/xliff/serializer";
@@ -212,6 +213,14 @@ async function translateXliffDocument(input: {
   });
 
   await recordFileTranslationUsage(requiredCredits);
+  await persistTranslatedProjectFile({
+    projectSlug: input.projectSlug,
+    fileName: input.fileName,
+    sourceLanguage: detectedSourceLanguage,
+    targetLanguage: input.targetLanguage,
+    words: requiredCredits,
+    xliffVersion: parsedDocument.version
+  });
 
   return {
     fileName: buildOutputFileName(
@@ -275,6 +284,13 @@ async function translateGenericDocument(input: {
   );
 
   await recordFileTranslationUsage(requiredCredits);
+  await persistTranslatedProjectFile({
+    projectSlug: input.projectSlug,
+    fileName: input.fileName,
+    sourceLanguage: detectedSourceLanguage,
+    targetLanguage: input.targetLanguage,
+    words: requiredCredits
+  });
 
   return {
     fileName: buildOutputFileName(
@@ -336,6 +352,13 @@ async function translateOfficeDocument(input: {
   );
 
   await recordFileTranslationUsage(requiredCredits);
+  await persistTranslatedProjectFile({
+    projectSlug: input.projectSlug,
+    fileName: input.fileName,
+    sourceLanguage: detectedSourceLanguage,
+    targetLanguage: input.targetLanguage,
+    words: requiredCredits
+  });
 
   return {
     fileName: buildOutputFileName(
@@ -553,6 +576,40 @@ function detectTranslationFileFormat(fileName: string) {
   }
 
   return null;
+}
+
+async function persistTranslatedProjectFile(input: {
+  projectSlug?: string;
+  fileName: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  words: number;
+  xliffVersion?: string;
+}) {
+  if (!input.projectSlug) {
+    return;
+  }
+
+  try {
+    await syncProjectFiles(input.projectSlug, [
+      {
+        clientId: buildProjectTranslationClientId(input.fileName, input.targetLanguage),
+        name: input.fileName,
+        sourceLanguage: input.sourceLanguage,
+        targetLanguage: input.targetLanguage,
+        words: input.words,
+        status: "Done",
+        progress: 100,
+        xliffVersion: input.xliffVersion ?? null
+      }
+    ]);
+  } catch (error) {
+    console.error("Failed to persist translated project file metadata.", error);
+  }
+}
+
+function buildProjectTranslationClientId(fileName: string, targetLanguage: string) {
+  return `server:${fileName.toLowerCase()}::${targetLanguage.toLowerCase()}`;
 }
 
 function buildOutputFileName(

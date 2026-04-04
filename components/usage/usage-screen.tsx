@@ -13,6 +13,7 @@ import { formatCompactNumber, formatPercent } from "@/lib/projects/formatters";
 import { StatusBadge } from "@/components/projects/status-badge";
 import type {
   UsageActivityFeedItem,
+  UsageBreakdownItem,
   UsageLanguageInsightItem,
   UsageProjectInsightItem,
   UsageScreenData,
@@ -294,6 +295,7 @@ export function UsageScreen({ data }: UsageScreenProps) {
 
         {activeTab === "breakdown" ? (
           <BreakdownTab
+            breakdown={data.breakdown}
             projectUsage={data.projectUsage}
             languageUsage={data.languageUsage}
             topFiles={data.topFiles}
@@ -329,10 +331,12 @@ function OverviewTab({
 }
 
 function BreakdownTab({
+  breakdown,
   projectUsage,
   languageUsage,
   topFiles
 }: {
+  breakdown: UsageBreakdownItem[];
   projectUsage: UsageProjectInsightItem[];
   languageUsage: UsageLanguageInsightItem[];
   topFiles: UsageTopFileItem[];
@@ -341,6 +345,13 @@ function BreakdownTab({
   const copy =
     locale === "de"
       ? {
+          cycleMix: "/ Breakdown mix",
+          cycleMixTitle: "Relative Nutzungssignale in diesem Zyklus",
+          cycleMixDescription:
+            "Zeigt Credits, Uploads, Exporte und Review-Sitzungen auf einer relativen Skala, damit du sofort siehst, was den Zyklus dominiert.",
+          relativeScale: "Relative Skala",
+          noBreakdown: "Noch keine Breakdown-Daten",
+          noBreakdownDesc: "Sobald Aktivität im Workspace vorliegt, erscheinen hier die wichtigsten Nutzungssignale.",
           usagePerProject: "/ Nutzung pro Projekt",
           whereUsageGoes: "Wohin der Großteil der Nutzung fließt",
           project: "Projekt",
@@ -362,6 +373,13 @@ function BreakdownTab({
           noFileActivityDesc: "Top-Dateien erscheinen nach Uploads und Übersetzungen im Workspace."
         }
       : {
+          cycleMix: "/ Breakdown mix",
+          cycleMixTitle: "Relative usage signals this cycle",
+          cycleMixDescription:
+            "Shows credits, uploads, exports, and review sessions on a relative scale so you can see what is dominating the cycle.",
+          relativeScale: "Relative scale",
+          noBreakdown: "No breakdown data yet",
+          noBreakdownDesc: "The most relevant usage signals will appear here as soon as the workspace has activity.",
           usagePerProject: "/ Usage per project",
           whereUsageGoes: "Where most usage is going",
           project: "Project",
@@ -383,158 +401,211 @@ function BreakdownTab({
           noFileActivityDesc: "Top files will appear after uploads and translations start moving through the workspace."
         };
   return (
-    <section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
-      <div className="rounded-[16px] border border-[var(--border)] bg-white">
+    <div className="space-y-6">
+      <section className="rounded-[16px] border border-[var(--border)] bg-white">
         <div className="border-b border-[var(--border-light)] px-5 py-4">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-            {copy.usagePerProject}
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+            {copy.cycleMix}
           </p>
           <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-            {copy.whereUsageGoes}
+            {copy.cycleMixTitle}
           </h2>
+          <p className="mt-2 max-w-[720px] text-[12px] leading-6 text-[var(--muted)]">
+            {copy.cycleMixDescription}
+          </p>
         </div>
 
-        {projectUsage.length > 0 ? (
-          <div className="overflow-hidden">
-            <div className="grid grid-cols-[minmax(0,1.6fr)_90px_80px_95px_110px] border-b border-[var(--border-light)] bg-[var(--background)] px-5 py-3">
-              {[copy.project, copy.files, copy.share, copy.used, copy.status].map((label) => (
-                <span
-                  key={label}
-                  className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-
-            {projectUsage.map((project) => (
+        {breakdown.length > 0 ? (
+          <div className="grid gap-4 px-5 py-5 md:grid-cols-2 xl:grid-cols-4">
+            {breakdown.map((item) => (
               <div
-                key={project.id}
-                className="grid grid-cols-[minmax(0,1.6fr)_90px_80px_95px_110px] items-center border-b border-[var(--border-light)] px-5 py-4 last:border-b-0"
+                key={item.label}
+                className="rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium text-[var(--foreground)]">
-                    {project.name}
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[12px] font-medium leading-5 text-[var(--foreground)]">
+                    {item.label}
                   </p>
-                  <p className="mt-1 truncate text-[11.5px] text-[var(--muted-soft)]">
-                    {project.languages}
-                  </p>
+                  <span className="shrink-0 text-[11px] text-[var(--muted-soft)]">
+                    {formatPercent(item.percent)}
+                  </span>
                 </div>
-                <div className="text-[12px] text-[var(--muted)]">{project.fileCount}</div>
-                <div className="text-[12px] text-[var(--muted)]">{formatPercent(project.sharePercent)}</div>
-                <div className="text-[12px] font-medium text-[var(--foreground)]">
-                  {formatCompactNumber(project.wordsUsed, locale)}
-                </div>
-                <div>
-                  <StatusBadge status={project.status} />
+                <p className="mt-4 text-[26px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">
+                  {item.value}
+                </p>
+                <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
+                  {copy.relativeScale}
+                </p>
+                <div className="mt-4 h-[6px] overflow-hidden rounded-full bg-[var(--border-light)]">
+                  <div
+                    className="h-full rounded-full bg-[var(--processing)]"
+                    style={{ width: `${clamp(item.percent, 0, 100)}%` }}
+                  />
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <EmptyState
-            title={copy.noProjectUsage}
-            description={copy.noProjectUsageDesc}
+            title={copy.noBreakdown}
+            description={copy.noBreakdownDesc}
           />
         )}
-      </div>
+      </section>
 
-      <div className="space-y-6">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
         <div className="rounded-[16px] border border-[var(--border)] bg-white">
           <div className="border-b border-[var(--border-light)] px-5 py-4">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              {copy.usagePerLanguage}
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+              {copy.usagePerProject}
             </p>
             <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-              {copy.targetLanguages}
+              {copy.whereUsageGoes}
             </h2>
           </div>
 
-          <div className="space-y-4 px-5 py-5">
-            {languageUsage.length > 0 ? (
-              languageUsage.map((language) => (
-                <div key={language.code}>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[13px] font-medium text-[var(--foreground)]">{language.label}</p>
-                      <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
-                        {copy.fileLabel(language.fileCount)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[13px] font-medium text-[var(--foreground)]">
-                        {formatCompactNumber(language.wordsUsed, locale)}
-                      </p>
-                      <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
-                        {formatPercent(language.sharePercent)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="h-[5px] overflow-hidden rounded-full bg-[var(--border-light)]">
-                    <div
-                      className="h-full rounded-full bg-[var(--processing)]"
-                      style={{ width: `${clamp(language.sharePercent, 0, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))
-            ) : (
-              <EmptyState
-                title={copy.noLanguageUsage}
-                description={copy.noLanguageUsageDesc}
-                compact
-              />
-            )}
-          </div>
-        </div>
+          {projectUsage.length > 0 ? (
+            <div className="overflow-hidden">
+              <div className="grid grid-cols-[minmax(0,1.6fr)_90px_80px_95px_110px] border-b border-[var(--border-light)] bg-[var(--background)] px-5 py-3">
+                {[copy.project, copy.files, copy.share, copy.used, copy.status].map((label) => (
+                  <span
+                    key={label}
+                    className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
 
-        <div className="rounded-[16px] border border-[var(--border)] bg-white">
-          <div className="border-b border-[var(--border-light)] px-5 py-4">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              {copy.topFiles}
-            </p>
-            <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-              {copy.topFilesTitle}
-            </h2>
-          </div>
-
-          <div className="space-y-3 px-5 py-5">
-            {topFiles.length > 0 ? (
-              topFiles.map((file) => (
+              {projectUsage.map((project) => (
                 <div
-                  key={file.id}
-                  className="rounded-[12px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4"
+                  key={project.id}
+                  className="grid grid-cols-[minmax(0,1.6fr)_90px_80px_95px_110px] items-center border-b border-[var(--border-light)] px-5 py-4 last:border-b-0"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-medium text-[var(--foreground)]">
-                        {file.name}
-                      </p>
-                      <p className="mt-1 truncate text-[11.5px] text-[var(--muted-soft)]">
-                        {file.projectName} · {file.languagePair}
-                      </p>
-                    </div>
-                    <StatusBadge status={file.status} />
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-[var(--foreground)]">
+                      {project.name}
+                    </p>
+                    <p className="mt-1 truncate text-[11.5px] text-[var(--muted-soft)]">
+                      {project.languages}
+                    </p>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 text-[11.5px] text-[var(--muted)]">
-                    <span>{file.updatedLabel}</span>
-                    <span className="font-medium text-[var(--foreground)]">
-                      {formatCompactNumber(file.wordsUsed, locale)} {copy.words}
-                    </span>
+                  <div className="text-[12px] text-[var(--muted)]">{project.fileCount}</div>
+                  <div className="text-[12px] text-[var(--muted)]">{formatPercent(project.sharePercent)}</div>
+                  <div className="text-[12px] font-medium text-[var(--foreground)]">
+                    {formatCompactNumber(project.wordsUsed, locale)}
+                  </div>
+                  <div>
+                    <StatusBadge status={project.status} />
                   </div>
                 </div>
-              ))
-            ) : (
-              <EmptyState
-                title={copy.noFileActivity}
-                description={copy.noFileActivityDesc}
-                compact
-              />
-            )}
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title={copy.noProjectUsage}
+              description={copy.noProjectUsageDesc}
+            />
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-[16px] border border-[var(--border)] bg-white">
+            <div className="border-b border-[var(--border-light)] px-5 py-4">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+                {copy.usagePerLanguage}
+              </p>
+              <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
+                {copy.targetLanguages}
+              </h2>
+            </div>
+
+            <div className="space-y-4 px-5 py-5">
+              {languageUsage.length > 0 ? (
+                languageUsage.map((language) => (
+                  <div key={language.code}>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[13px] font-medium text-[var(--foreground)]">{language.label}</p>
+                        <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
+                          {copy.fileLabel(language.fileCount)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[13px] font-medium text-[var(--foreground)]">
+                          {formatCompactNumber(language.wordsUsed, locale)}
+                        </p>
+                        <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
+                          {formatPercent(language.sharePercent)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="h-[5px] overflow-hidden rounded-full bg-[var(--border-light)]">
+                      <div
+                        className="h-full rounded-full bg-[var(--processing)]"
+                        style={{ width: `${clamp(language.sharePercent, 0, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState
+                  title={copy.noLanguageUsage}
+                  description={copy.noLanguageUsageDesc}
+                  compact
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[16px] border border-[var(--border)] bg-white">
+            <div className="border-b border-[var(--border-light)] px-5 py-4">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+                {copy.topFiles}
+              </p>
+              <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
+                {copy.topFilesTitle}
+              </h2>
+            </div>
+
+            <div className="space-y-3 px-5 py-5">
+              {topFiles.length > 0 ? (
+                topFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="rounded-[12px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-medium text-[var(--foreground)]">
+                          {file.name}
+                        </p>
+                        <p className="mt-1 truncate text-[11.5px] text-[var(--muted-soft)]">
+                          {file.projectName} · {file.languagePair}
+                        </p>
+                      </div>
+                      <StatusBadge status={file.status} />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 text-[11.5px] text-[var(--muted)]">
+                      <span>{file.updatedLabel}</span>
+                      <span className="font-medium text-[var(--foreground)]">
+                        {formatCompactNumber(file.wordsUsed, locale)} {copy.words}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState
+                  title={copy.noFileActivity}
+                  description={copy.noFileActivityDesc}
+                  compact
+                />
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }
 

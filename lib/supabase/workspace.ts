@@ -900,7 +900,7 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
   };
   const projectUsage = buildUsageProjectInsights(projects, creditsUsed, locale);
   const languageUsage = buildUsageLanguageInsights(projects, creditsUsed, locale);
-  const topFiles = buildUsageTopFiles(projects, locale);
+  const topFiles = buildUsageTopFiles(projects, creditsUsed, locale);
   const activity = buildUsageActivityFeed(projects, locale);
   const numberFormat = new Intl.NumberFormat(getIntlLocale(locale));
 
@@ -3651,23 +3651,30 @@ function buildUsageProjectInsights(
   totalUsed: number,
   locale: AppLocale
 ): UsageProjectInsightItem[] {
-  return projects
+  const usageDenominator = getUsageVolumeDenominator(projects, totalUsed);
+  const directProjectUsage = projects
     .map((project) => {
-      const translatedFiles = project.files.filter((file) => file.status !== "Queued");
-      const wordsUsed = translatedFiles.reduce((sum, file) => sum + file.words, 0);
+      const relevantFiles = project.files.filter((file) => file.words > 0);
+      const wordsUsed = relevantFiles.reduce((sum, file) => sum + file.words, 0) || Math.max(project.creditsUsed, 0);
 
       return {
         id: project.id,
         name: project.name,
         languages: project.targetLanguages.map((targetLanguage) => getLanguageLabel(targetLanguage, locale)).join(", "),
-        fileCount: translatedFiles.length,
+        fileCount: relevantFiles.length,
         wordsUsed,
-        sharePercent: totalUsed > 0 ? Math.round((wordsUsed / totalUsed) * 100) : 0,
+        sharePercent: usageDenominator > 0 ? Math.round((wordsUsed / usageDenominator) * 100) : 0,
         status: project.status
       };
     })
     .filter((project) => project.wordsUsed > 0)
     .sort((left, right) => right.wordsUsed - left.wordsUsed);
+
+  if (directProjectUsage.length > 0 || totalUsed <= 0) {
+    return directProjectUsage;
+  }
+
+  return buildEstimatedUsageProjectInsights(projects, totalUsed, usageDenominator, locale);
 }
 
 function buildUsageLanguageInsights(
@@ -3676,10 +3683,11 @@ function buildUsageLanguageInsights(
   locale: AppLocale
 ): UsageLanguageInsightItem[] {
   const aggregated = new Map<string, UsageLanguageInsightItem>();
+  const usageDenominator = getUsageVolumeDenominator(projects, totalUsed);
 
   for (const project of projects) {
     for (const file of project.files) {
-      if (file.status === "Queued") {
+      if (file.words <= 0) {
         continue;
       }
 
@@ -3697,19 +3705,25 @@ function buildUsageLanguageInsights(
     }
   }
 
-  return Array.from(aggregated.values())
+  const directLanguageUsage = Array.from(aggregated.values())
     .map((language) => ({
       ...language,
-      sharePercent: totalUsed > 0 ? Math.round((language.wordsUsed / totalUsed) * 100) : 0
+      sharePercent: usageDenominator > 0 ? Math.round((language.wordsUsed / usageDenominator) * 100) : 0
     }))
     .sort((left, right) => right.wordsUsed - left.wordsUsed);
+
+  if (directLanguageUsage.length > 0 || totalUsed <= 0) {
+    return directLanguageUsage;
+  }
+
+  return buildEstimatedUsageLanguageInsights(projects, totalUsed, usageDenominator, locale);
 }
 
-function buildUsageTopFiles(projects: ProjectRecord[], locale: AppLocale): UsageTopFileItem[] {
-  return projects
+function buildUsageTopFiles(projects: ProjectRecord[], totalUsed: number, locale: AppLocale): UsageTopFileItem[] {
+  const directTopFiles = projects
     .flatMap((project) =>
       project.files
-        .filter((file) => file.status !== "Queued")
+        .filter((file) => file.words > 0)
         .map((file) => ({
           id: file.id,
           name: file.name,
@@ -3722,6 +3736,148 @@ function buildUsageTopFiles(projects: ProjectRecord[], locale: AppLocale): Usage
     )
     .sort((left, right) => right.wordsUsed - left.wordsUsed)
     .slice(0, 8);
+
+  if (directTopFiles.length > 0 || totalUsed <= 0) {
+    return directTopFiles;
+  }
+
+  return buildEstimatedUsageTopFiles(projects, totalUsed, locale);
+}
+
+function getUsageVolumeDenominator(projects: ProjectRecord[], totalUsed: number) {
+  if (totalUsed > 0) {
+    return totalUsed;
+  }
+
+  const totalFileWords = projects.reduce(
+    (sum, project) => sum + project.files.reduce((projectSum, file) => projectSum + Math.max(file.words, 0), 0),
+    0
+  );
+
+  if (totalFileWords > 0) {
+    return totalFileWords;
+  }
+
+  return projects.reduce((sum, project) => sum + Math.max(project.creditsUsed, 0), 0);
+}
+
+function buildEstimatedUsageProjectInsights(
+  projects: ProjectRecord[],
+  totalUsed: number,
+  usageDenominator: number,
+  locale: AppLocale
+): UsageProjectInsightItem[] {
+  return getEstimatedUsageProjectAllocations(projects, totalUsed)
+    .map(({ project, wordsUsed }) => ({
+      id: project.id,
+      name: project.name,
+      languages: project.targetLanguages.map((targetLanguage) => getLanguageLabel(targetLanguage, locale)).join(", "),
+      fileCount: Math.max(project.files.length, 1),
+      wordsUsed,
+      sharePercent: usageDenominator > 0 ? Math.round((wordsUsed / usageDenominator) * 100) : 0,
+      status: project.status
+    }))
+    .sort((left, right) => right.wordsUsed - left.wordsUsed);
+}
+
+function buildEstimatedUsageLanguageInsights(
+  projects: ProjectRecord[],
+  totalUsed: number,
+  usageDenominator: number,
+  locale: AppLocale
+): UsageLanguageInsightItem[] {
+  const aggregated = new Map<string, UsageLanguageInsightItem>();
+
+  for (const { project, wordsUsed } of getEstimatedUsageProjectAllocations(projects, totalUsed)) {
+    const languages = Array.from(new Set(project.targetLanguages));
+
+    if (languages.length === 0) {
+      continue;
+    }
+
+    const baseWords = Math.floor(wordsUsed / languages.length);
+    const remainder = wordsUsed % languages.length;
+
+    languages.forEach((languageCode, index) => {
+      const existing = aggregated.get(languageCode) ?? {
+        code: languageCode,
+        label: getLanguageLabel(languageCode, locale),
+        fileCount: 0,
+        wordsUsed: 0,
+        sharePercent: 0
+      };
+
+      existing.fileCount += Math.max(
+        project.files.filter((file) => file.targetLanguage === languageCode).length,
+        1
+      );
+      existing.wordsUsed += baseWords + (index < remainder ? 1 : 0);
+      aggregated.set(languageCode, existing);
+    });
+  }
+
+  return Array.from(aggregated.values())
+    .map((language) => ({
+      ...language,
+      sharePercent: usageDenominator > 0 ? Math.round((language.wordsUsed / usageDenominator) * 100) : 0
+    }))
+    .filter((language) => language.wordsUsed > 0)
+    .sort((left, right) => right.wordsUsed - left.wordsUsed);
+}
+
+function buildEstimatedUsageTopFiles(
+  projects: ProjectRecord[],
+  totalUsed: number,
+  locale: AppLocale
+): UsageTopFileItem[] {
+  return getEstimatedUsageProjectAllocations(projects, totalUsed)
+    .flatMap(({ project, wordsUsed }) => {
+      const languages = Array.from(new Set(project.targetLanguages));
+
+      if (languages.length === 0) {
+        return [];
+      }
+
+      const baseWords = Math.floor(wordsUsed / languages.length);
+      const remainder = wordsUsed % languages.length;
+
+      return languages.map((targetLanguage, index) => ({
+        id: `${project.id}::estimated::${targetLanguage}`,
+        name: locale === "de" ? "Übersetzungsbatch (geschätzt)" : "Translation batch (estimated)",
+        projectName: project.name,
+        languagePair: `${getLanguageLabel(project.sourceLanguage, locale)} -> ${getLanguageLabel(targetLanguage, locale)}`,
+        wordsUsed: baseWords + (index < remainder ? 1 : 0),
+        status: "Done" as const,
+        updatedLabel: formatShortDate(new Date(project.lastUpdated), locale)
+      }));
+    })
+    .filter((file) => file.wordsUsed > 0)
+    .sort((left, right) => right.wordsUsed - left.wordsUsed)
+    .slice(0, 8);
+}
+
+function getEstimatedUsageProjectAllocations(projects: ProjectRecord[], totalUsed: number) {
+  const creditedProjects = projects
+    .map((project) => ({
+      project,
+      wordsUsed: Math.max(project.creditsUsed, 0)
+    }))
+    .filter((entry) => entry.wordsUsed > 0);
+
+  if (creditedProjects.length > 0) {
+    return creditedProjects;
+  }
+
+  if (totalUsed <= 0 || projects.length !== 1) {
+    return [];
+  }
+
+  return [
+    {
+      project: projects[0],
+      wordsUsed: totalUsed
+    }
+  ];
 }
 
 function buildUsageActivityFeed(projects: ProjectRecord[], locale: AppLocale): UsageActivityFeedItem[] {
