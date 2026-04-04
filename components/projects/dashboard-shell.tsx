@@ -14,6 +14,18 @@ type DashboardShellProps = {
   shellData: DashboardShellData;
 };
 
+type NavIconProps = {
+  className?: string;
+};
+
+type SidebarItem = {
+  label: string;
+  href: string;
+  icon: (props: NavIconProps) => ReactNode;
+  prefetch: boolean;
+  active?: boolean;
+};
+
 export function DashboardShell({ children, shellData }: DashboardShellProps) {
   const locale = useAppLocale();
   const pathname = usePathname();
@@ -37,6 +49,8 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           settings: "Einstellungen",
           projects: "Projekte",
           allProjects: "Alle Projekte",
+          workspaceSection: "Arbeitsbereich",
+          managementSection: "Verwalten",
           deleteProjectTitle: (projectName: string) => `${projectName} löschen`,
           deleteProjectConfirm: (projectName: string) =>
             `„${projectName}“ löschen? Das Projekt wird aus der Datenbank entfernt, archivierte Nutzungsstatistiken bleiben aber verfügbar.`,
@@ -56,6 +70,8 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           settings: "Settings",
           projects: "Projects",
           allProjects: "All projects",
+          workspaceSection: "Workspace",
+          managementSection: "Manage",
           deleteProjectTitle: (projectName: string) => `Delete ${projectName}`,
           deleteProjectConfirm: (projectName: string) =>
             `Delete "${projectName}"? The project will be removed from the database, but archived usage statistics will stay available.`,
@@ -65,13 +81,12 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           signOutFailed: "Sign-out failed.",
           planSuffix: "plan"
         };
-  const mainNavItems = [
+  const primaryNavItems: SidebarItem[] = [
     { label: copy.dashboard, href: "/dashboard", icon: HomeIcon, prefetch: shouldPrefetch },
     { label: copy.usage, href: "/usage", icon: UsageIcon, prefetch: false },
     { label: copy.glossary, href: "/glossary", icon: GlossaryIcon, prefetch: shouldPrefetch }
   ];
-  const [dashboardNavItem, ...secondaryNavItems] = mainNavItems;
-  const utilityNavItems = [
+  const utilityNavItems: SidebarItem[] = [
     {
       label: copy.notifications,
       href: "/notifications",
@@ -168,19 +183,40 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
     }
   }
 
-  function renderNavItem(item: (typeof mainNavItems)[number]) {
+  function isItemActive(item: SidebarItem) {
+    if (typeof item.active === "boolean") {
+      return item.active;
+    }
+
+    if (item.href === "/dashboard") {
+      return pathname === item.href;
+    }
+
+    return pathname.startsWith(item.href);
+  }
+
+  function renderNavItem(item: SidebarItem) {
     const Icon = item.icon;
-    const active = pathname.startsWith(item.href);
-    const className = [
-      "flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
-      active
-        ? "bg-[var(--background)] text-[var(--foreground)]"
-        : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-    ].join(" ");
+    const active = isItemActive(item);
 
     return (
-      <Link key={item.label} href={item.href} prefetch={item.prefetch} className={className}>
-        <Icon />
+      <Link
+        key={item.label}
+        href={item.href}
+        prefetch={item.prefetch}
+        className={[
+          "group flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-[12.5px] transition-colors",
+          active
+            ? "bg-[rgba(26,79,175,0.08)] font-semibold text-[var(--processing)]"
+            : "text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+        ].join(" ")}
+      >
+        <Icon
+          className={[
+            "h-[14px] w-[14px] shrink-0 transition-opacity",
+            active ? "opacity-100" : "opacity-70 group-hover:opacity-100"
+          ].join(" ")}
+        />
         <span>{item.label}</span>
       </Link>
     );
@@ -189,9 +225,9 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
   return (
     <div className="h-screen overflow-hidden bg-[var(--background)]">
       <div className="flex h-screen">
-        <aside className="hidden h-screen w-[212px] shrink-0 flex-col overflow-hidden border-r border-[var(--border)] bg-white lg:flex">
-          <div className="flex items-center gap-[9px] border-b border-[var(--border-light)] px-4 pb-4 pt-5">
-            <div className="flex h-6 w-6 items-center justify-center rounded-[5px] bg-[var(--foreground)] text-white">
+        <aside className="hidden h-screen w-[224px] shrink-0 flex-col overflow-hidden border-r border-[0.5px] border-[var(--border)] bg-white lg:flex">
+          <div className="flex items-center gap-[9px] border-b border-[0.5px] border-[var(--border-light)] px-4 py-4">
+            <div className="flex h-7 w-7 items-center justify-center rounded-[6px] bg-[var(--foreground)] text-white">
               <LogoIcon />
             </div>
             <span className="text-[14px] font-semibold tracking-[-0.3px] text-[var(--foreground)]">
@@ -199,36 +235,40 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
             </span>
           </div>
 
-          <div className="px-2 py-[10px]">
-            <div className="space-y-[1px] pt-[4px]">
-              {renderNavItem(dashboardNavItem)}
-            </div>
-            <button
-              type="button"
-              aria-expanded={projectsOpen}
-              onClick={() => setProjectsOpen((current) => !current)}
-              className={[
-                "mt-[1px] flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
-                projectsSectionActive
-                  ? "bg-[var(--background)] text-[var(--foreground)]"
-                  : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-              ].join(" ")}
-            >
-              <ProjectsIcon />
-              <span className="flex-1">{copy.projects}</span>
-              <ChevronIcon open={projectsOpen} />
-            </button>
-            {projectsOpen ? (
-              <div className="pb-[6px] pl-[18px] pt-[1px]">
-                <div className="space-y-[1px]">
+          <div className="flex-1 overflow-y-auto px-3 py-4">
+            <SidebarSection label={copy.workspaceSection}>
+              {primaryNavItems.slice(0, 1).map((item) => renderNavItem(item))}
+              <button
+                type="button"
+                aria-expanded={projectsOpen}
+                onClick={() => setProjectsOpen((current) => !current)}
+                className={[
+                  "group flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left text-[12.5px] transition-colors",
+                  projectsSectionActive
+                    ? "bg-[rgba(26,79,175,0.08)] font-semibold text-[var(--processing)]"
+                    : "text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                ].join(" ")}
+              >
+                <ProjectsIcon
+                  className={[
+                    "h-[14px] w-[14px] shrink-0 transition-opacity",
+                    projectsSectionActive ? "opacity-100" : "opacity-70 group-hover:opacity-100"
+                  ].join(" ")}
+                />
+                <span className="flex-1">{copy.projects}</span>
+                <ChevronIcon open={projectsOpen} />
+              </button>
+
+              {projectsOpen ? (
+                <div className="space-y-1 pl-6">
                   <Link
                     href="/projects"
                     prefetch={shouldPrefetch}
                     className={[
-                      "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
+                      "block truncate rounded-[7px] px-2.5 py-1.5 text-[12px] transition-colors",
                       pathname === "/projects"
-                        ? "font-medium text-[var(--foreground)]"
-                        : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                        ? "bg-[rgba(26,79,175,0.08)] font-medium text-[var(--processing)]"
+                        : "text-[var(--muted-soft)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                     ].join(" ")}
                   >
                     {copy.allProjects}
@@ -238,10 +278,10 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                     const active = pathname === `/projects/${project.id}`;
                     const isDeleting = deletingProjectId === project.id;
                     const linkClassName = [
-                      "block truncate rounded-[5px] px-2 py-[5px] text-[12.5px] transition",
+                      "block truncate rounded-[7px] px-2.5 py-1.5 text-[12px] transition-colors",
                       active
-                        ? "font-medium text-[var(--foreground)]"
-                        : "text-[rgba(17,17,16,0.42)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                        ? "bg-[rgba(26,79,175,0.08)] font-medium text-[var(--processing)]"
+                        : "text-[var(--muted-soft)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                     ].join(" ");
 
                     if (!hasMounted) {
@@ -263,10 +303,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                         <Link
                           href={`/projects/${project.id}`}
                           prefetch={shouldPrefetch}
-                          className={[
-                            linkClassName,
-                            "min-w-0 flex-1 pr-7"
-                          ].join(" ")}
+                          className={[linkClassName, "min-w-0 flex-1 pr-7"].join(" ")}
                           title={project.name}
                         >
                           {project.name}
@@ -284,7 +321,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                             "absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-[4px] text-[12px] leading-none transition",
                             isDeleting
                               ? "opacity-100 text-[var(--muted-soft)]"
-                              : "opacity-0 text-[rgba(17,17,16,0.34)] group-hover/project:opacity-100 hover:bg-[var(--background)] hover:text-[var(--foreground)] focus:opacity-100"
+                              : "opacity-0 text-[var(--muted-soft)] group-hover/project:opacity-100 hover:bg-[var(--background)] hover:text-[var(--foreground)] focus:opacity-100"
                           ].join(" ")}
                           title={copy.deleteProjectTitle(project.name)}
                         >
@@ -294,61 +331,39 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                     );
                   })}
                 </div>
-              </div>
-            ) : null}
-            <div className="space-y-[1px]">
-              {secondaryNavItems.map((item) => renderNavItem(item))}
-            </div>
+              ) : null}
+
+              {primaryNavItems.slice(1).map((item) => renderNavItem(item))}
+            </SidebarSection>
           </div>
 
-          <div className="mt-auto border-t border-[var(--border-light)]">
-            <div className="px-2 py-2">
-              <div className="space-y-[1px]">
-                {utilityNavItems.map((item) => {
-                  const Icon = item.icon;
-                  const className = [
-                    "flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
-                    item.active
-                      ? "bg-[var(--background)] text-[var(--foreground)]"
-                      : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                  ].join(" ");
+          <div className="border-t border-[0.5px] border-[var(--border-light)] p-3">
+            <SidebarSection label={copy.managementSection}>
+              {utilityNavItems.map((item) => renderNavItem(item))}
+            </SidebarSection>
 
-                  return (
-                    <Link key={item.label} href={item.href} prefetch={item.prefetch} className={className}>
-                      <Icon />
-                      <span>
-                        {item.label}
-                      </span>
-                    </Link>
-                  );
-                })}
+            <div className="flex items-center gap-3 rounded-[10px] border border-[0.5px] border-[var(--border)] bg-[var(--background)] px-3 py-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--foreground)] text-[10px] font-semibold text-white">
+                {shellData.workspaceAvatarLabel}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-medium text-[var(--foreground)]">
+                  {shellData.workspaceName}
+                </p>
+                <p className="truncate text-[11px] text-[var(--muted-soft)]">
+                  {shellData.workspacePlanName} {copy.planSuffix}
+                </p>
               </div>
             </div>
 
-            <div className="border-t border-[var(--border-light)] px-[14px] py-3">
-              <div className="flex items-center gap-[9px]">
-                <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[var(--foreground)] text-[10px] font-semibold text-white">
-                  {shellData.workspaceAvatarLabel}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-[12.5px] font-medium text-[var(--foreground)]">
-                    {shellData.workspaceName}
-                  </p>
-                  <p className="text-[11px] text-[var(--muted-soft)]">
-                    {shellData.workspacePlanName} {copy.planSuffix}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => void handleSignOut()}
-                disabled={isSigningOut}
-                className="mt-3 flex h-9 w-full items-center justify-center rounded-[8px] border border-[var(--border)] bg-white px-3 text-[12.5px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background)] disabled:cursor-progress disabled:opacity-70"
-              >
-                {isSigningOut ? copy.signingOut : copy.signOut}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              disabled={isSigningOut}
+              className="mt-2 flex h-8 w-full items-center justify-center rounded-[8px] border border-[0.5px] border-[var(--border)] bg-white px-3 text-[12px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background)] disabled:cursor-progress disabled:opacity-70"
+            >
+              {isSigningOut ? copy.signingOut : copy.signOut}
+            </button>
           </div>
         </aside>
 
@@ -357,6 +372,23 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
         </main>
       </div>
     </div>
+  );
+}
+
+function SidebarSection({
+  label,
+  children
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="mb-5">
+      <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]">
+        {label}
+      </p>
+      <div className="space-y-1">{children}</div>
+    </section>
   );
 }
 
@@ -373,97 +405,97 @@ function LogoIcon() {
   );
 }
 
-function ProjectsIcon() {
+function ProjectsIcon({ className }: NavIconProps) {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-      <rect x="1" y="1" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="4.75" height="4.75" rx="1.25" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="8.25" y="1" width="4.75" height="4.75" rx="1.25" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="1" y="8.25" width="4.75" height="4.75" rx="1.25" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="8.25" y="8.25" width="4.75" height="4.75" rx="1.25" stroke="currentColor" strokeWidth="1.2" />
     </svg>
   );
 }
 
-function HomeIcon() {
+function HomeIcon({ className }: NavIconProps) {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
       <path
-        d="M2 6.5 7.5 2l5.5 4.5v6a.5.5 0 0 1-.5.5H9v-3.5H6V13H2.5a.5.5 0 0 1-.5-.5v-6Z"
+        d="M2 6.1 7 2l5 4.1v5.4a.5.5 0 0 1-.5.5H8.2V8.8H5.8V12H2.5a.5.5 0 0 1-.5-.5V6.1Z"
         stroke="currentColor"
-        strokeWidth="1.3"
+        strokeWidth="1.2"
         strokeLinejoin="round"
       />
     </svg>
   );
 }
 
-function UsageIcon() {
+function UsageIcon({ className }: NavIconProps) {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-      <path d="M2 4h11M2 7.5h8M2 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M2 3.75h10M2 7h7M2 10.25h4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }
 
-function GlossaryIcon() {
+function GlossaryIcon({ className }: NavIconProps) {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
       <path
-        d="M7.5 1.5a6 6 0 100 12 6 6 0 000-12zM7.5 5v3l2 1.5"
+        d="M7 1.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM7 4.8v2.7l1.9 1.4"
         stroke="currentColor"
-        strokeWidth="1.3"
+        strokeWidth="1.2"
         strokeLinecap="round"
       />
     </svg>
   );
 }
 
-function SupportIcon() {
+function SupportIcon({ className }: NavIconProps) {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
       <path
-        d="M5 5.9A2.625 2.625 0 118.938 8.15c-.75.422-1.313.938-1.313 1.688M7.5 11.438h.01"
+        d="M4.85 5.45A2.45 2.45 0 1 1 8.53 7.5c-.7.39-1.23.86-1.23 1.55M7 10.68h.01"
         stroke="currentColor"
-        strokeWidth="1.3"
+        strokeWidth="1.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="7.5" cy="7.5" r="5.625" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="7" cy="7" r="5.25" stroke="currentColor" strokeWidth="1.2" />
     </svg>
   );
 }
 
-function BillingIcon() {
+function BillingIcon({ className }: NavIconProps) {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-      <rect x="1.5" y="2.5" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M1.5 5.25h12M4 9.25h3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="11" height="9" rx="1.75" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M1.5 5h11M3.8 8.6h3.2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }
 
-function BellIcon() {
+function BellIcon({ className }: NavIconProps) {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
       <path
-        d="M7.5 2.25a2.75 2.75 0 0 0-2.75 2.75v1.12c0 .53-.19 1.04-.54 1.44L3.1 8.82c-.53.6-.1 1.55.7 1.55h7.4c.8 0 1.23-.95.7-1.55l-1.11-1.26c-.35-.4-.54-.91-.54-1.44V5A2.75 2.75 0 0 0 7.5 2.25Z"
+        d="M7 2.25A2.5 2.5 0 0 0 4.5 4.75v1.02c0 .48-.17.94-.49 1.3l-1.01 1.15c-.49.55-.09 1.41.65 1.41h6.7c.74 0 1.14-.86.65-1.4l-1-1.16a1.93 1.93 0 0 1-.5-1.3V4.75A2.5 2.5 0 0 0 7 2.25Z"
         stroke="currentColor"
-        strokeWidth="1.3"
+        strokeWidth="1.2"
         strokeLinejoin="round"
       />
-      <path d="M6 12c.24.52.78.88 1.5.88S8.76 12.52 9 12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M5.75 11.25c.22.47.7.75 1.25.75s1.03-.28 1.25-.75" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }
 
-function SettingsIcon() {
+function SettingsIcon({ className }: NavIconProps) {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-      <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.3" />
+    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <circle cx="7" cy="7" r="1.85" stroke="currentColor" strokeWidth="1.2" />
       <path
-        d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M3.2 3.2l1 1M10.8 10.8l1 1M10.8 3.2l-1 1M3.2 10.8l1-1"
+        d="M7 1v1.4M7 11.6V13M1 7h1.4M11.6 7H13M3.2 3.2l.95.95M9.85 9.85l.95.95M9.85 3.2l-.95.95M3.2 9.85l.95-.95"
         stroke="currentColor"
-        strokeWidth="1.3"
+        strokeWidth="1.2"
         strokeLinecap="round"
       />
     </svg>
@@ -473,12 +505,12 @@ function SettingsIcon() {
 function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg
-      width="12"
-      height="12"
+      width="11"
+      height="11"
       viewBox="0 0 12 12"
       fill="none"
       aria-hidden="true"
-      className={["transition-transform", open ? "rotate-90" : ""].join(" ")}
+      className={["shrink-0 text-[var(--muted-soft)] transition-transform", open ? "rotate-90" : ""].join(" ")}
     >
       <path
         d="m4.5 2.5 3 3.5-3 3.5"

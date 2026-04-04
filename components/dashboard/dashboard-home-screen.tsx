@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import type { ReactNode } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
 import { StatusBadge } from "@/components/projects/status-badge";
@@ -50,11 +51,13 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
       )
         .filter((entry) => entry.files > 0 && entry.words > 0)
         .sort((left, right) => right.words - left.words || right.files - left.files)
-        .slice(0, 4);
+        .slice(0, 5);
 
     const projectSummaries = projects.map((project) => {
       const summary = getProjectSummary(project);
-      const processingFiles = project.files.filter((file) => file.status === "Processing" || file.status === "Queued").length;
+      const processingFiles = project.files.filter(
+        (file) => file.status === "Processing" || file.status === "Queued"
+      ).length;
       const reviewFiles = project.files.filter((file) => file.status === "Review").length;
       const failedFiles = project.files.filter((file) => file.status === "Error").length;
 
@@ -77,7 +80,6 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
     ).length;
     const filesInProgress = projectSummaries.reduce((sum, item) => sum + item.processingFiles, 0);
     const reviewQueue = projectSummaries.reduce((sum, item) => sum + item.reviewFiles, 0);
-    const completedFiles = projectSummaries.reduce((sum, item) => sum + item.summary.completedFiles, 0);
     const qualityProjects = projectSummaries.filter(({ project }) => project.qualityScore > 0);
     const averageQualityScore =
       qualityProjects.length > 0
@@ -89,7 +91,11 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
     const attentionProjects = projectSummaries
       .filter(
         ({ project, processingFiles, reviewFiles, failedFiles }) =>
-          project.status !== "Completed" || processingFiles > 0 || reviewFiles > 0 || failedFiles > 0
+          project.status === "In Review" ||
+          project.status === "Error" ||
+          processingFiles > 0 ||
+          reviewFiles > 0 ||
+          failedFiles > 0
       )
       .sort((left, right) => {
         if (right.attentionScore !== left.attentionScore) {
@@ -164,7 +170,6 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
       activeProjects,
       filesInProgress,
       reviewQueue,
-      completedFiles,
       averageQualityScore,
       attentionProjects,
       topLanguages,
@@ -172,516 +177,529 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
     };
   }, [home.recentTranslations, home.wordsThisMonth, projects]);
   const usagePercent = Math.max(0, Math.min(home.planPercent, 100));
+  const cycleRange = formatCycleRange(home.cycleStart, home.cycleEnd, locale);
   const copy =
     locale === "de"
       ? {
-          eyebrow: "/ Dashboard",
+          breadcrumb: "/ dashboard",
           heading: "Workspace Dashboard",
-          intro:
-            "Monatsverbrauch, Projektzustand und die zuletzt bewegten Übersetzungen auf einer operativen Startseite.",
-          currentCycle: "/ Aktueller Zyklus",
-          currentCycleIntro: "Verbrauch und Bewegung im laufenden Abrechnungszyklus.",
-          wordsThisMonth: "Wörter diesen Monat",
+          intro: "Verbrauch, operative Lage und die letzten Übersetzungen in einer kompakten Übersicht.",
+          usageAction: "Nutzung",
+          billingAction: "Abrechnung öffnen",
+          newProjectAction: "+ Neues Projekt",
+          wordsTranslated: "Wörter übersetzt",
           costThisMonth: "Kosten diesen Monat",
-          savingsVsAgency: "Eingesparte Kosten vs. klassische Agentur",
-          savingsMeta: "Verglichen mit einer Agentur-Basis von 0,12 € pro Wort.",
-          agencyBaseline: "Klassische Agentur",
-          usedOfLimit: "Verbrauch im aktuellen Limit",
-          remainingCredits: "Verbleibende Credits",
-          resetOn: "Reset am",
-          quickActions: "/ Schnellzugriffe",
-          quickActionsIntro: "Direkte Wege in die häufigsten Arbeitsflächen.",
-          createProject: "Projekt anlegen",
-          openUsage: "Nutzung öffnen",
-          openBilling: "Abrechnung öffnen",
-          dashboardHealth: "/ Operativer Zustand",
-          activeProjects: "Aktive Projekte",
-          activeProjectsMeta: (total: number) => `Von ${formatCompactNumber(total, locale)} insgesamt`,
-          filesInProgress: "Dateien in Bearbeitung",
-          filesInProgressMeta: (completed: number) => `${formatCompactNumber(completed, locale)} abgeschlossen`,
-          reviewQueue: "Review-Warteschlange",
-          reviewQueueMeta: (percent: number) => `${formatPercent(percent)} des Limits verbraucht`,
-          qualityAverage: "Ø Qualität",
-          qualityAverageMeta: "Über Projekte mit Score",
-          watchlist: "/ Projekte mit Aufmerksamkeit",
-          watchlistIntro: "Projekte mit offener Übersetzung, Review oder Fehlern.",
-          noWatchlist: "Aktuell ist kein Projekt mit offener Aufmerksamkeit vorhanden.",
-          processing: "In Bearbeitung",
+          savingsVsAgency: "Ersparnis vs. Agentur",
+          creditsRemaining: "Credits verbleibend",
+          agencyBaseline: "Agentur-Basis",
+          benchmarkNote: "Benchmark auf Basis von 0,12 € pro Wort.",
+          resetsOn: "Reset",
+          healthy: "Gesund",
+          limited: "Begrenzt",
+          projectsSection: "Projekte",
+          projectsAttention: "Projekte mit Aufmerksamkeit",
+          viewAll: "Alle anzeigen",
+          noAttention: "Keine weiteren Projekte brauchen Aufmerksamkeit.",
+          noAttentionCta: "Alle Projekte öffnen →",
+          processing: "Bearbeitung",
           review: "Review",
           failed: "Fehler",
-          progress: "Fortschritt",
-          topLanguages: "/ Zielsprachen mit Volumen",
-          topLanguagesIntro: "Welche Zielsprachen aktuell die meisten Credits binden.",
-          noLanguages: "Noch keine Zielsprachen mit verbrauchtem Volumen.",
-          filesLabel: "Dateien",
-          recentActivity: "/ Letzte Aktivität",
-          recentActivityIntro: "Die jüngsten Bewegungen quer durch den Workspace.",
+          operatingState: "Betriebszustand",
+          activeProjects: "Aktive Projekte",
+          filesInProgress: "Dateien in Bearbeitung",
+          reviewQueue: "Review-Warteschlange",
+          averageQuality: "Ø Qualität",
+          noDataYet: "Noch keine Daten",
+          recentActivity: "Letzte Aktivität",
           noActivity: "Noch keine Aktivität im Workspace.",
-          latestTranslations: "/ Letzte Übersetzungen",
-          latestTranslationsIntro: "Die zuletzt fertig gewordenen Übersetzungen im Workspace.",
-          noRecentTranslations: "Noch keine fertigen Übersetzungen in diesem Monat.",
-          goToProjects: "Zu Projekten",
-          utilizationHealthy: "Gesunder Bereich",
-          utilizationWarning: "Begrenzt verfügbar"
+          noActivityCta: "Projekte öffnen →",
+          languagesSection: "Sprachen",
+          targetLanguages: "Zielsprachen nach Volumen",
+          noLanguages: "Noch keine Zielsprachen mit Volumen.",
+          noLanguagesCta: "Datei hochladen, um zu starten →",
+          filesLabel: "Dateien",
+          translationsSection: "Übersetzungen",
+          latestTranslations: "Letzte Übersetzungen",
+          noTranslations: "Noch keine fertigen Übersetzungen in diesem Monat.",
+          noTranslationsCta: "Datei hochladen, um zu starten →"
         }
       : {
-          eyebrow: "/ Dashboard",
+          breadcrumb: "/ dashboard",
           heading: "Workspace Dashboard",
-          intro:
-            "Monthly usage, project state, and recently moved translations on one operational home screen.",
-          currentCycle: "/ Current cycle",
-          currentCycleIntro: "Consumption and movement inside the active billing cycle.",
-          wordsThisMonth: "Words this month",
+          intro: "Usage, operating state, and recent translations in one compact workspace view.",
+          usageAction: "Usage",
+          billingAction: "Open billing",
+          newProjectAction: "+ New project",
+          wordsTranslated: "Words translated",
           costThisMonth: "Cost this month",
-          savingsVsAgency: "Savings vs. a traditional agency",
-          savingsMeta: "Benchmarked against a EUR 0.12 per-word agency baseline.",
-          agencyBaseline: "Traditional agency",
-          usedOfLimit: "Used of current limit",
-          remainingCredits: "Credits remaining",
-          resetOn: "Resets on",
-          quickActions: "/ Quick actions",
-          quickActionsIntro: "Direct routes into the surfaces used most often.",
-          createProject: "Create project",
-          openUsage: "Open usage",
-          openBilling: "Open billing",
-          dashboardHealth: "/ Operating state",
+          savingsVsAgency: "Savings vs. agency",
+          creditsRemaining: "Credits remaining",
+          agencyBaseline: "Agency baseline",
+          benchmarkNote: "Benchmarked against EUR 0.12 per word.",
+          resetsOn: "Resets",
+          healthy: "Healthy",
+          limited: "Watch",
+          projectsSection: "Projects",
+          projectsAttention: "Projects needing attention",
+          viewAll: "View all",
+          noAttention: "No other projects need attention.",
+          noAttentionCta: "Open all projects →",
+          processing: "processing",
+          review: "review",
+          failed: "failed",
+          operatingState: "Operating state",
           activeProjects: "Active projects",
-          activeProjectsMeta: (total: number) => `Of ${formatCompactNumber(total, locale)} total`,
           filesInProgress: "Files in progress",
-          filesInProgressMeta: (completed: number) => `${formatCompactNumber(completed, locale)} completed`,
           reviewQueue: "Review queue",
-          reviewQueueMeta: (percent: number) => `${formatPercent(percent)} of plan consumed`,
-          qualityAverage: "Avg. quality",
-          qualityAverageMeta: "Across scored projects",
-          watchlist: "/ Projects needing attention",
-          watchlistIntro: "Projects with open translation, review, or failures.",
-          noWatchlist: "No project currently needs attention.",
-          processing: "Processing",
-          review: "Review",
-          failed: "Failed",
-          progress: "Progress",
-          topLanguages: "/ Target languages by volume",
-          topLanguagesIntro: "Which target languages currently consume the most credits.",
-          noLanguages: "No target languages have consumed volume yet.",
-          filesLabel: "files",
-          recentActivity: "/ Recent activity",
-          recentActivityIntro: "The latest movement across the workspace.",
+          averageQuality: "Avg. quality",
+          noDataYet: "No data yet",
+          recentActivity: "Recent activity",
           noActivity: "No workspace activity yet.",
-          latestTranslations: "/ Latest translations",
-          latestTranslationsIntro: "The most recently finished translations across the workspace.",
-          noRecentTranslations: "No completed translations yet this month.",
-          goToProjects: "Go to projects",
-          utilizationHealthy: "Healthy range",
-          utilizationWarning: "Limited headroom"
+          noActivityCta: "Open projects →",
+          languagesSection: "Languages",
+          targetLanguages: "Target languages by volume",
+          noLanguages: "No target language volume yet.",
+          noLanguagesCta: "Upload a file to get started →",
+          filesLabel: "files",
+          translationsSection: "Translations",
+          latestTranslations: "Latest translations",
+          noTranslations: "No completed translations this month.",
+          noTranslationsCta: "Upload a file to get started →"
         };
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--background)] px-7 py-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-[820px]">
-            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              {copy.eyebrow}
-            </span>
-            <h1 className="mt-2 text-[27px] font-semibold tracking-[-0.06em] text-[var(--foreground)]">
-              {copy.heading}
-            </h1>
-            <p className="mt-2 text-[12.5px] leading-6 text-[var(--muted)]">
-              {copy.intro}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/projects"
-              className="inline-flex items-center justify-center rounded-[10px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12.5px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
-            >
-              {copy.goToProjects}
-            </Link>
-          </div>
+    <div className="min-h-screen bg-[var(--background)]">
+      <header className="sticky top-0 z-10 flex h-12 items-center justify-between border-b-[0.5px] border-[var(--border)] bg-[var(--background)] px-6">
+        <p className="text-[11px] text-[var(--muted-soft)]">{copy.breadcrumb}</p>
+        <div className="flex items-center gap-2">
+          <TopbarAction href="/usage">{copy.usageAction}</TopbarAction>
+          <TopbarAction href="/billing">{copy.billingAction}</TopbarAction>
+          <TopbarAction href="/projects" tone="primary">
+            {copy.newProjectAction}
+          </TopbarAction>
         </div>
       </header>
 
-      <div className="flex flex-col gap-6 px-7 py-6">
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.85fr)]">
-          <div className="overflow-hidden rounded-[18px] border border-[var(--border)] bg-white">
-            <div className="grid gap-8 px-6 py-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
-              <div className="flex flex-col gap-6">
-                <div>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                    {copy.currentCycle}
-                  </p>
-                  <h2 className="mt-2 text-[34px] font-semibold tracking-[-0.08em] text-[var(--foreground)]">
-                    {formatCompactNumber(home.wordsThisMonth, locale)}
-                  </h2>
-                  <p className="mt-2 text-[12.5px] leading-6 text-[var(--muted)]">
-                    {copy.currentCycleIntro}
-                  </p>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <DashboardMetricPanel
-                    label={copy.wordsThisMonth}
-                    value={formatCompactNumber(home.wordsThisMonth, locale)}
-                  />
-                  <DashboardMetricPanel
-                    label={copy.costThisMonth}
-                    value={formatCurrency(home.costThisMonthCents / 100, locale)}
-                  />
-                  <DashboardMetricPanel
-                    label={copy.savingsVsAgency}
-                    value={formatCurrency(home.savingsVsAgencyCents / 100, locale)}
-                    meta={copy.savingsMeta}
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between gap-3 text-[12px]">
-                    <span className="text-[var(--muted)]">{copy.usedOfLimit}</span>
-                    <span className="font-medium text-[var(--foreground)]">
-                      {formatCompactNumber(home.creditsUsed, locale)} / {formatCompactNumber(home.creditsLimit, locale)}
-                    </span>
-                  </div>
-                  <div className="mt-3 h-[8px] overflow-hidden rounded-full bg-[var(--border-light)]">
-                    <div
-                      className={[
-                        "h-full rounded-full transition-[width]",
-                        usagePercent >= 80 ? "bg-[var(--review)]" : "bg-[var(--processing)]"
-                      ].join(" ")}
-                      style={{ width: `${usagePercent}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col justify-between rounded-[16px] border border-[var(--border)] bg-[var(--background)] p-5">
-                <div>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                      {copy.remainingCredits}
-                    </p>
-                    <span className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--foreground)]">
-                      {usagePercent >= 80 ? copy.utilizationWarning : copy.utilizationHealthy}
-                    </span>
-                  </div>
-                  <div className="mt-3 text-[34px] font-semibold leading-none tracking-[-0.08em] text-[var(--foreground)]">
-                    {formatCompactNumber(home.creditsRemaining, locale)}
-                  </div>
-                  <p className="mt-2 text-[12px] leading-6 text-[var(--muted)]">
-                    {copy.resetOn} {formatProjectDate(home.cycleEnd, locale)}
-                  </p>
-                </div>
-
-                <dl className="mt-8 space-y-3 border-t border-[var(--border)] pt-4 text-[12px]">
-                  <MetricRow
-                    label={copy.agencyBaseline}
-                    value={formatCurrency(home.agencyCostThisMonthCents / 100, locale)}
-                  />
-                  <MetricRow
-                    label={copy.costThisMonth}
-                    value={formatCurrency(home.costThisMonthCents / 100, locale)}
-                  />
-                  <MetricRow
-                    label={copy.usedOfLimit}
-                    value={formatPercent(home.planPercent)}
-                  />
-                </dl>
-              </div>
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-[18px] border border-[var(--border)] bg-white">
-            <div className="border-b border-[var(--border-light)] px-5 py-4">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                {copy.quickActions}
-              </p>
-              <p className="mt-2 text-[12px] leading-6 text-[var(--muted)]">
-                {copy.quickActionsIntro}
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 px-5 py-5">
-              <QuickActionLink href="/projects" label={copy.createProject} />
-              <QuickActionLink href="/usage" label={copy.openUsage} />
-              <QuickActionLink href="/billing" label={copy.openBilling} />
-            </div>
-          </div>
+      <div className="flex flex-col gap-6 p-6">
+        <section>
+          <h1 className="text-[20px] font-medium tracking-[-0.03em] text-[var(--foreground)]">
+            {copy.heading}
+          </h1>
+          <p className="mt-1 truncate text-[12px] text-[var(--muted)]">{copy.intro}</p>
         </section>
 
-        <section className="overflow-hidden rounded-[18px] border border-[var(--border)] bg-white">
-          <div className="border-b border-[var(--border-light)] px-6 py-4">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              {copy.dashboardHealth}
-            </p>
-          </div>
-          <div className="grid gap-0 md:grid-cols-2 xl:grid-cols-4">
-            <OperationalStat
-              label={copy.activeProjects}
-              value={formatCompactNumber(insights.activeProjects, locale)}
-              meta={copy.activeProjectsMeta(projects.length)}
-            />
-            <OperationalStat
-              label={copy.filesInProgress}
-              value={formatCompactNumber(insights.filesInProgress, locale)}
-              meta={copy.filesInProgressMeta(insights.completedFiles)}
-            />
-            <OperationalStat
-              label={copy.reviewQueue}
-              value={formatCompactNumber(insights.reviewQueue, locale)}
-              meta={copy.reviewQueueMeta(home.planPercent)}
-            />
-            <OperationalStat
-              label={copy.qualityAverage}
-              value={insights.averageQualityScore > 0 ? `${insights.averageQualityScore}/100` : "0"}
-              meta={copy.qualityAverageMeta}
-            />
-          </div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricSurface
+            title={copy.wordsTranslated}
+            value={formatCompactNumber(home.wordsThisMonth, locale)}
+            detail={cycleRange}
+          />
+          <MetricSurface
+            title={copy.costThisMonth}
+            value={formatCurrency(home.costThisMonthCents / 100, locale)}
+            detail={`${copy.agencyBaseline} ${formatCurrency(home.agencyCostThisMonthCents / 100, locale)}`}
+          />
+          <MetricSurface
+            title={copy.savingsVsAgency}
+            value={formatCurrency(home.savingsVsAgencyCents / 100, locale)}
+            detail={copy.benchmarkNote}
+          />
+          <CreditsMetricSurface
+            title={copy.creditsRemaining}
+            value={`${formatCompactNumber(home.creditsRemaining, locale)} / ${formatCompactNumber(home.creditsLimit, locale)}`}
+            progress={usagePercent}
+            resetLabel={`${copy.resetsOn} ${formatProjectDate(home.cycleEnd, locale)}`}
+            badgeLabel={usagePercent >= 80 ? copy.limited : copy.healthy}
+            badgeTone={usagePercent >= 80 ? "warning" : "healthy"}
+          />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <div className="overflow-hidden rounded-[18px] border border-[var(--border)] bg-white">
-            <div className="border-b border-[var(--border-light)] px-6 py-4">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                {copy.watchlist}
-              </p>
-              <p className="mt-2 text-[12px] leading-6 text-[var(--muted)]">
-                {copy.watchlistIntro}
-              </p>
-            </div>
-            <div className="px-6 py-3">
-              {insights.attentionProjects.length > 0 ? (
-                insights.attentionProjects.map(({ project, summary, processingFiles, reviewFiles, failedFiles }) => (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    className="grid gap-4 border-b border-[var(--border-light)] py-4 transition hover:opacity-85 last:border-b-0 md:grid-cols-[minmax(0,1fr)_auto]"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div>
+            <SectionLabel>{copy.projectsSection}</SectionLabel>
+            <Card>
+              <CardHeader
+                title={copy.projectsAttention}
+                action={
+                  <Link href="/projects" className="text-[12px] font-medium text-[var(--processing)] transition hover:opacity-80">
+                    {copy.viewAll}
+                  </Link>
+                }
+              />
+              <div className="px-4 py-1">
+                {insights.attentionProjects.length > 0 ? (
+                  insights.attentionProjects.map(({ project, summary, processingFiles, reviewFiles, failedFiles }) => (
+                    <Link
+                      key={project.id}
+                      href={`/projects/${project.id}`}
+                      className="grid gap-4 border-b-[0.5px] border-[var(--border-light)] py-4 transition hover:opacity-85 last:border-b-0 md:grid-cols-[minmax(0,1fr)_minmax(220px,0.9fr)] md:items-center"
+                    >
+                      <div className="min-w-0">
                         <p className="truncate text-[13px] font-medium text-[var(--foreground)]">
                           {project.name}
                         </p>
+                        <p className="mt-1 text-[12px] text-[var(--muted)]">
+                          {processingFiles} {copy.processing} · {reviewFiles} {copy.review} · {failedFiles} {copy.failed}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 md:justify-end">
+                        <div className="min-w-[110px] flex-1 md:max-w-[160px]">
+                          <div className="h-1 overflow-hidden rounded-full bg-[var(--border-light)]">
+                            <div
+                              className={["h-full rounded-full", getAttentionProgressTone(project.status, failedFiles, reviewFiles)].join(" ")}
+                              style={{ width: `${Math.max(0, Math.min(summary.overallProgress, 100))}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className="w-10 text-right text-[12px] font-medium text-[var(--foreground)]">
+                          {summary.overallProgress}%
+                        </span>
                         <StatusBadge status={project.status} />
                       </div>
-                      <p className="mt-1 text-[11.5px] text-[var(--muted)]">
-                        {processingFiles} {copy.processing} · {reviewFiles} {copy.review} · {failedFiles} {copy.failed}
-                      </p>
-                    </div>
-                    <div className="text-left md:text-right">
-                      <p className="text-[12px] font-medium text-[var(--foreground)]">
-                        {summary.overallProgress}%
-                      </p>
-                      <p className="mt-1 text-[11px] text-[var(--muted-soft)]">
-                        {copy.progress}
-                      </p>
-                    </div>
-                  </Link>
-                ))
-              ) : (
-                <div className="py-8 text-[12px] text-[var(--muted-soft)]">
-                  {copy.noWatchlist}
-                </div>
-              )}
-            </div>
+                    </Link>
+                  ))
+                ) : (
+                  <EmptyState href="/projects" message={copy.noAttention} cta={copy.noAttentionCta} />
+                )}
+              </div>
+            </Card>
           </div>
 
           <div className="flex flex-col gap-6">
-            <div className="overflow-hidden rounded-[18px] border border-[var(--border)] bg-white">
-              <div className="border-b border-[var(--border-light)] px-5 py-4">
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  {copy.topLanguages}
-                </p>
-                <p className="mt-2 text-[12px] leading-6 text-[var(--muted)]">
-                  {copy.topLanguagesIntro}
-                </p>
+            <Card>
+              <CardHeader title={copy.operatingState} />
+              <div className="px-4 py-1">
+                <StateRow
+                  label={copy.activeProjects}
+                  value={insights.activeProjects > 0 ? formatCompactNumber(insights.activeProjects, locale) : null}
+                  emptyLabel={copy.noDataYet}
+                />
+                <StateRow
+                  label={copy.filesInProgress}
+                  value={insights.filesInProgress > 0 ? formatCompactNumber(insights.filesInProgress, locale) : null}
+                  emptyLabel={copy.noDataYet}
+                />
+                <StateRow
+                  label={copy.reviewQueue}
+                  value={insights.reviewQueue > 0 ? formatCompactNumber(insights.reviewQueue, locale) : null}
+                  emptyLabel={copy.noDataYet}
+                />
+                <StateRow
+                  label={copy.averageQuality}
+                  value={insights.averageQualityScore > 0 ? `${insights.averageQualityScore}/100` : null}
+                  emptyLabel={copy.noDataYet}
+                />
               </div>
-              <div className="px-5 py-3">
-                {insights.topLanguages.length > 0 ? (
-                  insights.topLanguages.map((language) => (
-                    <div
-                      key={language.code}
-                      className="flex items-center justify-between gap-3 border-b border-[var(--border-light)] py-3 last:border-b-0"
-                    >
-                      <div>
-                        <p className="text-[13px] font-medium text-[var(--foreground)]">
-                          {getLanguageLabel(language.code, locale)}
-                        </p>
-                        <p className="mt-1 text-[11.5px] text-[var(--muted)]">
-                          {formatCompactNumber(language.files, locale)} {copy.filesLabel}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[12px] font-medium text-[var(--foreground)]">
-                          {formatCompactNumber(language.words, locale)}
-                        </p>
-                        <p className="mt-1 text-[11px] text-[var(--muted-soft)]">
-                          {formatPercent(home.wordsThisMonth > 0 ? (language.words / home.wordsThisMonth) * 100 : 0)}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-8 text-[12px] text-[var(--muted-soft)]">
-                    {copy.noLanguages}
-                  </div>
-                )}
-              </div>
-            </div>
+            </Card>
 
-            <div className="overflow-hidden rounded-[18px] border border-[var(--border)] bg-white">
-              <div className="border-b border-[var(--border-light)] px-5 py-4">
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-                  {copy.recentActivity}
-                </p>
-                <p className="mt-2 text-[12px] leading-6 text-[var(--muted)]">
-                  {copy.recentActivityIntro}
-                </p>
-              </div>
-              <div className="px-5 py-3">
+            <Card>
+              <CardHeader title={copy.recentActivity} />
+              <div className="px-4 py-1">
                 {insights.recentActivity.length > 0 ? (
                   insights.recentActivity.map((activity) => (
                     <Link
                       key={activity.id}
                       href={`/projects/${activity.projectId}`}
-                      className="block border-b border-[var(--border-light)] py-3 transition hover:opacity-85 last:border-b-0"
+                      className="flex gap-3 border-b-[0.5px] border-[var(--border-light)] py-4 transition hover:opacity-85 last:border-b-0"
                     >
-                      <p className="text-[13px] font-medium text-[var(--foreground)]">
-                        {activity.title}
-                      </p>
-                      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">
-                        {activity.projectName} · {activity.detail}
-                      </p>
-                      <p className="mt-2 text-[11px] text-[var(--muted-soft)]">
-                        {formatProjectDate(activity.timestamp, locale)}
-                      </p>
+                      <span className="mt-[5px] h-2 w-2 shrink-0 rounded-full bg-[var(--success)]" />
+                      <div className="min-w-0">
+                        <p className="text-[12.5px] text-[var(--foreground)]">
+                          {activity.title} · {activity.projectName} · {activity.detail}
+                        </p>
+                        <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
+                          {formatProjectDate(activity.timestamp, locale)}
+                        </p>
+                      </div>
                     </Link>
                   ))
                 ) : (
-                  <div className="py-8 text-[12px] text-[var(--muted-soft)]">
-                    {copy.noActivity}
-                  </div>
+                  <EmptyState href="/projects" message={copy.noActivity} cta={copy.noActivityCta} />
                 )}
               </div>
+            </Card>
+          </div>
+        </section>
+
+        <section>
+          <SectionLabel>{copy.languagesSection}</SectionLabel>
+          <Card>
+            <CardHeader title={copy.targetLanguages} />
+            <div className="px-4 py-1">
+              {insights.topLanguages.length > 0 ? (
+                insights.topLanguages.map((language) => {
+                  const sharePercent = home.wordsThisMonth > 0 ? (language.words / home.wordsThisMonth) * 100 : 0;
+
+                  return (
+                    <div
+                      key={language.code}
+                      className="grid gap-4 border-b-[0.5px] border-[var(--border-light)] py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_110px]"
+                    >
+                      <div>
+                        <p className="text-[13px] font-medium text-[var(--foreground)]">
+                          {getLanguageLabel(language.code, locale)}
+                        </p>
+                        <p className="mt-1 text-[12px] text-[var(--muted)]">
+                          {formatCompactNumber(language.files, locale)} {copy.filesLabel}
+                        </p>
+                        <div className="mt-3 h-1 overflow-hidden rounded-full bg-[var(--border-light)]">
+                          <div
+                            className="h-full rounded-full bg-[var(--processing)]"
+                            style={{ width: `${Math.max(0, Math.min(sharePercent, 100))}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-left md:text-right">
+                        <p className="text-[12.5px] font-medium text-[var(--foreground)]">
+                          {formatCompactNumber(language.words, locale)}
+                        </p>
+                        <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
+                          {formatPercent(sharePercent)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <EmptyState href="/projects" message={copy.noLanguages} cta={copy.noLanguagesCta} />
+              )}
             </div>
-          </div>
+          </Card>
         </section>
 
-        <section className="overflow-hidden rounded-[18px] border border-[var(--border)] bg-white">
-          <div className="border-b border-[var(--border-light)] px-5 py-4">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              {copy.latestTranslations}
-            </p>
-            <p className="mt-2 text-[12px] leading-6 text-[var(--muted)]">
-              {copy.latestTranslationsIntro}
-            </p>
-          </div>
-
-          <div className="px-5 py-3">
-            {home.recentTranslations.length > 0 ? (
-              home.recentTranslations.map((translation) => (
-                <Link
-                  key={translation.id}
-                  href={`/projects/${translation.projectId}`}
-                  className="flex items-start justify-between gap-4 border-b border-[var(--border-light)] py-3 transition hover:opacity-80 last:border-b-0"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-medium text-[var(--foreground)]">
-                      {translation.fileName}
-                    </p>
-                    <p className="mt-1 text-[11.5px] text-[var(--muted)]">
-                      {translation.projectName} · {translation.sourceLanguage.toUpperCase()} → {translation.targetLanguage.toUpperCase()}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-[12px] font-medium text-[var(--foreground)]">
-                      {formatCompactNumber(translation.wordsUsed, locale)}
-                    </p>
-                    <p className="mt-1 text-[11px] text-[var(--muted-soft)]">
-                      {formatProjectDate(translation.timestamp, locale)}
-                    </p>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <div className="py-8 text-[12px] text-[var(--muted-soft)]">
-                {copy.noRecentTranslations}
-              </div>
-            )}
-          </div>
+        <section>
+          <SectionLabel>{copy.translationsSection}</SectionLabel>
+          <Card>
+            <CardHeader title={copy.latestTranslations} />
+            <div className="px-4 py-1">
+              {home.recentTranslations.length > 0 ? (
+                home.recentTranslations.map((translation) => (
+                  <Link
+                    key={translation.id}
+                    href={`/projects/${translation.projectId}`}
+                    className="flex items-start justify-between gap-4 border-b-[0.5px] border-[var(--border-light)] py-4 transition hover:opacity-85 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-medium text-[var(--foreground)]">
+                        {translation.fileName}
+                      </p>
+                      <p className="mt-1 text-[12px] text-[var(--muted)]">
+                        {translation.projectName} · {translation.sourceLanguage.toUpperCase()} →{" "}
+                        {translation.targetLanguage.toUpperCase()}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[12.5px] font-medium text-[var(--foreground)]">
+                        {formatCompactNumber(translation.wordsUsed, locale)}
+                      </p>
+                      <p className="mt-1 text-[11.5px] text-[var(--muted-soft)]">
+                        {formatProjectDate(translation.timestamp, locale)}
+                      </p>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <EmptyState href="/projects" message={copy.noTranslations} cta={copy.noTranslationsCta} />
+              )}
+            </div>
+          </Card>
         </section>
       </div>
     </div>
   );
 }
 
-function DashboardMetricPanel({
-  label,
-  value,
-  meta
-}: {
-  label: string;
-  value: string;
-  meta?: string;
-}) {
-  return (
-    <div className="rounded-[16px] border border-[var(--border)] bg-[var(--background)] px-5 py-5">
-      <div className="text-[30px] font-semibold leading-none tracking-[-0.08em] text-[var(--foreground)]">
-        {value}
-      </div>
-      <div className="mt-2 text-[12px] text-[var(--muted-soft)]">{label}</div>
-      {meta ? <div className="mt-2 text-[11.5px] leading-5 text-[var(--muted)]">{meta}</div> : null}
-    </div>
-  );
-}
-
-function OperationalStat({
-  label,
-  value,
-  meta
-}: {
-  label: string;
-  value: string;
-  meta: string;
-}) {
-  return (
-    <div className="border-b border-[var(--border-light)] px-6 py-5 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="text-[28px] font-semibold leading-none tracking-[-0.08em] text-[var(--foreground)]">
-        {value}
-      </div>
-      <div className="mt-2 text-[12px] text-[var(--muted-soft)]">{label}</div>
-      <div className="mt-1 text-[11.5px] text-[var(--muted)]">{meta}</div>
-    </div>
-  );
-}
-
-function MetricRow({
-  label,
-  value
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-[var(--muted-soft)]">{label}</dt>
-      <dd className="font-medium text-[var(--foreground)]">{value}</dd>
-    </div>
-  );
-}
-
-function QuickActionLink({
+function TopbarAction({
   href,
-  label
+  children,
+  tone = "ghost"
 }: {
   href: string;
-  label: string;
+  children: ReactNode;
+  tone?: "ghost" | "primary";
 }) {
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-between rounded-[12px] border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-[13px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
+      className={[
+        "inline-flex h-8 items-center justify-center rounded-[8px] px-3 text-[12px] font-medium transition-colors",
+        tone === "primary"
+          ? "bg-[var(--foreground)] text-white hover:opacity-90"
+          : "border border-[0.5px] border-[var(--border)] bg-white text-[var(--muted)] hover:text-[var(--foreground)]"
+      ].join(" ")}
     >
-      <span>{label}</span>
-      <span aria-hidden="true">→</span>
+      {children}
     </Link>
   );
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]">
+      {children}
+    </p>
+  );
+}
+
+function Card({ children }: { children: ReactNode }) {
+  return <section className="overflow-hidden rounded-[10px] border-[0.5px] border-[var(--border)] bg-white">{children}</section>;
+}
+
+function CardHeader({
+  title,
+  action
+}: {
+  title: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b-[0.5px] border-[var(--border-light)] px-4 py-3">
+      <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]">
+        {title}
+      </p>
+      {action}
+    </div>
+  );
+}
+
+function MetricSurface({
+  title,
+  value,
+  detail
+}: {
+  title: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <article className="rounded-[8px] bg-[var(--background-strong)] px-3 py-3">
+      <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]">
+        {title}
+      </p>
+      <p className="mt-3 text-[30px] font-medium leading-none tracking-[-0.05em] text-[var(--foreground)]">
+        {value}
+      </p>
+      <p className="mt-2 text-[12px] text-[var(--muted)]">{detail}</p>
+    </article>
+  );
+}
+
+function CreditsMetricSurface({
+  title,
+  value,
+  progress,
+  resetLabel,
+  badgeLabel,
+  badgeTone
+}: {
+  title: string;
+  value: string;
+  progress: number;
+  resetLabel: string;
+  badgeLabel: string;
+  badgeTone: "healthy" | "warning";
+}) {
+  return (
+    <article className="rounded-[8px] bg-[var(--background-strong)] px-3 py-3">
+      <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--muted-soft)]">
+        {title}
+      </p>
+      <p className="mt-3 text-[30px] font-medium leading-none tracking-[-0.05em] text-[var(--foreground)]">
+        {value}
+      </p>
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-[var(--border)]">
+        <div className="h-full rounded-full bg-[var(--processing)]" style={{ width: `${progress}%` }} />
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="text-[12px] text-[var(--muted)]">{resetLabel}</p>
+        <span
+          className={[
+            "inline-flex items-center rounded-full px-2 py-[2px] text-[10px] font-medium",
+            badgeTone === "healthy"
+              ? "bg-[var(--success-bg)] text-[var(--success)]"
+              : "bg-[var(--review-bg)] text-[var(--review)]"
+          ].join(" ")}
+        >
+          {badgeLabel}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function StateRow({
+  label,
+  value,
+  emptyLabel
+}: {
+  label: string;
+  value: string | null;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b-[0.5px] border-[var(--border-light)] py-3 last:border-b-0">
+      <span className="text-[12.5px] text-[var(--foreground)]">{label}</span>
+      {value ? (
+        <span className="text-[12.5px] font-medium text-[var(--foreground)]">{value}</span>
+      ) : (
+        <span className="text-[12px] text-[var(--muted-soft)]">{emptyLabel}</span>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({
+  href,
+  message,
+  cta
+}: {
+  href: string;
+  message: string;
+  cta: string;
+}) {
+  return (
+    <div className="px-2 py-8 text-center text-[12px] text-[var(--muted-soft)]">
+      <span>{message} </span>
+      <Link href={href} className="font-medium text-[var(--processing)] transition hover:opacity-80">
+        {cta}
+      </Link>
+    </div>
+  );
+}
+
+function getAttentionProgressTone(status: string, failedFiles: number, reviewFiles: number) {
+  if (status === "Error" || failedFiles > 0) {
+    return "bg-[var(--danger)]";
+  }
+
+  if (status === "In Review" || reviewFiles > 0) {
+    return "bg-[var(--review)]";
+  }
+
+  return "bg-[var(--processing)]";
+}
+
+function formatCycleRange(cycleStart: string, cycleEnd: string, locale: string) {
+  const start = new Date(cycleStart);
+  const end = new Date(cycleEnd);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return "";
+  }
+
+  if (locale === "de") {
+    const formatter = new Intl.DateTimeFormat("de-AT", {
+      day: "numeric",
+      month: "short"
+    });
+
+    return `${formatter.format(start)}–${formatter.format(end)}`;
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric"
+  });
+
+  return `${formatter.format(start)}–${formatter.format(end)}`;
 }
