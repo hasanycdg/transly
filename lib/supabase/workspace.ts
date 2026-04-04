@@ -4,6 +4,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import type { User } from "@supabase/supabase-js";
 
 import { mergeGlossaryTranslations, parseGlossaryCsv } from "@/lib/glossary/csv";
+import { containsGlossaryTerm, type GlossaryRuntimeEntry } from "@/lib/glossary/runtime";
 import {
   BILLING_PLANS,
   DEFAULT_WORKSPACE_PLAN_ID,
@@ -4311,61 +4312,139 @@ function formatLocaleSummary(locales: string[]) {
   return `${locales.slice(0, 4).join(", ")} +${locales.length - 4}`;
 }
 
-export async function getExactGlossaryTranslations(
-  sourceLanguage: string,
-  targetLanguage: string,
-  sourceTexts: string[]
-): Promise<Map<string, string>> {
+export async function getRelevantGlossaryEntries(input: {
+  sourceLanguage: string;
+  targetLanguage: string;
+  sourceTexts: string[];
+  projectSlug?: string;
+}): Promise<GlossaryRuntimeEntry[]> {
   noStore();
 
-  if (sourceTexts.length === 0) {
-    return new Map();
-  }
-
   const { supabase, workspace } = await getWorkspaceContext();
-  const normalizedSourceLanguage = sourceLanguage.trim().toLowerCase();
-  const normalizedTargetLanguage = targetLanguage.trim().toLowerCase();
+  const normalizedSourceLanguage = input.sourceLanguage.trim().toLowerCase();
+  const normalizedTargetLanguage = input.targetLanguage.trim().toLowerCase();
   const normalizedSourceTexts = Array.from(
     new Set(
-      sourceTexts
+      input.sourceTexts
         .map((value) => value.trim())
         .filter((value) => value.length > 0)
     )
   );
 
   if (normalizedSourceTexts.length === 0) {
-    return new Map();
+    return [];
   }
 
-  const { data: glossaryRows, error } = await supabase
+  let scopedProjectId: string | null = null;
+
+  if (input.projectSlug) {
+    const project = await getProjectRowBySlug(supabase, workspace.id, input.projectSlug);
+
+    if (!project || !project.glossary_enabled) {
+      return [];
+    }
+
+    scopedProjectId = project.id;
+  }
+
+  const { data: glossaryTermsData, error: glossaryTermsError } = await supabase
     .from("glossary_terms")
-    .select("source_term, status, glossary_term_translations(locale_code, translated_term)")
+    .select("id, source_term, is_protected")
     .eq("workspace_id", workspace.id)
     .eq("source_language", normalizedSourceLanguage)
-    .in("source_term", normalizedSourceTexts)
-    .in("status", ["approved", "review"]);
+    .eq("status", "approved");
 
-  if (error) {
-    throw new Error(`Failed to load glossary translations: ${error.message}`);
+  if (glossaryTermsError) {
+    throw new Error(`Failed to load glossary terms: ${glossaryTermsError.message}`);
   }
 
-  const result = new Map<string, string>();
-
-  for (const row of (glossaryRows as Array<{
+  const glossaryTerms = (glossaryTermsData as Array<{
+    id: string;
     source_term: string;
-    status: string;
-    glossary_term_translations: Array<{ locale_code: string; translated_term: string }> | null;
-  }> | null) ?? []) {
-    const exactMatch = row.glossary_term_translations?.find(
-      (translation) => translation.locale_code.toLowerCase() === normalizedTargetLanguage
-    );
+    is_protected: boolean;
+  }> | null) ?? [];
 
-    if (exactMatch?.translated_term?.trim()) {
-      result.set(row.source_term.trim(), exactMatch.translated_term.trim());
-    }
+  if (glossaryTerms.length === 0) {
+    return [];
   }
 
-  return result;
+  const termIds = glossaryTerms.map((term) => term.id);
+  const [{ data: translationsData, error: translationsError }, { data: linksData, error: linksError }] =
+    await Promise.all([
+      supabase
+        .from("glossary_term_translations")
+        .select("term_id, locale_code, translated_term")
+        .in("term_id", termIds)
+        .eq("locale_code", normalizedTargetLanguage),
+      supabase
+        .from("project_glossary_terms")
+        .select("project_id, term_id")
+        .in("term_id", termIds)
+    ]);
+
+  if (translationsError) {
+    throw new Error(`Failed to load glossary translations: ${translationsError.message}`);
+  }
+
+  if (linksError) {
+    throw new Error(`Failed to load glossary project links: ${linksError.message}`);
+  }
+
+  const translationsByTermId = groupBy(
+    (translationsData as Array<{
+      term_id: string;
+      locale_code: string;
+      translated_term: string;
+    }> | null) ?? [],
+    (translation) => translation.term_id
+  );
+  const linksByTermId = groupBy(
+    (linksData as Array<{
+      project_id: string;
+      term_id: string;
+    }> | null) ?? [],
+    (link) => link.term_id
+  );
+
+  return glossaryTerms
+    .flatMap((term) => {
+      const sourceTerm = term.source_term.trim();
+
+      if (!sourceTerm) {
+        return [];
+      }
+
+      const projectLinks = linksByTermId.get(term.id) ?? [];
+      const isSharedTerm = projectLinks.length === 0;
+      const matchesProjectScope = scopedProjectId
+        ? isSharedTerm || projectLinks.some((link) => link.project_id === scopedProjectId)
+        : isSharedTerm;
+
+      if (!matchesProjectScope) {
+        return [];
+      }
+
+      if (!normalizedSourceTexts.some((text) => containsGlossaryTerm(text, sourceTerm))) {
+        return [];
+      }
+
+      const translatedTerm = (translationsByTermId.get(term.id) ?? [])
+        .map((translation) => translation.translated_term.trim())
+        .find((value) => value.length > 0) ?? null;
+
+      if (!term.is_protected && !translatedTerm) {
+        return [];
+      }
+
+      return [
+        {
+          sourceTerm,
+          translatedTerm,
+          isProtected: term.is_protected
+        }
+      ];
+    })
+    .sort((left, right) => right.sourceTerm.length - left.sourceTerm.length);
 }
 
 function parseWorkspaceSettingsMetadata(value: Record<string, unknown> | null | undefined): WorkspaceSettingsMetadata {

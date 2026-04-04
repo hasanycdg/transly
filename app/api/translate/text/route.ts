@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { buildGlossaryMatchKey, maskProtectedGlossaryTerms } from "@/lib/glossary/runtime";
+import { containsMeaningfulText, maskProtectedTokens } from "@/lib/masking/tokens";
+import { restoreProtectedTokens } from "@/lib/masking/restore";
 import { countMeaningfulTextContent } from "@/lib/translation/word-count";
 import {
   assertWorkspaceHasCredits,
+  getRelevantGlossaryEntries,
   getTranslationRuntimeSettings,
   recordTextTranslationUsage
 } from "@/lib/supabase/workspace";
@@ -59,17 +63,57 @@ export async function POST(request: Request) {
     const provider = new OpenAITranslationProvider({
       model: runtimeSettings.translationModel
     });
-    const result = await provider.translateText({
-      text,
-      sourceLanguage,
-      targetLanguage,
-      toneStyle,
-      model: runtimeSettings.translationModel
-    });
+    const glossaryEntries =
+      runtimeSettings.useGlossaryAutomatically && sourceLanguage
+        ? await getRelevantGlossaryEntries({
+            sourceLanguage,
+            targetLanguage,
+            sourceTexts: [text]
+          })
+        : [];
+    const protectedGlossaryTerms = glossaryEntries
+      .filter((entry) => entry.isProtected)
+      .map((entry) => entry.sourceTerm);
+    const glossaryPromptEntries = glossaryEntries.flatMap((entry) =>
+      !entry.isProtected && entry.translatedTerm
+        ? [
+            {
+              sourceTerm: entry.sourceTerm,
+              translatedTerm: entry.translatedTerm
+            }
+          ]
+        : []
+    );
+    const maskedText = protectedGlossaryTerms.length > 0
+      ? maskProtectedGlossaryTerms(maskProtectedTokens(text), protectedGlossaryTerms)
+      : maskProtectedTokens(text);
+    const exactGlossaryTranslation = glossaryPromptEntries.find(
+      (entry) => buildGlossaryMatchKey(entry.sourceTerm) === buildGlossaryMatchKey(text)
+    );
+    let translatedText: string;
+    let detectedSourceLanguage = sourceLanguage ?? "auto";
+
+    if (exactGlossaryTranslation && runtimeSettings.strictGlossaryMode) {
+      translatedText = exactGlossaryTranslation.translatedTerm;
+    } else if (!containsMeaningfulText(maskedText.maskedText)) {
+      translatedText = text;
+    } else {
+      const result = await provider.translateText({
+        text: maskedText.maskedText,
+        sourceLanguage,
+        targetLanguage,
+        toneStyle,
+        model: runtimeSettings.translationModel,
+        glossaryEntries: glossaryPromptEntries
+      });
+
+      translatedText = restoreProtectedTokens(result.translatedText, maskedText.tokens);
+      detectedSourceLanguage = sourceLanguage ?? result.detectedSourceLanguage;
+    }
 
     const responsePayload: TextTranslationApiSuccess = {
-      translatedText: result.translatedText,
-      detectedSourceLanguage: result.detectedSourceLanguage,
+      translatedText,
+      detectedSourceLanguage,
       targetLanguage,
       toneStyle,
       wordCount,

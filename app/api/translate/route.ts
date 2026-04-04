@@ -10,12 +10,13 @@ import { parsePoDocument, serializeTranslatedPo, type ParsedPoDocument } from "@
 import { parseResxDocument, serializeTranslatedResx, type ParsedResxDocument } from "@/lib/file-formats/resx";
 import { parseStringsDocument, serializeTranslatedStrings, type ParsedStringsDocument } from "@/lib/file-formats/strings";
 import { parseTxtDocument, serializeTranslatedTxt, type ParsedTxtDocument } from "@/lib/file-formats/txt";
+import { buildGlossaryMatchKey, maskProtectedGlossaryTerms } from "@/lib/glossary/runtime";
 import { containsMeaningfulText, maskProtectedTokens } from "@/lib/masking/tokens";
 import { restoreProtectedTokens, unmaskString } from "@/lib/masking/restore";
 import { countWordsFromSourceTexts } from "@/lib/translation/word-count";
 import {
   assertWorkspaceHasCredits,
-  getExactGlossaryTranslations,
+  getRelevantGlossaryEntries,
   getTranslationRuntimeSettings,
   recordFileTranslationUsage,
   syncProjectFiles
@@ -187,6 +188,7 @@ async function translateXliffDocument(input: {
     targetLanguage: input.targetLanguage,
     provider: input.provider,
     runtimeSettings: input.runtimeSettings,
+    projectSlug: input.projectSlug,
     encodeExactGlossaryMatch: escapeXmlText
   });
 
@@ -273,7 +275,8 @@ async function translateGenericDocument(input: {
     sourceLanguage: detectedSourceLanguage,
     targetLanguage: input.targetLanguage,
     provider: input.provider,
-    runtimeSettings: input.runtimeSettings
+    runtimeSettings: input.runtimeSettings,
+    projectSlug: input.projectSlug
   });
   const translationMap = new Map(writebacks.map((writeback) => [writeback.id, writeback.value]));
   const translatedContent = serializeGenericDocument(
@@ -343,7 +346,8 @@ async function translateOfficeDocument(input: {
     sourceLanguage: detectedSourceLanguage,
     targetLanguage: input.targetLanguage,
     provider: input.provider,
-    runtimeSettings: input.runtimeSettings
+    runtimeSettings: input.runtimeSettings,
+    projectSlug: input.projectSlug
   });
   const translatedArchive = await serializeTranslatedOffice(
     input.originalBuffer,
@@ -394,22 +398,47 @@ async function translateUnits(input: {
   targetLanguage: string;
   provider: OpenAITranslationProvider;
   runtimeSettings: Awaited<ReturnType<typeof getTranslationRuntimeSettings>>;
+  projectSlug?: string;
   encodeExactGlossaryMatch?: (value: string) => string;
 }) {
   const maskedSegments = new Map<string, MaskedSegment>();
   const writebacks: Array<{ id: string; value: string; warning?: boolean }> = [];
-  const glossaryMatches = input.runtimeSettings.useGlossaryAutomatically
-    ? await getExactGlossaryTranslations(
-        input.sourceLanguage,
-        input.targetLanguage,
-        input.units.map((unit) => unit.sourceLookupText)
-      )
-    : new Map<string, string>();
+  const glossaryEntries = input.runtimeSettings.useGlossaryAutomatically
+    ? await getRelevantGlossaryEntries({
+        sourceLanguage: input.sourceLanguage,
+        targetLanguage: input.targetLanguage,
+        sourceTexts: input.units.map((unit) => unit.sourceLookupText),
+        projectSlug: input.projectSlug
+      })
+    : [];
+  const protectedGlossaryTerms = glossaryEntries
+    .filter((entry) => entry.isProtected)
+    .map((entry) => entry.sourceTerm);
+  const glossaryPromptEntries = glossaryEntries.flatMap((entry) =>
+    !entry.isProtected && entry.translatedTerm
+      ? [
+          {
+            sourceTerm: entry.sourceTerm,
+            translatedTerm: entry.translatedTerm
+          }
+        ]
+      : []
+  );
+  const strictGlossaryMatches = new Map(
+    glossaryPromptEntries.map((entry) => [
+      buildGlossaryMatchKey(entry.sourceTerm),
+      entry.translatedTerm
+    ])
+  );
   const translationItems = input.units.flatMap((unit) => {
-    const masked = maskProtectedTokens(unit.sourceText);
+    const masked = protectedGlossaryTerms.length > 0
+      ? maskProtectedGlossaryTerms(maskProtectedTokens(unit.sourceText), protectedGlossaryTerms)
+      : maskProtectedTokens(unit.sourceText);
     maskedSegments.set(unit.id, masked);
 
-    const exactGlossaryTranslation = glossaryMatches.get(unit.sourceLookupText.trim());
+    const exactGlossaryTranslation = strictGlossaryMatches.get(
+      buildGlossaryMatchKey(unit.sourceLookupText)
+    );
 
     if (exactGlossaryTranslation && input.runtimeSettings.strictGlossaryMode) {
       writebacks.push({
@@ -446,7 +475,8 @@ async function translateUnits(input: {
     targetLanguage: input.targetLanguage,
     model: input.runtimeSettings.translationModel,
     maxBatchItems: input.runtimeSettings.translationBatchSize,
-    toneStyle: input.runtimeSettings.toneStyle
+    toneStyle: input.runtimeSettings.toneStyle,
+    glossaryEntries: glossaryPromptEntries
   });
 
   for (const translatedItem of translatedItems) {

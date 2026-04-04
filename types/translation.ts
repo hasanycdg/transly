@@ -54,12 +54,18 @@ export interface TranslationBatchResult {
   translatedText: string;
 }
 
+export interface GlossaryPromptEntry {
+  sourceTerm: string;
+  translatedTerm: string;
+}
+
 export interface TranslationContext {
   sourceLanguage: string;
   targetLanguage: string;
   model?: string;
   maxBatchItems?: number;
   toneStyle?: string;
+  glossaryEntries?: GlossaryPromptEntry[];
 }
 
 export interface TranslationApiSuccess {

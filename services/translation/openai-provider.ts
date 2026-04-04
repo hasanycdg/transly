@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { chunkTranslationItems, type TranslationProvider } from "@/services/translation/provider";
 import { TranslationPipelineError } from "@/types/translation";
 import type {
+  GlossaryPromptEntry,
   TranslationBatchItem,
   TranslationBatchResult,
   TranslationContext
@@ -125,8 +126,15 @@ export class OpenAITranslationProvider implements TranslationProvider {
     sourceLanguage?: string;
     toneStyle?: string;
     model?: string;
+    glossaryEntries?: GlossaryPromptEntry[];
   }) {
     const normalizedSourceLanguage = normalizeLanguageToken(input.sourceLanguage);
+    const behaviorInstruction = buildBehaviorInstruction({
+      sourceLanguage: normalizedSourceLanguage ?? "auto",
+      targetLanguage: input.targetLanguage,
+      toneStyle: input.toneStyle,
+      glossaryEntries: input.glossaryEntries
+    });
     const completion = await this.client.chat.completions.create({
       model: input.model ?? this.model,
       temperature: 0.2,
@@ -141,8 +149,11 @@ export class OpenAITranslationProvider implements TranslationProvider {
             "Translate the user's text naturally and safely.",
             "Detect the source language if it is not provided.",
             "Return only valid JSON in this shape:",
-            '{"sourceLanguage":"en","translation":"translated text"}'
-          ].join("\n")
+            '{"sourceLanguage":"en","translation":"translated text"}',
+            behaviorInstruction
+          ]
+            .filter(Boolean)
+            .join("\n")
         },
         {
           role: "user",
@@ -293,11 +304,24 @@ function stripMarkdownFence(content: string): string {
 }
 
 function buildBehaviorInstruction(context: TranslationContext) {
-  if (!context.toneStyle) {
-    return "";
+  const instructions: string[] = [];
+
+  if (context.toneStyle) {
+    instructions.push(
+      `Favor a ${context.toneStyle.toLowerCase()} tone whenever the source text allows it, while keeping translations concise and structurally safe.`
+    );
   }
 
-  return `Favor a ${context.toneStyle.toLowerCase()} tone whenever the source text allows it, while keeping translations concise and structurally safe.`;
+  if (context.glossaryEntries && context.glossaryEntries.length > 0) {
+    instructions.push("Use these approved glossary mappings whenever the source contains the matching term:");
+    instructions.push(
+      ...context.glossaryEntries.map(
+        (entry) => `- ${entry.sourceTerm} => ${entry.translatedTerm}`
+      )
+    );
+  }
+
+  return instructions.join("\n");
 }
 
 function normalizeLanguageToken(value: string | undefined) {
