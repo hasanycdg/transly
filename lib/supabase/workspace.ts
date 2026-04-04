@@ -129,6 +129,7 @@ type WorkspaceSettingsMetadata = {
   spendingLimitEmail?: boolean;
   inAppNotifications?: boolean;
   stripeCustomerId?: string;
+  stripeCurrentPeriodStart?: string;
   stripeSubscriptionId?: string;
   stripeSubscriptionStatus?: string;
   stripePriceId?: string;
@@ -216,6 +217,15 @@ type BillingCycleRow = {
   status: "active" | "closed" | "projected";
 };
 
+type ResolvedUsageCycle = {
+  activeCycle: BillingCycleRow | null;
+  cycleStart: Date;
+  cycleEnd: Date;
+  cycleStartKey: string;
+  cycleEndKey: string;
+  activeCycleMatchesResolvedRange: boolean;
+};
+
 type DailyUsageRow = {
   usage_date: string;
   credits_used: number;
@@ -224,14 +234,6 @@ type DailyUsageRow = {
   export_count: number;
   review_sessions: number;
   active_projects: number;
-};
-
-type UsageBreakdownRow = {
-  metric_key: string;
-  metric_label: string;
-  metric_value: number;
-  share_percent: number | null;
-  sort_order: number;
 };
 
 type ArchivedDailyUsageRow = {
@@ -373,57 +375,70 @@ export async function getProjectsOverviewData(): Promise<ProjectsOverviewData> {
   noStore();
 
   const now = new Date();
-  const { supabase, workspace } = await getWorkspaceContext();
-  const [projects, { data: billingCycleData, error: billingError }, { data: monthlyUsageData, error: monthlyUsageError }] =
-    await Promise.all([
-      getProjectRecordsForWorkspace(supabase, workspace.id),
-      supabase
-        .from("workspace_billing_cycles")
-        .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
-        .eq("workspace_id", workspace.id)
-        .eq("status", "active")
-        .order("period_start", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("workspace_daily_usage")
-        .select("usage_date, credits_used")
-        .eq("workspace_id", workspace.id)
-        .gte("usage_date", formatDateKey(startOfCurrentMonth(now)))
-        .lte("usage_date", formatDateKey(endOfCurrentMonth(now)))
-    ]);
+  const { supabase, workspace, settings } = await getWorkspaceContext();
+  const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const [projects, { data: billingCycleData, error: billingError }] = await Promise.all([
+    getProjectRecordsForWorkspace(supabase, workspace.id),
+    supabase
+      .from("workspace_billing_cycles")
+      .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
+      .eq("workspace_id", workspace.id)
+      .eq("status", "active")
+      .order("period_start", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  ]);
 
   if (billingError) {
     throw new Error(`Failed to load dashboard billing cycle: ${billingError.message}`);
   }
 
-  if (monthlyUsageError) {
-    throw new Error(`Failed to load dashboard monthly usage: ${monthlyUsageError.message}`);
+  const activeCycle = billingCycleData as BillingCycleRow | null;
+  const resolvedCycle = resolveUsageCycleWindow({
+    activeCycle,
+    metadata,
+    workspaceCreatedAt: workspace.created_at,
+    now
+  });
+  const { data: cycleUsageData, error: cycleUsageError } = await supabase
+    .from("workspace_daily_usage")
+    .select("usage_date, credits_used")
+    .eq("workspace_id", workspace.id)
+    .gte("usage_date", resolvedCycle.cycleStartKey)
+    .lte("usage_date", resolvedCycle.cycleEndKey);
+
+  if (cycleUsageError) {
+    throw new Error(`Failed to load dashboard cycle usage: ${cycleUsageError.message}`);
   }
 
-  const activeCycle = billingCycleData as BillingCycleRow | null;
   const currentPlan = getBillingPlanDefinition(workspace.plan_name);
-  const monthlyUsageRows =
-    (monthlyUsageData as Pick<DailyUsageRow, "usage_date" | "credits_used">[] | null) ?? [];
-  const wordsThisMonth = monthlyUsageRows.length > 0
-    ? monthlyUsageRows.reduce((sum, row) => sum + row.credits_used, 0)
-    : Math.max(activeCycle?.credits_used ?? 0, 0);
+  const cycleUsageRows =
+    (cycleUsageData as Pick<DailyUsageRow, "usage_date" | "credits_used">[] | null) ?? [];
+  const cycleUsageTotal = cycleUsageRows.reduce((sum, row) => sum + row.credits_used, 0);
+  const wordsThisMonth = Math.max(
+    cycleUsageTotal,
+    resolvedCycle.activeCycleMatchesResolvedRange ? activeCycle?.credits_used ?? 0 : 0
+  );
   const creditsLimit = Math.max(activeCycle?.credits_limit ?? 0, currentPlan.creditsLimit);
-  const creditsUsed = Math.max(activeCycle?.credits_used ?? 0, wordsThisMonth);
+  const creditsUsed = wordsThisMonth;
   const creditsRemaining = Math.max(creditsLimit - creditsUsed, 0);
   const planPercent = creditsLimit > 0 ? Math.min((creditsUsed / creditsLimit) * 100, 100) : 0;
   const costThisMonthCents = Math.max(
-    activeCycle?.projected_spend_cents ?? 0,
+    resolvedCycle.activeCycleMatchesResolvedRange ? activeCycle?.projected_spend_cents ?? 0 : 0,
     currentPlan.basePriceCents
   );
   const agencyCostThisMonthCents = wordsThisMonth * AGENCY_BASELINE_RATE_CENTS_PER_WORD;
   const savingsVsAgencyCents = Math.max(agencyCostThisMonthCents - costThisMonthCents, 0);
-  const cycleStart = activeCycle?.period_start ?? startOfCurrentMonth(now).toISOString();
-  const cycleEnd = activeCycle?.period_end ?? endOfCurrentMonth(now).toISOString();
+  const cycleStart = resolvedCycle.cycleStart.toISOString();
+  const cycleEnd = resolvedCycle.cycleEnd.toISOString();
   const recentTranslations = projects
     .flatMap((project) =>
       project.files
-        .filter((file) => file.status === "Done" || file.status === "Review")
+        .filter(
+          (file) =>
+            (file.status === "Done" || file.status === "Review") &&
+            isTimestampWithinCycle(file.lastUpdated, resolvedCycle)
+        )
         .map((file) => ({
           id: `${project.id}-${file.id}`,
           projectId: project.id,
@@ -640,10 +655,12 @@ export async function assertWorkspaceHasCredits(requiredCredits: number) {
     return;
   }
 
-  const { supabase, workspace } = await getWorkspaceContext();
+  const { supabase, workspace, settings } = await getWorkspaceContext();
+  const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const now = new Date();
   const { data, error } = await supabase
     .from("workspace_billing_cycles")
-    .select("credits_limit, credits_used")
+    .select("period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
     .eq("workspace_id", workspace.id)
     .eq("status", "active")
     .order("period_start", { ascending: false })
@@ -654,10 +671,33 @@ export async function assertWorkspaceHasCredits(requiredCredits: number) {
     throw new Error(`Failed to load active billing cycle for credit validation: ${error.message}`);
   }
 
-  const activeCycle = data as Pick<BillingCycleRow, "credits_limit" | "credits_used"> | null;
+  const activeCycle = data as BillingCycleRow | null;
+  const resolvedCycle = resolveUsageCycleWindow({
+    activeCycle,
+    metadata,
+    workspaceCreatedAt: workspace.created_at,
+    now
+  });
+  const { data: cycleUsageData, error: cycleUsageError } = await supabase
+    .from("workspace_daily_usage")
+    .select("usage_date, credits_used")
+    .eq("workspace_id", workspace.id)
+    .gte("usage_date", resolvedCycle.cycleStartKey)
+    .lte("usage_date", resolvedCycle.cycleEndKey);
+
+  if (cycleUsageError) {
+    throw new Error(`Failed to load cycle usage for credit validation: ${cycleUsageError.message}`);
+  }
+
+  const cycleUsageRows =
+    (cycleUsageData as Pick<DailyUsageRow, "usage_date" | "credits_used">[] | null) ?? [];
+  const cycleUsageTotal = cycleUsageRows.reduce((sum, row) => sum + row.credits_used, 0);
   const planCreditsLimit = getBillingPlanDefinition(workspace.plan_name).creditsLimit;
   const creditsLimit = activeCycle?.credits_limit ?? workspace.credits_limit ?? planCreditsLimit ?? DEFAULT_CREDITS_LIMIT;
-  const creditsUsed = Math.max(activeCycle?.credits_used ?? 0, workspace.credits_used ?? 0);
+  const creditsUsed = Math.max(
+    resolvedCycle.activeCycleMatchesResolvedRange ? activeCycle?.credits_used ?? 0 : 0,
+    cycleUsageTotal
+  );
   const remainingCredits = Math.max(creditsLimit - creditsUsed, 0);
 
   if (requiredCredits > remainingCredits) {
@@ -798,90 +838,80 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
   const locale = metadata.preferredLocale ?? DEFAULT_APP_LOCALE;
   const now = new Date();
 
-  const [{ data: billingCycleData, error: billingError }, { data: dailyUsageData, error: usageError }, { data: breakdownData, error: breakdownError }, projects] =
-    await Promise.all([
-      supabase
-        .from("workspace_billing_cycles")
-        .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
-        .eq("workspace_id", workspace.id)
-        .order("period_start", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("workspace_daily_usage")
-        .select("usage_date, credits_used, api_requests, upload_count, export_count, review_sessions, active_projects")
-        .eq("workspace_id", workspace.id)
-        .order("usage_date", { ascending: false }),
-      supabase
-        .from("workspace_usage_breakdown")
-        .select("metric_key, metric_label, metric_value, share_percent, sort_order")
-        .eq("workspace_id", workspace.id)
-        .order("sort_order", { ascending: true }),
-      getProjectRecords()
-    ]);
+  const [{ data: billingCycleData, error: billingError }, projects] = await Promise.all([
+    supabase
+      .from("workspace_billing_cycles")
+      .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
+      .eq("workspace_id", workspace.id)
+      .eq("status", "active")
+      .order("period_start", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    getProjectRecords()
+  ]);
 
   if (billingError) {
     throw new Error(`Failed to load billing cycle data: ${billingError.message}`);
   }
 
+  const billingCycle = billingCycleData as BillingCycleRow | null;
+  const resolvedCycle = resolveUsageCycleWindow({
+    activeCycle: billingCycle,
+    metadata,
+    workspaceCreatedAt: workspace.created_at,
+    now
+  });
+  const { data: dailyUsageData, error: usageError } = await supabase
+    .from("workspace_daily_usage")
+    .select("usage_date, credits_used, api_requests, upload_count, export_count, review_sessions, active_projects")
+    .eq("workspace_id", workspace.id)
+    .gte("usage_date", resolvedCycle.cycleStartKey)
+    .lte("usage_date", resolvedCycle.cycleEndKey)
+    .order("usage_date", { ascending: true });
+
   if (usageError) {
     throw new Error(`Failed to load usage history: ${usageError.message}`);
   }
 
-  if (breakdownError) {
-    throw new Error(`Failed to load usage breakdown: ${breakdownError.message}`);
-  }
-
-  const billingCycle = billingCycleData as BillingCycleRow | null;
-  const usageRows = ((dailyUsageData as DailyUsageRow[] | null) ?? []).slice().reverse();
-  const breakdownRows = (breakdownData as UsageBreakdownRow[] | null) ?? [];
+  const usageRows = (dailyUsageData as DailyUsageRow[] | null) ?? [];
   const derivedUsage = deriveUsageFromProjects(projects, now);
   const activeProjects = projects.filter((project) => project.status !== "Completed").length;
   const reviewProjects = projects.filter((project) => project.status === "In Review").length;
-  const mergedUsageRows = mergeUsageRows(usageRows, derivedUsage.dailyRows, activeProjects);
-  const effectiveUsageRows = normalizeUsageRows(mergedUsageRows, now, activeProjects);
-
+  const derivedCycleRows = filterUsageRowsToCycle(derivedUsage.dailyRows, resolvedCycle);
+  const mergedUsageRows = mergeUsageRows(usageRows, derivedCycleRows, activeProjects);
+  const effectiveUsageRows = normalizeUsageRows(
+    mergedUsageRows,
+    resolvedCycle.cycleEnd < now ? resolvedCycle.cycleEnd : now,
+    activeProjects,
+    resolvedCycle.cycleStart
+  );
+  const mergedTotals = getUsageRowTotals(mergedUsageRows);
   const creditsLimit = billingCycle?.credits_limit ?? workspace.credits_limit ?? DEFAULT_CREDITS_LIMIT;
   const creditsUsed = Math.max(
-    billingCycle?.credits_used ?? 0,
-    workspace.credits_used ?? 0,
-    derivedUsage.creditsUsed,
-    mergedUsageRows.reduce((sum, row) => sum + row.credits_used, 0)
+    resolvedCycle.activeCycleMatchesResolvedRange ? billingCycle?.credits_used ?? 0 : 0,
+    mergedTotals.creditsUsed
   );
   const cycleConsumedPercent = creditsLimit > 0 ? Math.round((creditsUsed / creditsLimit) * 100) : 0;
-  const totalApiRequests = Math.max(
-    derivedUsage.totalApiRequests,
-    mergedUsageRows.reduce((sum, row) => sum + row.api_requests, 0)
-  );
-  const totalUploads = Math.max(
-    derivedUsage.totalUploads,
-    mergedUsageRows.reduce((sum, row) => sum + row.upload_count, 0)
-  );
-  const totalExports = Math.max(
-    derivedUsage.totalExports,
-    mergedUsageRows.reduce((sum, row) => sum + row.export_count, 0)
-  );
-  const totalReviews = Math.max(
-    derivedUsage.totalReviews,
-    mergedUsageRows.reduce((sum, row) => sum + row.review_sessions, 0)
-  );
+  const totalApiRequests = mergedTotals.apiRequests;
+  const totalUploads = mergedTotals.uploads;
   const today = formatDateKey(now);
   const todayRow = effectiveUsageRows.find((row) => row.usage_date === today);
   const yesterdayRow = effectiveUsageRows.find((row) => row.usage_date !== today) ?? null;
-  const trend = effectiveUsageRows.length > 0 ? effectiveUsageRows.map((row) => mapUsageTrendPoint(row, locale)) : buildEmptyUsageTrend(now, locale);
-  const breakdown = breakdownRows.length > 0 ? mapUsageBreakdownRows(breakdownRows, locale) : buildFallbackUsageBreakdown(totalUploads, totalExports, totalReviews, creditsUsed, locale);
-  const projectedSpend = billingCycle ? billingCycle.projected_spend_cents : 0;
-  const cycleStart = billingCycle?.period_start
-    ? new Date(`${billingCycle.period_start}T00:00:00.000Z`)
-    : startOfCurrentMonth(now);
-  const cycleEnd = billingCycle?.period_end
-    ? new Date(`${billingCycle.period_end}T00:00:00.000Z`)
-    : endOfCurrentMonth(now);
-  const updatedLabel = derivedUsage.lastUpdatedAt
-    ? formatUpdatedLabel(derivedUsage.lastUpdatedAt, locale)
-    : effectiveUsageRows.length > 0
-      ? formatUpdatedLabel(new Date(`${effectiveUsageRows.at(-1)?.usage_date}T18:00:00.000Z`), locale)
-      : formatUpdatedLabel(now, locale);
+  const trend =
+    effectiveUsageRows.length > 0
+      ? effectiveUsageRows.map((row) => mapUsageTrendPoint(row, locale))
+      : buildEmptyUsageTrend(now, locale);
+  const breakdown = buildCycleUsageBreakdown(mergedUsageRows, locale);
+  const projectedSpend =
+    resolvedCycle.activeCycleMatchesResolvedRange && billingCycle ? billingCycle.projected_spend_cents : 0;
+  const cycleStart = resolvedCycle.cycleStart;
+  const cycleEnd = resolvedCycle.cycleEnd;
+  const latestUsageTimestamp =
+    getLatestUsageTimestamp(projects, resolvedCycle) ??
+    (mergedUsageRows.length > 0 ? new Date(`${mergedUsageRows.at(-1)?.usage_date}T18:00:00.000Z`) : null);
+  const updatedLabel = latestUsageTimestamp
+    ? formatUpdatedLabel(latestUsageTimestamp, locale)
+    : formatUpdatedLabel(now, locale);
   const planValue = locale === "de"
     ? `${formatCompactNumber(creditsUsed, locale)} / ${formatCompactNumber(creditsLimit, locale)} Credits`
     : `${formatCompactNumber(creditsUsed, locale)} / ${formatCompactNumber(creditsLimit, locale)} credits`;
@@ -899,10 +929,10 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
     resetDateLabel: formatLongDate(cycleEnd, locale),
     resetRelativeLabel: describeResetDate(cycleEnd, now, locale)
   };
-  const projectUsage = buildUsageProjectInsights(projects, creditsUsed, locale);
-  const languageUsage = buildUsageLanguageInsights(projects, creditsUsed, locale);
-  const topFiles = buildUsageTopFiles(projects, creditsUsed, locale);
-  const activity = buildUsageActivityFeed(projects, locale);
+  const projectUsage = buildUsageProjectInsights(projects, creditsUsed, locale, resolvedCycle);
+  const languageUsage = buildUsageLanguageInsights(projects, creditsUsed, locale, resolvedCycle);
+  const topFiles = buildUsageTopFiles(projects, creditsUsed, locale, resolvedCycle);
+  const activity = buildUsageActivityFeed(projects, locale, resolvedCycle);
   const numberFormat = new Intl.NumberFormat(getIntlLocale(locale));
 
   const metrics: UsageMetricItem[] = [
@@ -1002,6 +1032,7 @@ export async function getNotificationsScreenData(): Promise<NotificationsScreenD
       .from("workspace_billing_cycles")
       .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
       .eq("workspace_id", workspace.id)
+      .eq("status", "active")
       .order("period_start", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -1014,11 +1045,30 @@ export async function getNotificationsScreenData(): Promise<NotificationsScreenD
 
   const billingCycle = billingCycleData as BillingCycleRow | null;
   const currentPlan = getBillingPlanDefinition(workspace.plan_name);
+  const resolvedCycle = resolveUsageCycleWindow({
+    activeCycle: billingCycle,
+    metadata,
+    workspaceCreatedAt: workspace.created_at,
+    now
+  });
+  const { data: cycleUsageData, error: cycleUsageError } = await supabase
+    .from("workspace_daily_usage")
+    .select("usage_date, credits_used")
+    .eq("workspace_id", workspace.id)
+    .gte("usage_date", resolvedCycle.cycleStartKey)
+    .lte("usage_date", resolvedCycle.cycleEndKey);
+
+  if (cycleUsageError) {
+    throw new Error(`Failed to load notification usage rows: ${cycleUsageError.message}`);
+  }
+
+  const cycleUsageRows =
+    (cycleUsageData as Pick<DailyUsageRow, "usage_date" | "credits_used">[] | null) ?? [];
+  const cycleUsageTotal = cycleUsageRows.reduce((sum, row) => sum + row.credits_used, 0);
   const creditsLimit = Math.max(billingCycle?.credits_limit ?? 0, currentPlan.creditsLimit);
   const creditsUsed = Math.max(
-    billingCycle?.credits_used ?? 0,
-    workspace.credits_used ?? 0,
-    projects.reduce((sum, project) => sum + project.files.reduce((fileSum, file) => fileSum + file.words, 0), 0)
+    resolvedCycle.activeCycleMatchesResolvedRange ? billingCycle?.credits_used ?? 0 : 0,
+    cycleUsageTotal
   );
   const planPercent = creditsLimit > 0 ? Math.min(Math.round((creditsUsed / creditsLimit) * 100), 100) : 0;
   const reviewQueue = projects.reduce(
@@ -1144,18 +1194,39 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
 
   const billingCycles = (billingCyclesData as BillingCycleRow[] | null) ?? [];
   const activeCycle = billingCycles.find((cycle) => cycle.status === "active") ?? billingCycles[0] ?? null;
-  const derivedUsage = deriveUsageFromProjects(projects, now);
+  const resolvedCycle = resolveUsageCycleWindow({
+    activeCycle,
+    metadata,
+    workspaceCreatedAt: workspace.created_at,
+    now
+  });
+  const { data: cycleUsageData, error: cycleUsageError } = await supabase
+    .from("workspace_daily_usage")
+    .select("usage_date, credits_used")
+    .eq("workspace_id", workspace.id)
+    .gte("usage_date", resolvedCycle.cycleStartKey)
+    .lte("usage_date", resolvedCycle.cycleEndKey);
+
+  if (cycleUsageError) {
+    throw new Error(`Failed to load billing cycle usage: ${cycleUsageError.message}`);
+  }
+
+  const cycleUsageRows =
+    (cycleUsageData as Pick<DailyUsageRow, "usage_date" | "credits_used">[] | null) ?? [];
+  const cycleUsageTotal = cycleUsageRows.reduce((sum, row) => sum + row.credits_used, 0);
   const creditsLimit = activeCycle?.credits_limit ?? workspace.credits_limit ?? currentPlan.creditsLimit;
-  const creditsUsed = Math.max(activeCycle?.credits_used ?? 0, workspace.credits_used ?? 0, derivedUsage.creditsUsed);
+  const creditsUsed = Math.max(
+    resolvedCycle.activeCycleMatchesResolvedRange ? activeCycle?.credits_used ?? 0 : 0,
+    cycleUsageTotal
+  );
   const creditsRemaining = Math.max(creditsLimit - creditsUsed, 0);
   const usagePercent = creditsLimit > 0 ? Math.min(100, Math.round((creditsUsed / creditsLimit) * 100)) : 0;
-  const projectedSpendCents = Math.max(activeCycle?.projected_spend_cents ?? 0, currentPlan.basePriceCents);
-  const cycleStart = activeCycle?.period_start
-    ? new Date(`${activeCycle.period_start}T00:00:00.000Z`)
-    : startOfCurrentMonth(now);
-  const cycleEnd = activeCycle?.period_end
-    ? new Date(`${activeCycle.period_end}T00:00:00.000Z`)
-    : endOfCurrentMonth(now);
+  const projectedSpendCents = Math.max(
+    resolvedCycle.activeCycleMatchesResolvedRange ? activeCycle?.projected_spend_cents ?? 0 : 0,
+    currentPlan.basePriceCents
+  );
+  const cycleStart = resolvedCycle.cycleStart;
+  const cycleEnd = resolvedCycle.cycleEnd;
   const activeProjects = projects.filter((project) => project.status !== "Completed").length;
   const reviewProjects = projects.filter((project) => project.status === "In Review").length;
   const billingEmail = metadata.profileEmail ?? `${workspace.slug}@translayr.app`;
@@ -1223,7 +1294,11 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
     current: plan.name.toLowerCase() === currentPlan.name.toLowerCase()
   }));
 
-  const invoices = (billingCycles.length > 0 ? billingCycles : [buildFallbackBillingCycle(now, currentPlan, creditsUsed)])
+  const invoices = (
+    billingCycles.length > 0
+      ? billingCycles
+      : [buildFallbackBillingCycle(cycleStart, cycleEnd, currentPlan, creditsUsed)]
+  )
     .map((cycle) => mapBillingInvoiceItem(cycle, currentPlan, locale))
     .slice(0, 6);
 
@@ -3516,12 +3591,24 @@ function mergeUsageRows(
   return Array.from(merged.values()).sort((left, right) => left.usage_date.localeCompare(right.usage_date));
 }
 
-function normalizeUsageRows(rows: DailyUsageRow[], now: Date, activeProjects: number) {
+function normalizeUsageRows(
+  rows: DailyUsageRow[],
+  now: Date,
+  activeProjects: number,
+  cycleStart?: Date
+) {
   const byDate = new Map(rows.map((row) => [row.usage_date, row]));
+  const normalizedNow = startOfUtcDay(now);
+  const normalizedCycleStart = cycleStart ? startOfUtcDay(cycleStart) : null;
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  const daysInWindow = normalizedCycleStart
+    ? Math.max(1, Math.floor((normalizedNow.getTime() - normalizedCycleStart.getTime()) / millisecondsPerDay) + 1)
+    : 10;
+  const pointCount = Math.min(10, daysInWindow);
 
-  return Array.from({ length: 10 }, (_, index) => {
-    const date = new Date(now);
-    date.setUTCDate(now.getUTCDate() - (9 - index));
+  return Array.from({ length: pointCount }, (_, index) => {
+    const date = new Date(normalizedNow);
+    date.setUTCDate(normalizedNow.getUTCDate() - (pointCount - 1 - index));
     const usageDate = formatDateKey(date);
     const row = byDate.get(usageDate);
 
@@ -3591,17 +3678,6 @@ function getOrCreateArchivedDailyUsageRow(
   return nextRow;
 }
 
-function mapUsageBreakdownRows(
-  rows: UsageBreakdownRow[],
-  locale: AppLocale = DEFAULT_APP_LOCALE
-): UsageBreakdownItem[] {
-  return rows.map((row) => ({
-    label: translateUsageBreakdownLabel(row.metric_label, locale),
-    value: formatCompactNumber(row.metric_value, locale),
-    percent: Math.max(0, Math.min(100, Math.round(row.share_percent ?? 0)))
-  }));
-}
-
 function buildFallbackUsageBreakdown(
   totalUploads: number,
   totalExports: number,
@@ -3650,13 +3726,16 @@ function buildEmptyUsageTrend(now: Date, locale: AppLocale): UsageTrendPoint[] {
 function buildUsageProjectInsights(
   projects: ProjectRecord[],
   totalUsed: number,
-  locale: AppLocale
+  locale: AppLocale,
+  cycle: ResolvedUsageCycle
 ): UsageProjectInsightItem[] {
   const usageDenominator = getUsageVolumeDenominator(projects, totalUsed);
   const directProjectUsage = projects
     .map((project) => {
-      const relevantFiles = project.files.filter((file) => file.words > 0);
-      const wordsUsed = relevantFiles.reduce((sum, file) => sum + file.words, 0) || Math.max(project.creditsUsed, 0);
+      const relevantFiles = project.files.filter(
+        (file) => file.words > 0 && isTimestampWithinCycle(file.lastUpdated, cycle)
+      );
+      const wordsUsed = relevantFiles.reduce((sum, file) => sum + file.words, 0);
 
       return {
         id: project.id,
@@ -3681,14 +3760,15 @@ function buildUsageProjectInsights(
 function buildUsageLanguageInsights(
   projects: ProjectRecord[],
   totalUsed: number,
-  locale: AppLocale
+  locale: AppLocale,
+  cycle: ResolvedUsageCycle
 ): UsageLanguageInsightItem[] {
   const aggregated = new Map<string, UsageLanguageInsightItem>();
   const usageDenominator = getUsageVolumeDenominator(projects, totalUsed);
 
   for (const project of projects) {
     for (const file of project.files) {
-      if (file.words <= 0) {
+      if (file.words <= 0 || !isTimestampWithinCycle(file.lastUpdated, cycle)) {
         continue;
       }
 
@@ -3720,11 +3800,16 @@ function buildUsageLanguageInsights(
   return buildEstimatedUsageLanguageInsights(projects, totalUsed, usageDenominator, locale);
 }
 
-function buildUsageTopFiles(projects: ProjectRecord[], totalUsed: number, locale: AppLocale): UsageTopFileItem[] {
+function buildUsageTopFiles(
+  projects: ProjectRecord[],
+  totalUsed: number,
+  locale: AppLocale,
+  cycle: ResolvedUsageCycle
+): UsageTopFileItem[] {
   const directTopFiles = projects
     .flatMap((project) =>
       project.files
-        .filter((file) => file.words > 0)
+        .filter((file) => file.words > 0 && isTimestampWithinCycle(file.lastUpdated, cycle))
         .map((file) => ({
           id: file.id,
           name: file.name,
@@ -3881,21 +3966,59 @@ function getEstimatedUsageProjectAllocations(projects: ProjectRecord[], totalUse
   ];
 }
 
-function buildUsageActivityFeed(projects: ProjectRecord[], locale: AppLocale): UsageActivityFeedItem[] {
+function buildUsageActivityFeed(
+  projects: ProjectRecord[],
+  locale: AppLocale,
+  cycle: ResolvedUsageCycle
+): UsageActivityFeedItem[] {
   return projects
     .flatMap((project) =>
-      project.recentActivity.map((activity) => ({
-        id: `${project.id}-${activity.id}`,
-        kind: classifyUsageActivityKind(activity.title, activity.detail),
-        title: activity.title,
-        detail: activity.detail,
-        projectName: project.name,
-        timestampLabel: formatActivityTimestamp(new Date(activity.timestamp), locale),
-        timestamp: activity.timestamp
-      }))
+      project.recentActivity
+        .filter((activity) => isTimestampWithinCycle(activity.timestamp, cycle))
+        .map((activity) => ({
+          id: `${project.id}-${activity.id}`,
+          kind: classifyUsageActivityKind(activity.title, activity.detail),
+          title: activity.title,
+          detail: activity.detail,
+          projectName: project.name,
+          timestampLabel: formatActivityTimestamp(new Date(activity.timestamp), locale),
+          timestamp: activity.timestamp
+        }))
     )
     .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
     .slice(0, 12);
+}
+
+function getLatestUsageTimestamp(projects: ProjectRecord[], cycle: ResolvedUsageCycle) {
+  let latestTimestamp: Date | null = null;
+
+  for (const project of projects) {
+    for (const file of project.files) {
+      if (!isTimestampWithinCycle(file.lastUpdated, cycle)) {
+        continue;
+      }
+
+      const parsed = safeParseDate(file.lastUpdated);
+
+      if (parsed && (!latestTimestamp || parsed > latestTimestamp)) {
+        latestTimestamp = parsed;
+      }
+    }
+
+    for (const activity of project.recentActivity) {
+      if (!isTimestampWithinCycle(activity.timestamp, cycle)) {
+        continue;
+      }
+
+      const parsed = safeParseDate(activity.timestamp);
+
+      if (parsed && (!latestTimestamp || parsed > latestTimestamp)) {
+        latestTimestamp = parsed;
+      }
+    }
+  }
+
+  return latestTimestamp;
 }
 
 function buildNotificationEventItems({
@@ -4113,12 +4236,178 @@ function formatCurrency(value: number, locale: AppLocale = DEFAULT_APP_LOCALE) {
   }).format(value);
 }
 
-function startOfCurrentMonth(now: Date) {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+function startOfUtcDay(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-function endOfCurrentMonth(now: Date) {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+function addUtcMonthsPreservingDay(date: Date, months: number, anchorDay = date.getUTCDate()) {
+  const targetMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
+  const lastDayOfTargetMonth = new Date(
+    Date.UTC(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+  const targetDay = Math.min(anchorDay, lastDayOfTargetMonth);
+
+  return new Date(Date.UTC(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth(), targetDay));
+}
+
+function buildMonthlyCycleFromAnchor(anchorDate: Date, referenceDate: Date) {
+  const anchor = startOfUtcDay(anchorDate);
+  const reference = startOfUtcDay(referenceDate);
+  const anchorDay = anchor.getUTCDate();
+  let cycleStart = anchor;
+  let cycleEnd = addUtcMonthsPreservingDay(cycleStart, 1, anchorDay);
+
+  while (reference < cycleStart) {
+    cycleEnd = cycleStart;
+    cycleStart = addUtcMonthsPreservingDay(cycleStart, -1, anchorDay);
+  }
+
+  while (reference > cycleEnd) {
+    cycleStart = cycleEnd;
+    cycleEnd = addUtcMonthsPreservingDay(cycleStart, 1, anchorDay);
+  }
+
+  return {
+    cycleStart,
+    cycleEnd
+  };
+}
+
+function resolveStripeMetadataCycleRange(metadata: WorkspaceSettingsMetadata) {
+  const stripePeriodStart = metadata.stripeCurrentPeriodStart
+    ? safeParseDate(metadata.stripeCurrentPeriodStart)
+    : null;
+  const stripePeriodEnd = metadata.stripeCurrentPeriodEnd
+    ? safeParseDate(metadata.stripeCurrentPeriodEnd)
+    : null;
+
+  if (stripePeriodStart && stripePeriodEnd) {
+    return {
+      cycleStart: startOfUtcDay(stripePeriodStart),
+      cycleEnd: startOfUtcDay(stripePeriodEnd)
+    };
+  }
+
+  if (stripePeriodStart) {
+    return {
+      cycleStart: startOfUtcDay(stripePeriodStart),
+      cycleEnd: addUtcMonthsPreservingDay(startOfUtcDay(stripePeriodStart), 1, stripePeriodStart.getUTCDate())
+    };
+  }
+
+  if (stripePeriodEnd) {
+    const normalizedEnd = startOfUtcDay(stripePeriodEnd);
+
+    return {
+      cycleStart: addUtcMonthsPreservingDay(normalizedEnd, -1, normalizedEnd.getUTCDate()),
+      cycleEnd: normalizedEnd
+    };
+  }
+
+  return null;
+}
+
+function getBillingCycleDateRange(cycle: BillingCycleRow | null) {
+  if (!cycle) {
+    return null;
+  }
+
+  return {
+    cycleStart: startOfUtcDay(new Date(`${cycle.period_start}T00:00:00.000Z`)),
+    cycleEnd: startOfUtcDay(new Date(`${cycle.period_end}T00:00:00.000Z`))
+  };
+}
+
+function resolveUsageCycleWindow({
+  activeCycle,
+  metadata,
+  workspaceCreatedAt,
+  now
+}: {
+  activeCycle: BillingCycleRow | null;
+  metadata: WorkspaceSettingsMetadata;
+  workspaceCreatedAt: string;
+  now: Date;
+}): ResolvedUsageCycle {
+  const referenceDate = startOfUtcDay(now);
+  const billingCycleRange = getBillingCycleDateRange(activeCycle);
+  const stripeCycleRange = resolveStripeMetadataCycleRange(metadata);
+  const normalizedBillingCycleRange = billingCycleRange
+    ? buildMonthlyCycleFromAnchor(billingCycleRange.cycleStart, referenceDate)
+    : null;
+  const normalizedStripeCycleRange = stripeCycleRange
+    ? buildMonthlyCycleFromAnchor(stripeCycleRange.cycleStart, referenceDate)
+    : null;
+  const fallbackAnchor = safeParseDate(workspaceCreatedAt) ?? now;
+  const fallbackCycleRange = buildMonthlyCycleFromAnchor(fallbackAnchor, referenceDate);
+  const resolvedRange = normalizedStripeCycleRange ?? normalizedBillingCycleRange ?? fallbackCycleRange;
+  const activeCycleMatchesResolvedRange = Boolean(
+    activeCycle &&
+      billingCycleRange &&
+      normalizedBillingCycleRange &&
+      normalizedBillingCycleRange.cycleStart.getTime() === resolvedRange.cycleStart.getTime() &&
+      normalizedBillingCycleRange.cycleEnd.getTime() === resolvedRange.cycleEnd.getTime()
+  );
+
+  return {
+    activeCycle,
+    cycleStart: resolvedRange.cycleStart,
+    cycleEnd: resolvedRange.cycleEnd,
+    cycleStartKey: formatDateKey(resolvedRange.cycleStart),
+    cycleEndKey: formatDateKey(resolvedRange.cycleEnd),
+    activeCycleMatchesResolvedRange
+  };
+}
+
+function isUsageDateWithinCycle(usageDate: string, cycle: ResolvedUsageCycle) {
+  return usageDate >= cycle.cycleStartKey && usageDate <= cycle.cycleEndKey;
+}
+
+function filterUsageRowsToCycle(rows: DailyUsageRow[], cycle: ResolvedUsageCycle) {
+  return rows.filter((row) => isUsageDateWithinCycle(row.usage_date, cycle));
+}
+
+function getUsageRowTotals(rows: DailyUsageRow[]) {
+  return rows.reduce(
+    (sum, row) => ({
+      creditsUsed: sum.creditsUsed + row.credits_used,
+      apiRequests: sum.apiRequests + row.api_requests,
+      uploads: sum.uploads + row.upload_count,
+      exports: sum.exports + row.export_count,
+      reviews: sum.reviews + row.review_sessions
+    }),
+    {
+      creditsUsed: 0,
+      apiRequests: 0,
+      uploads: 0,
+      exports: 0,
+      reviews: 0
+    }
+  );
+}
+
+function buildCycleUsageBreakdown(rows: DailyUsageRow[], locale: AppLocale) {
+  const totals = getUsageRowTotals(rows);
+
+  return buildFallbackUsageBreakdown(
+    totals.uploads,
+    totals.exports,
+    totals.reviews,
+    totals.creditsUsed,
+    locale
+  );
+}
+
+function isTimestampWithinCycle(value: string, cycle: ResolvedUsageCycle) {
+  const parsed = safeParseDate(value);
+
+  if (!parsed) {
+    return false;
+  }
+
+  const usageDate = formatDateKey(parsed);
+
+  return usageDate >= cycle.cycleStartKey && usageDate <= cycle.cycleEndKey;
 }
 
 async function getGlossaryWriteContext(
@@ -4478,6 +4767,10 @@ function parseWorkspaceSettingsMetadata(value: Record<string, unknown> | null | 
       typeof metadata.inAppNotifications === "boolean" ? metadata.inAppNotifications : undefined,
     stripeCustomerId:
       typeof metadata.stripeCustomerId === "string" ? metadata.stripeCustomerId : undefined,
+    stripeCurrentPeriodStart:
+      typeof metadata.stripeCurrentPeriodStart === "string"
+        ? metadata.stripeCurrentPeriodStart
+        : undefined,
     stripeSubscriptionId:
       typeof metadata.stripeSubscriptionId === "string" ? metadata.stripeSubscriptionId : undefined,
     stripeSubscriptionStatus:
@@ -4646,14 +4939,15 @@ async function rollbackWorkspaceInvitation(
 }
 
 function buildFallbackBillingCycle(
-  now: Date,
+  cycleStart: Date,
+  cycleEnd: Date,
   plan: BillingPlanDefinition,
   creditsUsed: number
 ): BillingCycleRow {
   return {
     id: "fallback-cycle",
-    period_start: formatDateKey(startOfCurrentMonth(now)),
-    period_end: formatDateKey(endOfCurrentMonth(now)),
+    period_start: formatDateKey(cycleStart),
+    period_end: formatDateKey(cycleEnd),
     credits_limit: plan.creditsLimit,
     credits_used: creditsUsed,
     projected_spend_cents: plan.basePriceCents,
@@ -4759,25 +5053,6 @@ function getLocalizedPlanFeatures(plan: BillingPlanDefinition, locale: AppLocale
       return ["400k Wörter pro Monat", "Höherer Durchsatz", "Geteilte Team-Abläufe"];
     default:
       return plan.features;
-  }
-}
-
-function translateUsageBreakdownLabel(label: string, locale: AppLocale) {
-  if (locale !== "de") {
-    return label;
-  }
-
-  switch (label.trim().toLowerCase()) {
-    case "credits consumed":
-      return "Verbrauchte Credits";
-    case "uploads":
-      return "Uploads";
-    case "exports generated":
-      return "Erstellte Exporte";
-    case "review sessions":
-      return "Prüf-Sitzungen";
-    default:
-      return label;
   }
 }
 

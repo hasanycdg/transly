@@ -36,13 +36,18 @@ type WorkspaceSettingsRow = {
 
 type BillingCycleRow = {
   id: string;
+  period_start: string;
+  period_end: string;
+  credits_used: number;
   projected_spend_cents: number;
+  status: "active" | "closed" | "projected";
 };
 
 type StripeWorkspaceMetadata = {
   profileEmail?: string;
   profileName?: string;
   stripeCustomerId?: string;
+  stripeCurrentPeriodStart?: string;
   stripeSubscriptionId?: string;
   stripeSubscriptionStatus?: string;
   stripePriceId?: string;
@@ -158,6 +163,7 @@ export async function syncWorkspaceBillingFromStripe(input?: {
   if (!subscription || !isManagedInStripe(subscription)) {
     await persistWorkspacePlanState(context, DEFAULT_WORKSPACE_PLAN, {
       stripeCustomerId: customerId ?? null,
+      stripeCurrentPeriodStart: null,
       stripeSubscriptionId: null,
       stripeSubscriptionStatus: subscription?.status ?? null,
       stripePriceId: null,
@@ -171,10 +177,11 @@ export async function syncWorkspaceBillingFromStripe(input?: {
 
   await persistWorkspacePlanState(context, resolvedPlan, {
     stripeCustomerId: customerId ?? getStripeObjectId(subscription.customer) ?? null,
+    stripeCurrentPeriodStart: formatStripePeriodBoundary(getStripeSubscriptionPeriodStart(subscription)),
     stripeSubscriptionId: subscription.id,
     stripeSubscriptionStatus: subscription.status,
     stripePriceId: subscription.items.data[0]?.price.id ?? null,
-    stripeCurrentPeriodEnd: formatStripePeriodEnd(getStripeSubscriptionPeriodEnd(subscription))
+    stripeCurrentPeriodEnd: formatStripePeriodBoundary(getStripeSubscriptionPeriodEnd(subscription))
   });
 }
 
@@ -337,6 +344,7 @@ async function persistWorkspacePlanState(
   plan: BillingPlanDefinition,
   stripePatch: {
     stripeCustomerId?: string | null;
+    stripeCurrentPeriodStart?: string | null;
     stripeCurrentPeriodEnd?: string | null;
     stripePriceId?: string | null;
     stripeSubscriptionId?: string | null;
@@ -358,29 +366,88 @@ async function persistWorkspacePlanState(
 
   const { data: cycleData, error: cycleError } = await supabase
     .from("workspace_billing_cycles")
-    .select("id, projected_spend_cents")
+    .select("id, period_start, period_end, credits_used, projected_spend_cents, status")
     .eq("workspace_id", context.workspace.id)
-    .eq("status", "active")
     .order("period_start", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(12);
 
   if (cycleError) {
     throw new Error(`Failed to load the active billing cycle: ${cycleError.message}`);
   }
 
-  if (cycleData) {
-    const cycle = cycleData as BillingCycleRow;
-    const { error: updateCycleError } = await supabase
-      .from("workspace_billing_cycles")
-      .update({
-        credits_limit: plan.creditsLimit,
-        projected_spend_cents: Math.max(plan.basePriceCents, cycle.projected_spend_cents)
-      })
-      .eq("id", cycle.id);
+  const cycles = (cycleData as BillingCycleRow[] | null) ?? [];
+  const periodStart = normalizeStripePeriodDate(stripePatch.stripeCurrentPeriodStart);
+  const periodEnd = normalizeStripePeriodDate(stripePatch.stripeCurrentPeriodEnd);
 
-    if (updateCycleError) {
-      throw new Error(`Failed to update the active billing cycle: ${updateCycleError.message}`);
+  if (periodStart && periodEnd) {
+    const matchingCycle = cycles.find(
+      (cycle) => cycle.period_start === periodStart && cycle.period_end === periodEnd
+    );
+
+    if (matchingCycle) {
+      const { error: updateCycleError } = await supabase
+        .from("workspace_billing_cycles")
+        .update({
+          credits_limit: plan.creditsLimit,
+          projected_spend_cents: Math.max(plan.basePriceCents, matchingCycle.projected_spend_cents),
+          status: "active"
+        })
+        .eq("id", matchingCycle.id);
+
+      if (updateCycleError) {
+        throw new Error(`Failed to update the active billing cycle: ${updateCycleError.message}`);
+      }
+    } else {
+      const { error: createCycleError } = await supabase
+        .from("workspace_billing_cycles")
+        .insert({
+          workspace_id: context.workspace.id,
+          period_start: periodStart,
+          period_end: periodEnd,
+          credits_limit: plan.creditsLimit,
+          credits_used: 0,
+          projected_spend_cents: plan.basePriceCents,
+          status: "active"
+        });
+
+      if (createCycleError) {
+        throw new Error(`Failed to create the active billing cycle: ${createCycleError.message}`);
+      }
+    }
+
+    const activeCycleIdsToClose = cycles
+      .filter(
+        (cycle) =>
+          cycle.status === "active" &&
+          (cycle.period_start !== periodStart || cycle.period_end !== periodEnd)
+      )
+      .map((cycle) => cycle.id);
+
+    if (activeCycleIdsToClose.length > 0) {
+      const { error: closeCyclesError } = await supabase
+        .from("workspace_billing_cycles")
+        .update({ status: "closed" })
+        .in("id", activeCycleIdsToClose);
+
+      if (closeCyclesError) {
+        throw new Error(`Failed to close previous billing cycles: ${closeCyclesError.message}`);
+      }
+    }
+  } else {
+    const cycle = cycles.find((entry) => entry.status === "active");
+
+    if (cycle) {
+      const { error: updateCycleError } = await supabase
+        .from("workspace_billing_cycles")
+        .update({
+          credits_limit: plan.creditsLimit,
+          projected_spend_cents: Math.max(plan.basePriceCents, cycle.projected_spend_cents)
+        })
+        .eq("id", cycle.id);
+
+      if (updateCycleError) {
+        throw new Error(`Failed to update the active billing cycle: ${updateCycleError.message}`);
+      }
     }
   }
 
@@ -391,6 +458,7 @@ async function updateWorkspaceStripeMetadata(
   context: StripeWorkspaceContext,
   patch: {
     stripeCustomerId?: string | null;
+    stripeCurrentPeriodStart?: string | null;
     stripeCurrentPeriodEnd?: string | null;
     stripePriceId?: string | null;
     stripeSubscriptionId?: string | null;
@@ -517,6 +585,10 @@ function parseStripeWorkspaceMetadata(metadata: Record<string, unknown>) {
     profileEmail: typeof metadata.profileEmail === "string" ? metadata.profileEmail : undefined,
     profileName: typeof metadata.profileName === "string" ? metadata.profileName : undefined,
     stripeCustomerId: typeof metadata.stripeCustomerId === "string" ? metadata.stripeCustomerId : undefined,
+    stripeCurrentPeriodStart:
+      typeof metadata.stripeCurrentPeriodStart === "string"
+        ? metadata.stripeCurrentPeriodStart
+        : undefined,
     stripeSubscriptionId:
       typeof metadata.stripeSubscriptionId === "string" ? metadata.stripeSubscriptionId : undefined,
     stripeSubscriptionStatus:
@@ -537,12 +609,20 @@ function sanitizeOrigin(origin: string) {
   return new URL(origin).origin.replace(/\/$/, "");
 }
 
-function formatStripePeriodEnd(value: number | null) {
+function formatStripePeriodBoundary(value: number | null) {
   if (!value) {
     return null;
   }
 
   return new Date(value * 1000).toISOString();
+}
+
+function getStripeSubscriptionPeriodStart(subscription: Stripe.Subscription) {
+  const rawValue = (subscription as Stripe.Subscription & {
+    current_period_start?: number | null;
+  }).current_period_start;
+
+  return typeof rawValue === "number" ? rawValue : null;
 }
 
 function getStripeSubscriptionPeriodEnd(subscription: Stripe.Subscription) {
@@ -551,6 +631,20 @@ function getStripeSubscriptionPeriodEnd(subscription: Stripe.Subscription) {
   }).current_period_end;
 
   return typeof rawValue === "number" ? rawValue : null;
+}
+
+function normalizeStripePeriodDate(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().slice(0, 10);
 }
 
 function getStripeObjectId(
