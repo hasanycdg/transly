@@ -30,7 +30,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
       ? {
           dashboard: "Dashboard",
           usage: "Nutzung",
-          translate: "Übersetzen",
           glossary: "Glossar",
           notifications: "Benachrichtigungen",
           billing: "Abrechnung",
@@ -50,7 +49,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
       : {
           dashboard: "Dashboard",
           usage: "Usage",
-          translate: "Translate",
           glossary: "Glossary",
           notifications: "Notifications",
           billing: "Billing",
@@ -69,7 +67,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
         };
   const mainNavItems = [
     { label: copy.dashboard, href: "/dashboard", icon: HomeIcon, prefetch: shouldPrefetch },
-    { label: copy.translate, href: "/translate", icon: TranslateIcon, prefetch: shouldPrefetch },
     { label: copy.usage, href: "/usage", icon: UsageIcon, prefetch: false },
     { label: copy.glossary, href: "/glossary", icon: GlossaryIcon, prefetch: shouldPrefetch }
   ];
@@ -380,20 +377,6 @@ function UsageIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
       <path d="M2 4h11M2 7.5h8M2 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function TranslateIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-      <path
-        d="M2 3.5h7M5.5 3.5c0 3-1.2 5.2-3.5 6.6M4.5 6.5c1.1.9 2.2 1.7 3.4 2.2M9.5 4.5l3 7M8.4 9h4.2"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }

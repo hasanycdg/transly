@@ -221,7 +221,6 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
           latestTranslationsIntro: "Die zuletzt fertig gewordenen Übersetzungen im Workspace.",
           noRecentTranslations: "Noch keine fertigen Übersetzungen in diesem Monat.",
           goToProjects: "Zu Projekten",
-          translateText: "Text übersetzen",
           utilizationHealthy: "Gesunder Bereich",
           utilizationWarning: "Begrenzt verfügbar"
         }
@@ -272,7 +271,6 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
           latestTranslationsIntro: "The most recently finished translations across the workspace.",
           noRecentTranslations: "No completed translations yet this month.",
           goToProjects: "Go to projects",
-          translateText: "Translate text",
           utilizationHealthy: "Healthy range",
           utilizationWarning: "Limited headroom"
         };
@@ -299,12 +297,6 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
               className="inline-flex items-center justify-center rounded-[10px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12.5px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
             >
               {copy.goToProjects}
-            </Link>
-            <Link
-              href="/translate"
-              className="inline-flex items-center justify-center rounded-[10px] bg-[var(--foreground)] px-4 py-2.5 text-[12.5px] font-medium text-white transition hover:opacity-90"
-            >
-              {copy.translateText}
             </Link>
           </div>
         </div>
@@ -408,7 +400,6 @@ export function DashboardHomeScreen({ data }: DashboardHomeScreenProps) {
               </p>
             </div>
             <div className="flex flex-col gap-3 px-5 py-5">
-              <QuickActionLink href="/translate" label={copy.translateText} />
               <QuickActionLink href="/projects" label={copy.createProject} />
               <QuickActionLink href="/usage" label={copy.openUsage} />
               <QuickActionLink href="/billing" label={copy.openBilling} />
