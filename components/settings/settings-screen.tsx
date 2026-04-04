@@ -79,15 +79,6 @@ const SECTION_ITEMS: SectionMeta[] = [
     icon: BellIcon
   },
   {
-    id: "support",
-    label: "Support",
-    eyebrow: "/ Support",
-    sidebarDescription: "Help, contact, docs, and service status.",
-    heading: "Support",
-    description: "Get help fast, reach the right channel, and keep operational links in one predictable place.",
-    icon: SupportIcon
-  },
-  {
     id: "danger",
     label: "Danger Zone",
     eyebrow: "/ Danger Zone",
@@ -191,8 +182,6 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                   ? "Präferenzen"
                   : section.id === "notifications"
                     ? "Benachrichtigungen"
-                  : section.id === "support"
-                    ? "Support"
                     : "Gefahrenzone",
           eyebrow:
             section.id === "profile"
@@ -203,8 +192,6 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                   ? "/ Präferenzen"
                   : section.id === "notifications"
                     ? "/ Benachrichtigungen"
-                  : section.id === "support"
-                    ? "/ Support"
                     : "/ Gefahrenzone",
           sidebarDescription:
             section.id === "profile"
@@ -215,8 +202,6 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                   ? "Liefer- und Export-Standards."
                   : section.id === "notifications"
                     ? "E-Mails, Erinnerungen und In-App-Hinweise."
-                  : section.id === "support"
-                    ? "Hilfe, Kontakt, Doku und Service-Status."
                     : "Dauerhafte Kontoaktionen.",
           heading:
             section.id === "profile"
@@ -227,8 +212,6 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                   ? "Präferenzen"
                   : section.id === "notifications"
                     ? "Benachrichtigungen"
-                  : section.id === "support"
-                    ? "Support"
                     : "Gefahrenzone",
           description:
             section.id === "profile"
@@ -239,8 +222,6 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                   ? "Kleine Liefer-Standards, die wiederholtes Setup nach jeder Übersetzung reduzieren."
                   : section.id === "notifications"
                     ? "Lege fest, welche Liefer-, Billing- und Review-Ereignisse dein Team aktiv unterbrechen dürfen."
-                  : section.id === "support"
-                    ? "Hol dir schnell Hilfe, erreiche den richtigen Kanal und halte operative Links an einem verlässlichen Ort."
                     : "Sensible Aktionen bleiben visuell vom Rest der Workspace-Einstellungen getrennt."
         }))
       : SECTION_ITEMS;
@@ -253,7 +234,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
           settingsEyebrow: "/ Einstellungen",
           heading: "Einstellungen",
           intro:
-            "Eine fokussierte Oberfläche für Kontodaten, Übersetzungsstandards, Liefer-Präferenzen, Support und sensible Workspace-Aktionen.",
+            "Eine fokussierte Oberfläche für Kontodaten, Übersetzungsstandards, Liefer-Präferenzen, Benachrichtigungen und sensible Workspace-Aktionen.",
           reset: "Zurücksetzen",
           saving: "Speichert...",
           saveChanges: "Änderungen speichern",
@@ -262,9 +243,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
           language: "Sprache",
           appLanguage: "App-Sprache",
           appLanguageDesc: "Lege fest, ob die Oberfläche standardmäßig auf Englisch oder Deutsch erscheinen soll.",
-          keepSimple: "Einfach halten",
-          supportWindow: "Mo-Fr, 09:00-17:00 CET",
-          criticalIssues: "Mit Prioritäts-Triage behandelt"
+          keepSimple: "Einfach halten"
         }
       : {
           saveSuccess: "Settings saved.",
@@ -272,7 +251,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
           settingsEyebrow: "/ Settings",
           heading: "Settings",
           intro:
-            "A focused control surface for account details, translation defaults, delivery preferences, support, and sensitive workspace actions.",
+            "A focused control surface for account details, translation defaults, delivery preferences, notifications, and sensitive workspace actions.",
           reset: "Reset",
           saving: "Saving...",
           saveChanges: "Save changes",
@@ -281,9 +260,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
           language: "Language",
           appLanguage: "App language",
           appLanguageDesc: "Choose whether the interface should default to English or German.",
-          keepSimple: "Keep it simple",
-          supportWindow: "Mon-Fri, 09:00-17:00 CET",
-          criticalIssues: "Handled with priority triage"
+          keepSimple: "Keep it simple"
         };
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(data);
 
@@ -968,104 +945,6 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                 </div>
               ) : null}
 
-              {activeSection === "support" ? (
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
-                  <div className="space-y-5">
-                    <SettingsCard
-                      eyebrow="/ Contact"
-                      title="Support channels"
-                      description="Use the fastest path depending on whether you need product help, operational clarity, or account assistance."
-                    >
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <SupportCard
-                          title="Email support"
-                          description="Best for account questions, product issues, and workflow guidance."
-                          value="support@translayr.app"
-                          meta="Typical response within one business day."
-                          actionLabel="Email support"
-                          href="mailto:support@translayr.app"
-                        />
-                        <SupportCard
-                          title="Priority channel"
-                          description="For plan-specific escalations and critical production blockers."
-                          value={draft.profile.email}
-                          meta="Requests are routed through your workspace contact email."
-                          actionLabel="Use account email"
-                        />
-                      </div>
-                    </SettingsCard>
-
-                    <SettingsCard
-                      eyebrow="/ Help"
-                      title="Guides and documentation"
-                      description="A compact support surface for the material users typically need before opening a ticket."
-                    >
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <ResourceCard
-                          title="Getting started"
-                          description="Project setup, language defaults, and first translation workflow."
-                        />
-                        <ResourceCard
-                          title="Glossary guide"
-                          description="How shared terms, strict glossary mode, and term review work."
-                        />
-                        <ResourceCard
-                          title="File handling"
-                          description="XLIFF imports, tag protection behavior, and export defaults."
-                        />
-                      </div>
-                    </SettingsCard>
-                  </div>
-
-                  <div className="space-y-5">
-                    <SettingsCard
-                      eyebrow="/ Service"
-                      title="Operational status"
-                      description="Keep the most relevant service information visible without turning settings into a dashboard."
-                    >
-                      <div className="space-y-4">
-                        <div className="flex items-start justify-between gap-3 rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
-                          <div>
-                            <p className="text-[13px] font-medium text-[var(--foreground)]">API and translation queue</p>
-                            <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">
-                              No current incidents. Core translation services are operating normally.
-                            </p>
-                          </div>
-                          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--foreground)]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
-                            Healthy
-                          </span>
-                        </div>
-
-                        <div className="space-y-3">
-                          <DetailRow label="Workspace contact" value={draft.profile.email} />
-                          <DetailRow
-                            label={screenLocale === "de" ? "Support-Fenster" : "Support window"}
-                            value={copy.supportWindow}
-                          />
-                          <DetailRow
-                            label={screenLocale === "de" ? "Kritische Probleme" : "Critical issues"}
-                            value={copy.criticalIssues}
-                          />
-                        </div>
-                      </div>
-                    </SettingsCard>
-
-                    <SettingsCard
-                      eyebrow="/ Best Practice"
-                      title="Before you contact support"
-                      description="A short checklist that removes the usual back-and-forth for translation issues."
-                    >
-                      <div className="space-y-3 text-[12px] leading-6 text-[var(--muted)]">
-                        <p>Include the project name, source language, target language, and the exact step where the issue happened.</p>
-                        <p>For file issues, mention whether the problem came from import, translation output, glossary enforcement, or export.</p>
-                        <p>If the issue is blocking delivery, say that explicitly so it can be triaged correctly.</p>
-                      </div>
-                    </SettingsCard>
-                  </div>
-                </div>
-              ) : null}
-
               {activeSection === "danger" ? (
                 <SettingsCard
                   eyebrow="/ Danger Zone"
@@ -1510,21 +1389,6 @@ function BellIcon({ className = "h-4 w-4" }: IconProps) {
   );
 }
 
-function SupportIcon({ className = "h-4 w-4" }: IconProps) {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M5.2 6.3a2.8 2.8 0 1 1 4.2 2.4c-.8.45-1.4 1-1.4 1.8M8 12.2h.01"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
-  );
-}
-
 function DangerIcon({ className = "h-4 w-4" }: IconProps) {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
@@ -1534,61 +1398,6 @@ function DangerIcon({ className = "h-4 w-4" }: IconProps) {
   );
 }
 
-function SupportCard({
-  title,
-  description,
-  value,
-  meta,
-  actionLabel,
-  href
-}: {
-  title: string;
-  description: string;
-  value: string;
-  meta: string;
-  actionLabel: string;
-  href?: string;
-}) {
-  const locale = useAppLocale();
-  const className =
-    "inline-flex items-center justify-center rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]";
-
-  return (
-    <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
-      <p className="text-[13px] font-medium text-[var(--foreground)]">{translateSettingsText(title, locale)}</p>
-      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">
-        {translateSettingsText(description, locale)}
-      </p>
-      <p className="mt-4 text-[14px] font-medium text-[var(--foreground)]">{value}</p>
-      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{translateSettingsText(meta, locale)}</p>
-      {href ? (
-        <a href={href} className={["mt-4", className].join(" ")}>
-          {translateSettingsText(actionLabel, locale)}
-        </a>
-      ) : (
-        <div className={["mt-4", className].join(" ")}>{translateSettingsText(actionLabel, locale)}</div>
-      )}
-    </div>
-  );
-}
-
-function ResourceCard({
-  title,
-  description
-}: {
-  title: string;
-  description: string;
-}) {
-  const locale = useAppLocale();
-  return (
-    <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
-      <p className="text-[13px] font-medium text-[var(--foreground)]">{translateSettingsText(title, locale)}</p>
-      <p className="mt-2 text-[11.5px] leading-5 text-[var(--muted)]">
-        {translateSettingsText(description, locale)}
-      </p>
-    </div>
-  );
-}
 
 function translateSettingsText(value: string, locale: string) {
   if (locale !== "de") {

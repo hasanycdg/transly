@@ -32,9 +32,9 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           usage: "Nutzung",
           glossary: "Glossar",
           notifications: "Benachrichtigungen",
+          support: "Support",
           billing: "Abrechnung",
           settings: "Einstellungen",
-          workspace: "Workspace",
           projects: "Projekte",
           allProjects: "Alle Projekte",
           deleteProjectTitle: (projectName: string) => `${projectName} löschen`,
@@ -51,9 +51,9 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           usage: "Usage",
           glossary: "Glossary",
           notifications: "Notifications",
+          support: "Support",
           billing: "Billing",
           settings: "Settings",
-          workspace: "Workspace",
           projects: "Projects",
           allProjects: "All projects",
           deleteProjectTitle: (projectName: string) => `Delete ${projectName}`,
@@ -70,11 +70,38 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
     { label: copy.usage, href: "/usage", icon: UsageIcon, prefetch: false },
     { label: copy.glossary, href: "/glossary", icon: GlossaryIcon, prefetch: shouldPrefetch }
   ];
+  const [dashboardNavItem, ...secondaryNavItems] = mainNavItems;
   const utilityNavItems = [
-    { label: copy.notifications, href: "/notifications", icon: BellIcon, prefetch: shouldPrefetch },
-    { label: copy.billing, href: "/billing", icon: BillingIcon, prefetch: shouldPrefetch },
-    { label: copy.settings, href: "/settings", icon: SettingsIcon, prefetch: shouldPrefetch }
+    {
+      label: copy.notifications,
+      href: "/notifications",
+      icon: BellIcon,
+      prefetch: shouldPrefetch,
+      active: pathname.startsWith("/notifications")
+    },
+    {
+      label: copy.support,
+      href: "/support",
+      icon: SupportIcon,
+      prefetch: shouldPrefetch,
+      active: pathname.startsWith("/support")
+    },
+    {
+      label: copy.billing,
+      href: "/billing",
+      icon: BillingIcon,
+      prefetch: shouldPrefetch,
+      active: pathname.startsWith("/billing")
+    },
+    {
+      label: copy.settings,
+      href: "/settings",
+      icon: SettingsIcon,
+      prefetch: shouldPrefetch,
+      active: pathname.startsWith("/settings")
+    }
   ];
+  const projectsSectionActive = pathname.startsWith("/projects");
 
   useEffect(() => {
     setHasMounted(true);
@@ -141,6 +168,24 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
     }
   }
 
+  function renderNavItem(item: (typeof mainNavItems)[number]) {
+    const Icon = item.icon;
+    const active = pathname.startsWith(item.href);
+    const className = [
+      "flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
+      active
+        ? "bg-[var(--background)] text-[var(--foreground)]"
+        : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+    ].join(" ");
+
+    return (
+      <Link key={item.label} href={item.href} prefetch={item.prefetch} className={className}>
+        <Icon />
+        <span>{item.label}</span>
+      </Link>
+    );
+  }
+
   return (
     <div className="h-screen overflow-hidden bg-[var(--background)]">
       <div className="flex h-screen">
@@ -156,41 +201,18 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
 
           <div className="px-2 py-[10px]">
             <div className="space-y-[1px] pt-[4px]">
-              {mainNavItems.map((item) => {
-                const Icon = item.icon;
-                const active = item.href ? pathname.startsWith(item.href) : false;
-
-                const className = [
-                  "flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
-                  active
-                    ? "bg-[var(--background)] text-[var(--foreground)]"
-                    : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                ].join(" ");
-
-                return item.href ? (
-                  <Link key={item.label} href={item.href} prefetch={item.prefetch} className={className}>
-                    <Icon />
-                    <span>
-                      {item.label}
-                    </span>
-                  </Link>
-                ) : (
-                  <button key={item.label} type="button" className={className}>
-                    <Icon />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="px-2 pb-1 pt-[10px] text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
-              {copy.workspace}
+              {renderNavItem(dashboardNavItem)}
             </div>
             <button
               type="button"
               aria-expanded={projectsOpen}
               onClick={() => setProjectsOpen((current) => !current)}
-              className="flex w-full items-center gap-2 rounded-[6px] bg-[var(--background)] px-2 py-1.5 text-left text-[13px] font-medium text-[var(--foreground)]"
+              className={[
+                "mt-[1px] flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
+                projectsSectionActive
+                  ? "bg-[var(--background)] text-[var(--foreground)]"
+                  : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+              ].join(" ")}
             >
               <ProjectsIcon />
               <span className="flex-1">{copy.projects}</span>
@@ -274,6 +296,9 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
                 </div>
               </div>
             ) : null}
+            <div className="space-y-[1px]">
+              {secondaryNavItems.map((item) => renderNavItem(item))}
+            </div>
           </div>
 
           <div className="mt-auto border-t border-[var(--border-light)]">
@@ -281,10 +306,9 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
               <div className="space-y-[1px]">
                 {utilityNavItems.map((item) => {
                   const Icon = item.icon;
-                  const active = pathname.startsWith(item.href);
                   const className = [
                     "flex w-full items-center gap-2 rounded-[6px] px-2 py-2 text-left text-[13px] font-medium transition",
-                    active
+                    item.active
                       ? "bg-[var(--background)] text-[var(--foreground)]"
                       : "text-[rgba(17,17,16,0.72)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                   ].join(" ");
@@ -390,6 +414,21 @@ function GlossaryIcon() {
         strokeWidth="1.3"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+function SupportIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+      <path
+        d="M5 5.9A2.625 2.625 0 118.938 8.15c-.75.422-1.313.938-1.313 1.688M7.5 11.438h.01"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="7.5" cy="7.5" r="5.625" stroke="currentColor" strokeWidth="1.3" />
     </svg>
   );
 }

@@ -233,7 +233,6 @@ export type SettingsSectionId =
   | "translation"
   | "preferences"
   | "notifications"
-  | "support"
   | "danger";
 
 export type SettingsToneStyle = "Neutral" | "Formal" | "Informal" | "Marketing" | "Technical";

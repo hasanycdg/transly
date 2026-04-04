@@ -13,7 +13,6 @@ const SETTINGS_SECTION_IDS = new Set<SettingsSectionId>([
   "translation",
   "preferences",
   "notifications",
-  "support",
   "danger"
 ]);
 
