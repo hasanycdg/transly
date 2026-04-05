@@ -235,6 +235,57 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
               ))}
             </div>
 
+            <div className="mt-16">
+              <h3 className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(1.6rem,2.5vw,2.2rem)] leading-[0.95] text-[var(--foreground)]`}>
+                {locale === "de" ? "Feature-Vergleich" : "Feature comparison"}
+              </h3>
+              <p className="mt-3 max-w-[560px] text-[15px] leading-7 text-[var(--muted)]">
+                {locale === "de"
+                  ? "Alle Funktionen im Überblick – was in welchem Plan enthalten ist."
+                  : "All features at a glance – what is included in each plan."}
+              </p>
+              <div className="mt-8 overflow-x-auto rounded-[20px] border border-[var(--border)] bg-[var(--surface)]">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-soft)]">
+                        {locale === "de" ? "Funktion" : "Feature"}
+                      </th>
+                      {pricingPlans.map((plan) => (
+                        <th key={plan.id} className="px-5 py-4 text-center text-[13px] font-semibold text-[var(--foreground)]">
+                          {plan.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {copy.pricingComparison.map((row, ri) => (
+                      <tr key={row.label} className={ri > 0 ? "border-t border-[var(--border-light)]" : ""}>
+                        <td className="px-5 py-3.5 font-medium text-[var(--foreground)]">{row.label}</td>
+                        {row.values.map((val, ci) => (
+                          <td key={ci} className="px-5 py-3.5 text-center">
+                            {val === true ? (
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--success-bg)] text-[var(--success)]">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                  <path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              </span>
+                            ) : (
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--background-strong)] text-[var(--muted-soft)]">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                  <path d="M3.5 3.5L10.5 10.5M10.5 3.5L3.5 10.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                </svg>
+                              </span>
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <section className="mt-8 grid gap-6 lg:grid-cols-3">
               {copy.pricingNotes.map((note) => (
                 <div
@@ -1536,7 +1587,7 @@ function getGermanMarketingCopy() {
       body: "Translayr ist nicht mehr nur XLIFF-first. Die Produktseite erklärt jetzt klar den Flow für strukturierte Dateien, Review und Exporte.",
       actions: [
         { href: "/register", label: "Datei hochladen", tone: "primary" as const },
-        { href: "/products/text-translation", label: "Textfläche ansehen", tone: "secondary" as const }
+        { href: "/products/file-translation", label: "Dateifläche ansehen", tone: "secondary" as const }
       ]
     },
     filesBlocks: [
@@ -1636,6 +1687,88 @@ function getGermanMarketingCopy() {
       {
         title: "Positionierung",
         body: "Die Pricing-Seite steht jetzt als eigene Fläche und muss nicht mehr in derselben Scrollstrecke wie Features und Story mitschwingen."
+      }
+    ],
+    pricingComparison: [
+      {
+        label: "1.000 Wörter / Monat",
+        values: [true, false, false, false]
+      },
+      {
+        label: "50.000 Wörter / Monat",
+        values: [false, true, false, false]
+      },
+      {
+        label: "200.000 Wörter / Monat",
+        values: [false, false, true, false]
+      },
+      {
+        label: "700.000 Wörter / Monat",
+        values: [false, false, false, true]
+      },
+      {
+        label: "XLIFF / XLF Übersetzung",
+        values: [true, true, true, true]
+      },
+      {
+        label: "PO / STRINGS / RESX / XML",
+        values: [false, true, true, true]
+      },
+      {
+        label: "CSV / TXT / DOCX / PPTX",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Glossary Basics",
+        values: [true, true, false, false]
+      },
+      {
+        label: "Glossary Support",
+        values: [false, true, true, true]
+      },
+      {
+        label: "Priority Glossary Injection",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Project Workspaces",
+        values: [false, true, true, true]
+      },
+      {
+        label: "Review Workflow",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Faster Throughput",
+        values: [false, false, false, true]
+      },
+      {
+        label: "Shared Team Operations",
+        values: [false, false, false, true]
+      },
+      {
+        label: "Side-by-side Review",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Tag & Struktur-Schutz",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Auto-Detect Quellsprache",
+        values: [true, true, true, true]
+      },
+      {
+        label: "Tonalität-Steuerung",
+        values: [true, true, true, true]
+      },
+      {
+        label: "Wortzählung vor Übersetzung",
+        values: [true, true, true, true]
+      },
+      {
+        label: "Credit-Check vor Übersetzung",
+        values: [true, true, true, true]
       }
     ]
   };
@@ -1800,7 +1933,7 @@ function getEnglishMarketingCopy() {
       body: "Translayr is no longer framed as only XLIFF-first. This page clearly explains the flow for structured files, review, and export.",
       actions: [
         { href: "/register", label: "Upload a file", tone: "primary" as const },
-        { href: "/products/text-translation", label: "See text translation", tone: "secondary" as const }
+        { href: "/products/file-translation", label: "See file translation", tone: "secondary" as const }
       ]
     },
     filesBlocks: [
@@ -1900,6 +2033,88 @@ function getEnglishMarketingCopy() {
       {
         title: "Positioning",
         body: "Pricing now stands as its own surface instead of being squeezed into the same scroll flow as features and story."
+      }
+    ],
+    pricingComparison: [
+      {
+        label: "1,000 words / month",
+        values: [true, false, false, false]
+      },
+      {
+        label: "50,000 words / month",
+        values: [false, true, false, false]
+      },
+      {
+        label: "200,000 words / month",
+        values: [false, false, true, false]
+      },
+      {
+        label: "700,000 words / month",
+        values: [false, false, false, true]
+      },
+      {
+        label: "XLIFF / XLF translation",
+        values: [true, true, true, true]
+      },
+      {
+        label: "PO / STRINGS / RESX / XML",
+        values: [false, true, true, true]
+      },
+      {
+        label: "CSV / TXT / DOCX / PPTX",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Glossary basics",
+        values: [true, true, false, false]
+      },
+      {
+        label: "Glossary support",
+        values: [false, true, true, true]
+      },
+      {
+        label: "Priority glossary injection",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Project workspaces",
+        values: [false, true, true, true]
+      },
+      {
+        label: "Review workflow",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Faster throughput",
+        values: [false, false, false, true]
+      },
+      {
+        label: "Shared team operations",
+        values: [false, false, false, true]
+      },
+      {
+        label: "Side-by-side review",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Tag & structure protection",
+        values: [false, false, true, true]
+      },
+      {
+        label: "Auto-detect source language",
+        values: [true, true, true, true]
+      },
+      {
+        label: "Tone control",
+        values: [true, true, true, true]
+      },
+      {
+        label: "Word count before translation",
+        values: [true, true, true, true]
+      },
+      {
+        label: "Credit check before translation",
+        values: [true, true, true, true]
       }
     ]
   };
