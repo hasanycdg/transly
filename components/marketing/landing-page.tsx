@@ -9,11 +9,11 @@ import { BILLING_PLANS } from "@/lib/billing/plans";
 const DISPLAY_FONT_CLASS_NAME = "[font-family:var(--font-display)] font-medium tracking-[-0.065em]";
 const EYEBROW_CLASS = "text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]";
 const PRIMARY_BUTTON_CLASS =
-  "inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-[13px] font-medium text-white transition hover:opacity-90";
+  "px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70";
 const SECONDARY_BUTTON_CLASS =
   "inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-5 text-[13px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]";
 
-type MarketingPageId = "home" | "products" | "workspace" | "files" | "text" | "pricing";
+type MarketingPageId = "home" | "products" | "workspace" | "files" | "pricing";
 
 type MarketingNavItem = {
   href: string;
@@ -111,7 +111,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
     {
       href: "/products",
       label: copy.navProducts,
-      active: pageId === "products" || pageId === "workspace" || pageId === "files" || pageId === "text"
+      active: pageId === "products" || pageId === "workspace" || pageId === "files"
     },
     {
       href: "/pricing",
@@ -201,22 +201,6 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
           hero={copy.filesHero}
           blocks={copy.filesBlocks}
           visual={<FilesVisual locale={locale} />}
-          locale={locale}
-        />
-      );
-    case "text":
-      return (
-        <ProductDetailPage
-          activePage={pageId}
-          navItems={navItems}
-          productCards={productCards}
-          footer={copy.footer}
-          loginLabel={copy.navLogin}
-          registerLabel={copy.navRegister}
-          cta={copy.cta}
-          hero={copy.textHero}
-          blocks={copy.textBlocks}
-          visual={<TextTranslationVisual locale={locale} />}
           locale={locale}
         />
       );
@@ -407,7 +391,7 @@ function PageFrame({
         loginLabel={loginLabel}
         registerLabel={registerLabel}
       />
-      {activePage === "products" || activePage === "workspace" || activePage === "files" || activePage === "text" ? (
+      {activePage === "products" || activePage === "workspace" || activePage === "files" ? (
         <ProductTabs
           activePage={activePage}
           cards={productCards}
@@ -531,7 +515,7 @@ function MarketingHeader({
           </Link>
           <Link
             href="/register"
-            className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--foreground)] px-5 text-[13px] font-medium text-white transition hover:opacity-90"
+            className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
           >
             {registerLabel}
           </Link>
@@ -1418,18 +1402,6 @@ function getGermanMarketingCopy() {
         "Side-by-side Review und Download im Originalformat",
         "Tag- und Struktur-Schutz für Lokalisierungsdateien"
       ]
-    },
-    {
-      id: "text",
-      href: "/products/text-translation",
-      label: "Text Translation",
-      title: "Schnelle Textübersetzung für Copy, Support und kurze Freigaben.",
-      body: "Wenn kein Projekt nötig ist, läuft die Übersetzung direkt über eine schlanke Textfläche mit Tonalität und Export.",
-      points: [
-        "Auto-Detect, Zielsprache und Tonalität",
-        "Copy, TXT-Export und sofortige Ausgabe",
-        "Nutzung läuft in dieselbe Credit-Logik"
-      ]
     }
   ];
 
@@ -1693,18 +1665,6 @@ function getEnglishMarketingCopy() {
         "Multi-format upload with word-based credits",
         "Side-by-side review and original-format download",
         "Tag and structure protection for localization files"
-      ]
-    },
-    {
-      id: "text",
-      href: "/products/text-translation",
-      label: "Text translation",
-      title: "Fast text translation for copy, support, and short approval loops.",
-      body: "When you do not need a project wrapper, translation runs through a dedicated text surface with tone control and export.",
-      points: [
-        "Auto-detect, target language, and tone",
-        "Copy, TXT export, and immediate output",
-        "Usage tracked inside the same credit model"
       ]
     }
   ];
