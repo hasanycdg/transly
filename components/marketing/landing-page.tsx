@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
 import { BILLING_PLANS } from "@/lib/billing/plans";
@@ -62,6 +62,7 @@ type PageFrameProps = {
   children: React.ReactNode;
   visual: React.ReactNode;
   locale: "de" | "en";
+  onLocaleChange: (locale: "de" | "en") => void;
   heroVisualLarge?: boolean;
 };
 
@@ -93,14 +94,119 @@ type PricingPlanView = {
 };
 
 type PricingInterval = "monthly" | "yearly";
+type MarketingLocale = "de" | "en";
+
+type MarketingCopy = {
+  navHome: string;
+  navProducts: string;
+  navPricing: string;
+  navLogin: string;
+  navRegister: string;
+  footer: MarketingFooterCopy;
+  cta: MarketingCtaCopy;
+  productCards: ProductCard[];
+  homeHero: PageHero;
+  homeProductsEyebrow: string;
+  homeProductsTitle: string;
+  homeProductsBody: string;
+  metrics: Array<{ value: string; label: string }>;
+  homeOperationsEyebrow: string;
+  homeOperationsTitle: string;
+  homeOperationsBody: string;
+  homeOperationsRows: Array<{ title: string; body: string }>;
+  productsHero: PageHero;
+  productsGridEyebrow: string;
+  productsGridTitle: string;
+  productsGridBody: string;
+  compareEyebrow: string;
+  compareTitle: string;
+  compareBody: string;
+  compareRows: Array<{ title: string; body: string }>;
+  workspaceHero: PageHero;
+  workspaceBlocks: DetailBlock[];
+  filesHero: PageHero;
+  filesBlocks: DetailBlock[];
+  textHero: PageHero;
+  textBlocks: DetailBlock[];
+  pricingHero: PageHero;
+  pricingGridEyebrow: string;
+  pricingGridTitle: string;
+  pricingGridBody: string;
+  pricingNotes: Array<{ title: string; body: string }>;
+  pricingComparison: Array<{ label: string; values: boolean[] }>;
+};
+
+const MARKETING_LOCALE_STORAGE_KEY = "translayr-marketing-locale";
+const marketingLocaleSubscribers = new Set<() => void>();
+
+function readStoredMarketingLocale(): MarketingLocale | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const storedLocale = window.localStorage.getItem(MARKETING_LOCALE_STORAGE_KEY);
+    return storedLocale === "de" || storedLocale === "en" ? storedLocale : null;
+  } catch {
+    return null;
+  }
+}
+
+function subscribeToMarketingLocale(onStoreChange: () => void): () => void {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === MARKETING_LOCALE_STORAGE_KEY) {
+      onStoreChange();
+    }
+  };
+
+  marketingLocaleSubscribers.add(onStoreChange);
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    marketingLocaleSubscribers.delete(onStoreChange);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+function writeStoredMarketingLocale(locale: MarketingLocale) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(MARKETING_LOCALE_STORAGE_KEY, locale);
+  } catch {
+    // Ignore storage write failures (private mode / blocked storage).
+  }
+
+  marketingLocaleSubscribers.forEach((notify) => notify());
+}
+
+function useMarketingLocale(serverLocale: MarketingLocale): MarketingLocale {
+  return useSyncExternalStore(
+    subscribeToMarketingLocale,
+    () => readStoredMarketingLocale() ?? serverLocale,
+    () => serverLocale
+  );
+}
 
 export function LandingPage() {
   return <MarketingPage pageId="home" />;
 }
 
 export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
-  const locale = useAppLocale();
+  const serverLocale = useAppLocale();
+  const locale = useMarketingLocale(serverLocale);
   const [pricingInterval, setPricingInterval] = useState<PricingInterval>("monthly");
+
+  const handleLocaleChange = (nextLocale: MarketingLocale) => {
+    writeStoredMarketingLocale(nextLocale);
+  };
+
   const copy = locale === "de" ? getGermanMarketingCopy() : getEnglishMarketingCopy();
   const navItems: MarketingNavItem[] = [
     {
@@ -136,6 +242,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
           cta={copy.cta}
           visual={<ProductsOverviewVisual locale={locale} />}
           locale={locale}
+          onLocaleChange={handleLocaleChange}
         >
           <SectionIntro eyebrow={copy.productsGridEyebrow} title={copy.productsGridTitle} body={copy.productsGridBody} />
           <div className="mt-10 grid gap-5 lg:grid-cols-3">
@@ -186,6 +293,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
           blocks={copy.workspaceBlocks}
           visual={<WorkspaceVisual locale={locale} />}
           locale={locale}
+          onLocaleChange={handleLocaleChange}
         />
       );
     case "files":
@@ -202,6 +310,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
           blocks={copy.filesBlocks}
           visual={<FilesVisual locale={locale} />}
           locale={locale}
+          onLocaleChange={handleLocaleChange}
         />
       );
     case "pricing":
@@ -217,6 +326,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
           cta={copy.cta}
           visual={<PricingVisual locale={locale} />}
           locale={locale}
+          onLocaleChange={handleLocaleChange}
         >
           <section className="mt-12 rounded-[32px] border border-[var(--border)] bg-[var(--surface)] px-6 py-8 shadow-[0_24px_80px_rgba(17,17,16,0.05)] lg:px-8 lg:py-10">
             <div className="mx-auto max-w-[720px] text-center">
@@ -317,6 +427,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
           visual={<HomeHeroVisual locale={locale} />}
           locale={locale}
           heroVisualLarge
+          onLocaleChange={handleLocaleChange}
         >
           <SectionIntro eyebrow={copy.homeProductsEyebrow} title={copy.homeProductsTitle} body={copy.homeProductsBody} />
           <div className="mt-10 grid gap-5 lg:grid-cols-3">
@@ -432,6 +543,7 @@ function PageFrame({
   children,
   visual,
   locale,
+  onLocaleChange,
   heroVisualLarge = false
 }: PageFrameProps) {
   return (
@@ -441,6 +553,8 @@ function PageFrame({
         navItems={navItems}
         loginLabel={loginLabel}
         registerLabel={registerLabel}
+        locale={locale}
+        onLocaleChange={onLocaleChange}
       />
       {activePage === "products" || activePage === "workspace" || activePage === "files" ? (
         <ProductTabs
@@ -523,14 +637,18 @@ function PageFrame({
 function MarketingHeader({
   navItems,
   loginLabel,
-  registerLabel
+  registerLabel,
+  locale,
+  onLocaleChange
 }: {
   navItems: MarketingNavItem[];
   loginLabel: string;
   registerLabel: string;
+  locale: "de" | "en";
+  onLocaleChange: (locale: "de" | "en") => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.9)] backdrop-blur-xl">
+    <header className="sticky top-0 z-50 relative border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.9)] backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-6 px-5 py-4 sm:px-7 lg:px-8">
         <Link href="/" className="flex items-center gap-3">
           <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--foreground)]">
@@ -570,6 +688,32 @@ function MarketingHeader({
           >
             {registerLabel}
           </Link>
+          <div className="pointer-events-auto relative flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1">
+            <button
+              type="button"
+              onClick={() => onLocaleChange("en")}
+              className={[
+                "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
+                locale === "en"
+                  ? "bg-[var(--foreground)] text-[var(--surface)]"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              ].join(" ")}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => onLocaleChange("de")}
+              className={[
+                "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
+                locale === "de"
+                  ? "bg-[var(--foreground)] text-[var(--surface)]"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              ].join(" ")}
+            >
+              DE
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -820,7 +964,7 @@ function SocialProofSection({ locale }: { locale: "de" | "en" }) {
     <section className="mt-24 border-t border-[var(--border)] pt-16">
       <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr]">
         <div>
-          <p className={EYEBROW_CLASS}>/ {locale === "de" ? "Social proof" : "Social proof"}</p>
+          <p className={EYEBROW_CLASS}>/ {locale === "de" ? "Vertrauen" : "Social proof"}</p>
           <div className="mt-8 grid gap-8 sm:grid-cols-3">
             {logos.map((logo) => (
               <div key={logo} className="text-[14px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
@@ -881,17 +1025,17 @@ function MarketingFooter({ footer, locale }: { footer: MarketingFooterCopy; loca
         </div>
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
-            {locale === "de" ? "Home" : "Home"}
+            {locale === "de" ? "Startseite" : "Home"}
           </div>
           <div className="mt-4 flex flex-col gap-3 text-[13px] text-[var(--muted)]">
-            <Link href="/" className="transition hover:text-[var(--processing)]">{locale === "de" ? "Overview" : "Overview"}</Link>
+            <Link href="/" className="transition hover:text-[var(--processing)]">{locale === "de" ? "Überblick" : "Overview"}</Link>
             <Link href="/products" className="transition hover:text-[var(--processing)]">{locale === "de" ? "Produkte" : "Products"}</Link>
-            <Link href="/pricing" className="transition hover:text-[var(--processing)]">{locale === "de" ? "Pricing" : "Pricing"}</Link>
+            <Link href="/pricing" className="transition hover:text-[var(--processing)]">{locale === "de" ? "Preise" : "Pricing"}</Link>
           </div>
         </div>
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
-            {locale === "de" ? "Company" : "Company"}
+            {locale === "de" ? "Unternehmen" : "Company"}
           </div>
           <div className="mt-4 flex flex-col gap-3 text-[13px] text-[var(--muted)]">
             <Link href="/blog" className="transition hover:text-[var(--processing)]">Blog</Link>
@@ -901,7 +1045,7 @@ function MarketingFooter({ footer, locale }: { footer: MarketingFooterCopy; loca
         </div>
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
-            {locale === "de" ? "Legal" : "Legal"}
+            {locale === "de" ? "Rechtliches" : "Legal"}
           </div>
           <div className="mt-4 flex flex-col gap-3 text-[13px] text-[var(--muted)]">
             <Link href="/" className="transition hover:text-[var(--processing)]">{footer.terms}</Link>
@@ -974,7 +1118,7 @@ function HomeHeroVisual({ locale }: { locale: "de" | "en" }) {
         <span className="h-2.5 w-2.5 rounded-full bg-[var(--border)]" />
         <span className="h-2.5 w-2.5 rounded-full bg-[var(--border)]" />
         <div className="ml-3 text-[11px] uppercase tracking-[0.14em] text-[var(--muted-soft)]">
-          {locale === "de" ? "Workspace preview" : "Workspace preview"}
+          {locale === "de" ? "Workspace-Vorschau" : "Workspace preview"}
         </div>
       </div>
       <div className="grid min-h-[560px] grid-cols-[94px_minmax(0,1fr)]">
@@ -983,8 +1127,8 @@ function HomeHeroVisual({ locale }: { locale: "de" | "en" }) {
             {[
               locale === "de" ? "Dashboard" : "Dashboard",
               locale === "de" ? "Projekte" : "Projects",
-              locale === "de" ? "Reports" : "Reports",
-              locale === "de" ? "Usage" : "Usage"
+              locale === "de" ? "Berichte" : "Reports",
+              locale === "de" ? "Verbrauch" : "Usage"
             ].map((item, index) => (
               <div
                 key={item}
@@ -1011,7 +1155,7 @@ function HomeHeroVisual({ locale }: { locale: "de" | "en" }) {
           <div className="mt-5 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4">
               <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
-                {locale === "de" ? "Usage this month" : "Usage this month"}
+                {locale === "de" ? "Nutzung diesen Monat" : "Usage this month"}
               </div>
               <div className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">$1,759</div>
               <div className="mt-4 space-y-3">
@@ -1033,7 +1177,7 @@ function HomeHeroVisual({ locale }: { locale: "de" | "en" }) {
             </div>
             <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4">
               <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
-                {locale === "de" ? "Wordflow now" : "Wordflow now"}
+                {locale === "de" ? "Live-Workflow" : "Wordflow now"}
               </div>
               <div className="mt-4 flex h-[150px] items-end justify-between gap-3">
                 {[34, 52, 73, 46, 67].map((bar, index) => (
@@ -1057,7 +1201,7 @@ function HomeHeroVisual({ locale }: { locale: "de" | "en" }) {
           <div className="mt-5 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4">
             <div className="flex items-center justify-between">
               <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted-soft)]">
-                {locale === "de" ? "Live translation queue" : "Live translation queue"}
+                {locale === "de" ? "Live-Übersetzungswarteschlange" : "Live translation queue"}
               </div>
               <div className="text-[11px] text-[var(--muted-soft)]">EN → DE · FR</div>
             </div>
@@ -1134,7 +1278,7 @@ function WorkspaceVisual({ locale }: { locale: "de" | "en" }) {
             {[
               locale === "de" ? "Dashboard" : "Dashboard",
               locale === "de" ? "Projekte" : "Projects",
-              locale === "de" ? "Usage" : "Usage",
+              locale === "de" ? "Verbrauch" : "Usage",
               locale === "de" ? "Glossar" : "Glossary"
             ].map((item, index) => (
               <div
@@ -1166,9 +1310,9 @@ function WorkspaceVisual({ locale }: { locale: "de" | "en" }) {
           </div>
           <div className="mt-5 space-y-3">
             {[
-              locale === "de" ? "Mobile App strings" : "Mobile app strings",
-              locale === "de" ? "Help Center update" : "Help center update",
-              locale === "de" ? "Website checkout" : "Website checkout"
+              locale === "de" ? "Mobile-App-Texte" : "Mobile app strings",
+              locale === "de" ? "Help-Center-Update" : "Help center update",
+              locale === "de" ? "Website-Checkout" : "Website checkout"
             ].map((item, index) => (
               <div key={item} className="flex items-center justify-between rounded-[18px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
                 <div>
@@ -1296,9 +1440,9 @@ function TextTranslationVisual({ locale }: { locale: "de" | "en" }) {
           </div>
           <div className="mt-4 flex gap-2">
             {[
-              locale === "de" ? "Auto detect" : "Auto detect",
-              locale === "de" ? "Formal" : "Formal",
-              locale === "de" ? "TXT export" : "TXT export"
+              locale === "de" ? "Automatische Erkennung" : "Auto detect",
+              locale === "de" ? "Formell" : "Formal",
+              locale === "de" ? "TXT-Export" : "TXT export"
             ].map((item) => (
               <span key={item} className="rounded-full border border-[var(--border)] bg-[var(--background-strong)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
                 {item}
@@ -1428,36 +1572,36 @@ function localizePlanFeatures(
   }
 }
 
-function getGermanMarketingCopy() {
+function getGermanMarketingCopy(): MarketingCopy {
   const productCards: ProductCard[] = [
     {
       id: "workspace",
       href: "/products/workspace",
-      label: "Translation Workspace",
-      title: "Die operative Fläche für Projekte, Review und Billing.",
+      label: "Übersetzungs-Workspace",
+      title: "Die operative Fläche für Projekte, Prüfung und Abrechnung.",
       body: "Translayr bündelt Projektstatus, letzte Übersetzungen, Glossar und Verbrauch in einer klaren Oberfläche.",
       points: [
-        "Dashboard, Projekte und Usage in einem Ablauf",
-        "Review-Status und Fortschritt direkt sichtbar",
-        "Billing und Credits ohne Seitensprünge"
+        "Dashboard, Projekte und Verbrauch in einem Ablauf",
+        "Prüfstatus und Fortschritt direkt sichtbar",
+        "Abrechnung und Credits ohne Seitensprünge"
       ]
     },
     {
       id: "files",
       href: "/products/file-translation",
-      label: "File Translation",
+      label: "Dateiübersetzung",
       title: "Dateiübersetzung für reale Release-Dateien statt Demo-Uploads.",
       body: "Arbeite mit XLIFF, PO, STRINGS, RESX, CSV, TXT, DOCX und PPTX, ohne Struktur manuell neu aufzubauen.",
       points: [
         "Mehrformat-Upload mit wortbasiertem Credit-Modell",
-        "Side-by-side Review und Download im Originalformat",
+        "Seitenvergleich in der Prüfung und Download im Originalformat",
         "Tag- und Struktur-Schutz für Lokalisierungsdateien"
       ]
     }
   ];
 
   return {
-    navHome: "Overview",
+    navHome: "Überblick",
     navProducts: "Produkte",
     navPricing: "Preise",
     navLogin: "Anmelden",
@@ -1477,7 +1621,7 @@ function getGermanMarketingCopy() {
     },
     productCards,
     homeHero: {
-      eyebrow: "Language operations",
+      eyebrow: "Sprachoperationen",
       title: "Übersetzung als Produktfläche, nicht als Ordnerstruktur.",
       body: "Translayr bringt Projekte, Dateien, direkte Textübersetzung und Credits in ein sauberes System. Statt One-off-Uploads arbeitest du in einem klaren Release-Flow.",
       actions: [
@@ -1496,23 +1640,23 @@ function getGermanMarketingCopy() {
     ],
     homeOperationsEyebrow: "Release-Realität",
     homeOperationsTitle: "Gebaut für Teams, die Übersetzung operativ steuern müssen.",
-    homeOperationsBody: "Die Site erklärt Translayr jetzt wie ein Produkt: mit eigener Home, eigenen Produktseiten und einer separaten Pricing-Fläche. Das wirkt klarer, glaubwürdiger und näher an echten SaaS-Navigationsmustern.",
+    homeOperationsBody: "Die Seite erklärt Translayr jetzt wie ein Produkt: mit eigener Startseite, eigenen Produktseiten und einer separaten Preisfläche. Das wirkt klarer, glaubwürdiger und näher an echten SaaS-Navigationsmustern.",
     homeOperationsRows: [
       {
-        title: "Launches",
+        title: "Releases",
         body: "Mehrere Zielsprachen und mehrere Dateien bleiben im selben Projektkontext statt in Einzelaktionen."
       },
       {
-        title: "Review",
+        title: "Prüfung",
         body: "Fortschritt, offene Prüfungen und letzte Übersetzungen sind keine versteckten Zustände, sondern eigene Produktflächen."
       },
       {
-        title: "Finance",
+        title: "Finanzen",
         body: "Credits, monatliche Limits und aktuelle Kosten hängen direkt an derselben operativen Oberfläche."
       }
     ],
     productsHero: {
-      eyebrow: "Products",
+      eyebrow: "Produkte",
       title: "Drei Flächen, drei Aufgaben, ein zusammenhängender Release-Flow.",
       body: "Statt alles auf die Homepage zu legen, hat Translayr jetzt eigene Seiten für Workspace, Dateiübersetzung und schnelle Textübersetzung.",
       actions: [
@@ -1525,14 +1669,14 @@ function getGermanMarketingCopy() {
     productsGridBody: "Das ist näher an DeepL-ähnlichen Produktseiten: separate Flächen mit eigenem Fokus statt alles als Scroll-Stack.",
     compareEyebrow: "Vergleich",
     compareTitle: "So greifen die drei Flächen ineinander.",
-    compareBody: "Workspace ist der operative Kern. Files bringt strukturierte Assets hinein. Text deckt die schnellen Einzel-Outputs ab, die keinen Projektcontainer brauchen.",
+    compareBody: "Workspace ist der operative Kern. Dateien bringen strukturierte Assets hinein. Text deckt schnelle Einzel-Ausgaben ab, die keinen Projektcontainer brauchen.",
     compareRows: [
       {
         title: "Workspace",
-        body: "Für Projektstatus, Review, letzte Übersetzungen, Billing und Team-Kontext."
+        body: "Für Projektstatus, Prüfung, letzte Übersetzungen, Abrechnung und Team-Kontext."
       },
       {
-        title: "Files",
+        title: "Dateien",
         body: "Für echte Lokalisierungsdateien mit Upload, Fortschritt, Wortzählung und Export."
       },
       {
@@ -1543,7 +1687,7 @@ function getGermanMarketingCopy() {
     workspaceHero: {
       eyebrow: "Workspace",
       title: "Die Übersetzungszentrale für laufende Produktarbeit.",
-      body: "Der Workspace hält Projekte, Fortschritt, Review, Usage, Glossar und Billing an derselben Stelle. Genau dort, wo Teams täglich Entscheidungen treffen.",
+        body: "Der Workspace hält Projekte, Fortschritt, Prüfung, Verbrauch, Glossar und Abrechnung an derselben Stelle. Genau dort, wo Teams täglich Entscheidungen treffen.",
       actions: [
         { href: "/register", label: "Workspace testen", tone: "primary" as const },
         { href: "/dashboard", label: "Dashboard ansehen", tone: "secondary" as const }
@@ -1555,15 +1699,15 @@ function getGermanMarketingCopy() {
         title: "Ein Dashboard statt vier Nebentools.",
         body: "Monatsverbrauch, letzte Übersetzungen, Zielsprachen und Projektstatus liegen an einem Ort und müssen nicht aus mehreren Systemen zusammengesucht werden.",
         points: [
-          "Wörter diesen Monat, Spend und Savings sichtbar",
+          "Wörter diesen Monat, Kosten und Einsparungen sichtbar",
           "Letzte Übersetzungen direkt auf der Startfläche",
           "Zielsprachen und Projektaktivität ohne Kontextwechsel"
         ]
       },
       {
-        eyebrow: "Review",
+        eyebrow: "Prüfung",
         title: "Projektarbeit mit sichtbarem Prüfzustand.",
-        body: "Nicht nur hochladen und hoffen: Review, Qualitätsstatus und offene Dateien bleiben im Projektkontext verankert.",
+        body: "Nicht nur hochladen und hoffen: Prüfung, Qualitätsstatus und offene Dateien bleiben im Projektkontext verankert.",
         points: [
           "Review-Warteschlange im Dashboard",
           "Projekt-Workspace mit Datei-Status und Fortschritt",
@@ -1572,19 +1716,19 @@ function getGermanMarketingCopy() {
       },
       {
         eyebrow: "Kontrolle",
-        title: "Credits, Limits und Billing ohne Black Box.",
+        title: "Credits, Limits und Abrechnung ohne Black Box.",
         body: "Verbrauch, verbleibende Credits und Upgrade-Pfade sind direkt im Produkt sichtbar. Das macht Translayr operativ steuerbar statt nur technisch funktionsfähig.",
         points: [
           "Credit-Checks vor jeder Übersetzung",
-          "Usage- und Billing-Flächen mit echten Summen",
+          "Verbrauchs- und Abrechnungsflächen mit echten Summen",
           "Planleiter von Free bis Scale im selben System"
         ]
       }
     ],
     filesHero: {
-      eyebrow: "File translation",
+      eyebrow: "Dateiübersetzung",
       title: "Mehrformat-Übersetzung für die Dateien, mit denen Teams wirklich releasen.",
-      body: "Translayr ist nicht mehr nur XLIFF-first. Die Produktseite erklärt jetzt klar den Flow für strukturierte Dateien, Review und Exporte.",
+      body: "Translayr ist nicht mehr nur XLIFF-first. Die Produktseite erklärt jetzt klar den Ablauf für strukturierte Dateien, Prüfung und Exporte.",
       actions: [
         { href: "/register", label: "Datei hochladen", tone: "primary" as const },
         { href: "/products/file-translation", label: "Dateifläche ansehen", tone: "secondary" as const }
@@ -1606,7 +1750,7 @@ function getGermanMarketingCopy() {
         title: "Upload, Übersetzung, Review, Export.",
         body: "Die Dateiübersetzung ist als echter Ablauf dargestellt, nicht als generischer Demo-Upload mit einem einzigen Button.",
         points: [
-          "Drag-and-drop Upload mit Status",
+          "Drag-and-drop-Upload mit Status",
           "Zielsprache und Dateifortschritt je Artefakt",
           "Download im übersetzten Originalformat"
         ]
@@ -1617,15 +1761,15 @@ function getGermanMarketingCopy() {
         body: "Gerade bei strukturierten Dateiformaten ist die Sicherheit im Workflow entscheidend. Die Seite macht diesen Aspekt klar sichtbar.",
         points: [
           "Tag-Schutz im Übersetzungsprozess",
-          "Side-by-side Review für Dateiinhalt",
-          "Kein manuelles Reformatting vor dem Release"
+          "Seitenvergleich in der Prüfung für Dateiinhalt",
+          "Kein manuelles Neuformatieren vor dem Release"
         ]
       }
     ],
     textHero: {
-      eyebrow: "Text translation",
+      eyebrow: "Textübersetzung",
       title: "Direkte Übersetzung für kurze Inhalte, ohne erst ein Projekt anzulegen.",
-      body: "Nicht jede Übersetzung beginnt mit einer Datei. Für Copy, Support oder schnelle Freigaben gibt es eine eigene Textfläche mit Auto-Detect, Tonalität und Export.",
+      body: "Nicht jede Übersetzung beginnt mit einer Datei. Für Copy, Support oder schnelle Freigaben gibt es eine eigene Textfläche mit automatischer Erkennung, Tonalität und Export.",
       actions: [
         { href: "/translate", label: "Text übersetzen", tone: "primary" as const },
         { href: "/products/file-translation", label: "Dateifläche ansehen", tone: "secondary" as const }
@@ -1633,13 +1777,13 @@ function getGermanMarketingCopy() {
     },
     textBlocks: [
       {
-        eyebrow: "Speed",
+        eyebrow: "Geschwindigkeit",
         title: "Schneller Output für operative Texte.",
         body: "Die Textfläche ist für kurze Inhalte gedacht, die nicht erst in eine Projektstruktur umgebaut werden müssen.",
         points: [
           "Copy/Paste ohne Setup",
-          "Auto-Detect der Quellsprache",
-          "Sofortige Ausgabe im selben Screen"
+          "Automatische Erkennung der Quellsprache",
+          "Sofortige Ausgabe im selben Bildschirm"
         ]
       },
       {
@@ -1648,27 +1792,27 @@ function getGermanMarketingCopy() {
         body: "Auch schnelle Übersetzungen brauchen Kontrolle. Deshalb bleibt die Auswahl von Sprache und Stil im Flow sichtbar.",
         points: [
           "Zielsprache mit bevorzugten Sprachen oben",
-          "Tone-Optionen für formell, informell und technisch",
+          "Tonalitätsoptionen für formell, informell und technisch",
           "Copy und TXT-Export für den direkten Weiterweg"
         ]
       },
       {
         eyebrow: "Verbrauch",
         title: "Dieselbe Credit-Logik wie im Rest des Produkts.",
-        body: "Textübersetzungen laufen nicht nebenher, sondern in dieselbe Usage- und Credit-Logik wie Dateiübersetzungen.",
+        body: "Textübersetzungen laufen nicht nebenher, sondern in dieselbe Verbrauchs- und Credit-Logik wie Dateiübersetzungen.",
         points: [
           "Wortzählung vor dem Start",
           "Credit-Check vor der Übersetzung",
-          "Monatsverbrauch auf derselben Billing-Grundlage"
+          "Monatsverbrauch auf derselben Abrechnungsgrundlage"
         ]
       }
     ],
     pricingHero: {
-      eyebrow: "Pricing",
+      eyebrow: "Preise",
       title: "Eine klare Planleiter statt einer langen Scrollsektion.",
       body: "Preise leben jetzt auf einer eigenen Seite. Das wirkt sauberer, verständlicher und näher an einer echten Produktseite mit eigenem Fokus.",
       actions: [
-        { href: "/register", label: "Free starten", tone: "primary" as const },
+        { href: "/register", label: "Kostenlos starten", tone: "primary" as const },
         { href: "/products", label: "Produktseiten ansehen", tone: "secondary" as const }
       ]
     },
@@ -1678,15 +1822,15 @@ function getGermanMarketingCopy() {
     pricingNotes: [
       {
         title: "Credits",
-        body: "Ein Credit entspricht in der Produktlogik einem Wort. Dadurch bleibt Pricing direkt mit der echten Nutzung verknüpft."
+        body: "Ein Credit entspricht in der Produktlogik einem Wort. Dadurch bleiben Preise direkt mit der echten Nutzung verknüpft."
       },
       {
         title: "Upgrade",
-        body: "Wenn das Volumen größer wird als das aktuelle Paket erlaubt, bleibt der Upgrade-Pfad im Produkt und auf der Pricing-Seite konsistent."
+        body: "Wenn das Volumen größer wird als das aktuelle Paket erlaubt, bleibt der Upgrade-Pfad im Produkt und auf der Preisseite konsistent."
       },
       {
         title: "Positionierung",
-        body: "Die Pricing-Seite steht jetzt als eigene Fläche und muss nicht mehr in derselben Scrollstrecke wie Features und Story mitschwingen."
+        body: "Die Preisseite steht jetzt als eigene Fläche und muss nicht mehr in derselben Scrollstrecke wie Features und Story mitschwingen."
       }
     ],
     pricingComparison: [
@@ -1719,35 +1863,35 @@ function getGermanMarketingCopy() {
         values: [false, false, true, true]
       },
       {
-        label: "Glossary Basics",
+        label: "Glossar-Basics",
         values: [true, true, false, false]
       },
       {
-        label: "Glossary Support",
+        label: "Glossar-Support",
         values: [false, true, true, true]
       },
       {
-        label: "Priority Glossary Injection",
+        label: "Priorisierte Glossar-Injektion",
         values: [false, false, true, true]
       },
       {
-        label: "Project Workspaces",
+        label: "Projekt-Workspaces",
         values: [false, true, true, true]
       },
       {
-        label: "Review Workflow",
+        label: "Prüf-Workflow",
         values: [false, false, true, true]
       },
       {
-        label: "Faster Throughput",
+        label: "Höherer Durchsatz",
         values: [false, false, false, true]
       },
       {
-        label: "Shared Team Operations",
+        label: "Gemeinsame Team-Operationen",
         values: [false, false, false, true]
       },
       {
-        label: "Side-by-side Review",
+        label: "Seitenvergleich in der Prüfung",
         values: [false, false, true, true]
       },
       {
@@ -1774,7 +1918,7 @@ function getGermanMarketingCopy() {
   };
 }
 
-function getEnglishMarketingCopy() {
+function getEnglishMarketingCopy(): MarketingCopy {
   const productCards: ProductCard[] = [
     {
       id: "workspace",
