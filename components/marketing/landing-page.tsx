@@ -438,7 +438,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
             ))}
           </div>
 
-          <FeatureTabs productCards={productCards} locale={locale} />
+          <FeatureTabs locale={locale} />
 
           <DarkContrastSection locale={locale} />
 
@@ -544,7 +544,7 @@ function PageFrame({
         />
       ) : null}
 
-      <div className="relative mx-auto max-w-[1280px] px-5 pb-24 pt-12 sm:px-7 lg:px-8 lg:pt-20">
+      <div className="relative mx-auto max-w-[1280px] px-5 pb-24 pt-6 sm:px-7 lg:px-8 lg:pt-10">
         <section
           className={[
             "grid gap-12 border-b border-[var(--border)] pb-20 lg:items-center",
@@ -624,127 +624,112 @@ function MarketingHeader({
     if (!mobileOpen) {
       return;
     }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [mobileOpen]);
 
   return (
-    <>
-      <header className="sticky top-0 z-[100] border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.9)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-6 px-5 py-4 sm:px-7 lg:px-8">
-          <Link href="/" className="flex items-center gap-3">
-            <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--foreground)]">
-              <BrandMark />
-            </span>
-            <span className="text-[16px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">Translayr</span>
-          </Link>
+    <header className="sticky top-0 z-[120] border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.9)] backdrop-blur-xl">
+      <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-6 px-5 py-4 sm:px-7 lg:px-8">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--foreground)]">
+            <BrandMark />
+          </span>
+          <span className="text-[16px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">Translayr</span>
+        </Link>
 
-          <nav className="hidden items-center gap-8 md:flex">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={[
-                  "relative py-2 text-[14px] font-medium transition",
-                  item.active
-                    ? "text-[var(--foreground)]"
-                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                ].join(" ")}
-              >
-                {item.label}
-                {item.active ? <span className="absolute inset-x-0 -bottom-4 h-0.5 bg-[var(--foreground)]" /> : null}
-              </Link>
-            ))}
-          </nav>
+        <nav className="hidden items-center gap-8 md:flex">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={[
+                "relative py-2 text-[14px] font-medium transition",
+                item.active
+                  ? "text-[var(--foreground)]"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              ].join(" ")}
+            >
+              {item.label}
+              {item.active ? <span className="absolute inset-x-0 -bottom-4 h-0.5 bg-[var(--foreground)]" /> : null}
+            </Link>
+          ))}
+        </nav>
 
-          <div className="flex items-center gap-3">
-            <div className="pointer-events-auto relative hidden items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 md:flex">
-              <button
-                type="button"
-                onClick={() => onLocaleChange("en")}
-                className={[
-                  "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
-                  locale === "en"
-                    ? "bg-[var(--foreground)] text-[var(--surface)]"
-                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                ].join(" ")}
-              >
-                EN
-              </button>
-              <button
-                type="button"
-                onClick={() => onLocaleChange("de")}
-                className={[
-                  "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
-                  locale === "de"
-                    ? "bg-[var(--foreground)] text-[var(--surface)]"
-                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                ].join(" ")}
-              >
-                DE
-              </button>
-            </div>
-            <Link
-              href="/login"
-              className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
-            >
-              {loginLabel}
-            </Link>
-            <Link
-              href="/register"
-              className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
-            >
-              {registerLabel}
-            </Link>
+        <div className="flex items-center gap-3">
+          <div className="pointer-events-auto relative hidden items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 md:flex">
             <button
               type="button"
-              aria-expanded={mobileOpen}
-              aria-controls={mobileMenuId}
-              aria-label={mobileOpen ? (locale === "de" ? "Menü schließen" : "Close menu") : locale === "de" ? "Menü öffnen" : "Open menu"}
-              onClick={() => setMobileOpen((open) => !open)}
-              className="pointer-events-auto relative z-10 flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] transition hover:bg-[var(--background-strong)] md:hidden"
+              onClick={() => onLocaleChange("en")}
+              className={[
+                "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
+                locale === "en"
+                  ? "bg-[var(--foreground)] text-[var(--surface)]"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              ].join(" ")}
             >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                {mobileOpen ? (
-                  <path d="M4 4L14 14M14 4L4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                ) : (
-                  <>
-                    <path d="M3 5H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                    <path d="M3 9H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                    <path d="M3 13H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                  </>
-                )}
-              </svg>
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => onLocaleChange("de")}
+              className={[
+                "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
+                locale === "de"
+                  ? "bg-[var(--foreground)] text-[var(--surface)]"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              ].join(" ")}
+            >
+              DE
             </button>
           </div>
+          <Link
+            href="/login"
+            className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
+          >
+            {loginLabel}
+          </Link>
+          <Link
+            href="/register"
+            className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
+          >
+            {registerLabel}
+          </Link>
+          <button
+            type="button"
+            aria-expanded={mobileOpen}
+            aria-controls={mobileMenuId}
+            aria-label={mobileOpen ? (locale === "de" ? "Menü schließen" : "Close menu") : locale === "de" ? "Menü öffnen" : "Open menu"}
+            onClick={() => setMobileOpen((open) => !open)}
+            className="pointer-events-auto relative z-10 flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] transition hover:bg-[var(--background-strong)] md:hidden"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              {mobileOpen ? (
+                <path d="M4 4L14 14M14 4L4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+              ) : (
+                <>
+                  <path d="M3 5H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                  <path d="M3 9H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                  <path d="M3 13H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                </>
+              )}
+            </svg>
+          </button>
         </div>
-      </header>
+      </div>
 
-      {mobileOpen && (
-        <div id={mobileMenuId} className="fixed inset-0 z-[120] md:hidden">
-          <div className="absolute inset-0 bg-[var(--background)]/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <div className="absolute right-0 top-0 h-full w-[280px] border-l border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <span className="text-[14px] font-semibold text-[var(--foreground)]">
-                {locale === "de" ? "Menü" : "Menu"}
-              </span>
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-[8px] text-[var(--muted)] transition hover:bg-[var(--background-strong)] hover:text-[var(--foreground)]"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
-
-            <nav className="mt-8 flex flex-col gap-1">
+      {mobileOpen ? (
+        <div id={mobileMenuId} className="border-t border-[var(--border)] bg-[var(--surface)] md:hidden">
+          <div className="mx-auto max-w-[1280px] px-5 py-5 sm:px-7">
+            <nav className="flex flex-col gap-1">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
@@ -807,8 +792,8 @@ function MarketingHeader({
             </div>
           </div>
         </div>
-      )}
-    </>
+      ) : null}
+    </header>
   );
 }
 
@@ -1122,7 +1107,7 @@ function LogoBar({ locale }: { locale: "de" | "en" }) {
   );
 }
 
-function FeatureTabs({ productCards, locale }: { productCards: ProductCard[]; locale: "de" | "en" }) {
+function FeatureTabs({ locale }: { locale: "de" | "en" }) {
   const [activeTab, setActiveTab] = useState<"workspace" | "files">("workspace");
 
   const workspaceData =
@@ -1299,12 +1284,13 @@ function FeatureTabs({ productCards, locale }: { productCards: ProductCard[]; lo
 
   return (
     <section className="mt-32 grid gap-8 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_70px_rgba(17,17,16,0.04)] lg:p-8">
-      <div className="flex gap-1 rounded-full border border-[var(--border)] bg-[var(--background-strong)] p-1">
+      <div className="grid grid-cols-2 gap-1 rounded-full border border-[var(--border)] bg-[var(--background-strong)] p-1">
         <button
           type="button"
+          aria-pressed={activeTab === "workspace"}
           onClick={() => setActiveTab("workspace")}
           className={[
-            "rounded-full px-5 py-2.5 text-[13px] font-medium transition",
+            "w-full rounded-full px-3 py-2.5 text-center text-[12px] font-medium transition sm:px-5 sm:text-[13px]",
             activeTab === "workspace"
               ? "bg-[var(--foreground)] text-[var(--surface)]"
               : "text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -1314,9 +1300,10 @@ function FeatureTabs({ productCards, locale }: { productCards: ProductCard[]; lo
         </button>
         <button
           type="button"
+          aria-pressed={activeTab === "files"}
           onClick={() => setActiveTab("files")}
           className={[
-            "rounded-full px-5 py-2.5 text-[13px] font-medium transition",
+            "w-full rounded-full px-3 py-2.5 text-center text-[12px] font-medium transition sm:px-5 sm:text-[13px]",
             activeTab === "files"
               ? "bg-[var(--foreground)] text-[var(--surface)]"
               : "text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -1343,6 +1330,13 @@ function FeatureTabs({ productCards, locale }: { productCards: ProductCard[]; lo
               </li>
             ))}
           </ul>
+          <Link
+            href={activeTab === "workspace" ? "/products/workspace" : "/products/file-translation"}
+            className="mt-8 inline-flex items-center gap-2 text-[14px] font-medium text-[var(--processing)] transition hover:opacity-80"
+          >
+            {locale === "de" ? "Mehr erfahren" : "Learn more"}
+            <span className="text-[18px] leading-none">→</span>
+          </Link>
         </div>
         <div>{active.visual}</div>
       </div>
@@ -2165,7 +2159,7 @@ function getGermanMarketingCopy(): MarketingCopy {
       body: "Translayr ist nicht mehr nur XLIFF-first. Die Produktseite erklärt jetzt klar den Ablauf für strukturierte Dateien, Prüfung und Exporte.",
       actions: [
         { href: "/register", label: "Datei hochladen", tone: "primary" as const },
-        { href: "/products/file-translation", label: "Dateifläche ansehen", tone: "secondary" as const }
+        { href: "/pricing", label: "Preise ansehen", tone: "secondary" as const }
       ]
     },
     filesBlocks: [
@@ -2511,7 +2505,7 @@ function getEnglishMarketingCopy(): MarketingCopy {
       body: "Translayr is no longer framed as only XLIFF-first. This page clearly explains the flow for structured files, review, and export.",
       actions: [
         { href: "/register", label: "Upload a file", tone: "primary" as const },
-        { href: "/products/file-translation", label: "See file translation", tone: "secondary" as const }
+        { href: "/pricing", label: "View pricing", tone: "secondary" as const }
       ]
     },
     filesBlocks: [
