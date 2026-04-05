@@ -618,6 +618,20 @@ function MarketingHeader({
   onLocaleChange: (locale: "de" | "en") => void;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileMenuId = "marketing-mobile-menu";
+
+  useEffect(() => {
+    if (!mobileOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
 
   return (
     <>
@@ -689,7 +703,10 @@ function MarketingHeader({
             </Link>
             <button
               type="button"
-              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-expanded={mobileOpen}
+              aria-controls={mobileMenuId}
+              aria-label={mobileOpen ? (locale === "de" ? "Menü schließen" : "Close menu") : locale === "de" ? "Menü öffnen" : "Open menu"}
+              onClick={() => setMobileOpen((open) => !open)}
               className="pointer-events-auto relative z-10 flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] transition hover:bg-[var(--background-strong)] md:hidden"
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -709,7 +726,7 @@ function MarketingHeader({
       </header>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-[100] md:hidden">
+        <div id={mobileMenuId} className="fixed inset-0 z-[120] md:hidden">
           <div className="absolute inset-0 bg-[var(--background)]/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <div className="absolute right-0 top-0 h-full w-[280px] border-l border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
             <div className="flex items-center justify-between">
@@ -1465,9 +1482,9 @@ function MarketingFooter({ footer, locale }: { footer: MarketingFooterCopy; loca
             {locale === "de" ? "Rechtliches" : "Legal"}
           </div>
           <div className="mt-4 flex flex-col gap-3 text-[13px] text-[var(--muted)]">
-            <Link href="/" className="transition hover:text-[var(--processing)]">{footer.terms}</Link>
-            <Link href="/" className="transition hover:text-[var(--processing)]">{footer.privacy}</Link>
-            <Link href="/" className="transition hover:text-[var(--processing)]">{footer.status}</Link>
+            <Link href="/terms" className="transition hover:text-[var(--processing)]">{footer.terms}</Link>
+            <Link href="/privacy" className="transition hover:text-[var(--processing)]">{footer.privacy}</Link>
+            <Link href="/status" className="transition hover:text-[var(--processing)]">{footer.status}</Link>
           </div>
           <div className="mt-6 text-[12px] text-[var(--muted-soft)]">{footer.copyright}</div>
         </div>
