@@ -9,9 +9,9 @@ import { BILLING_PLANS } from "@/lib/billing/plans";
 const DISPLAY_FONT_CLASS_NAME = "[font-family:var(--font-display)] font-medium tracking-[-0.065em]";
 const EYEBROW_CLASS = "text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]";
 const PRIMARY_BUTTON_CLASS =
-  "px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70";
+  "inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--foreground)] px-6 text-[14px] font-medium text-[var(--surface)] transition hover:opacity-90";
 const SECONDARY_BUTTON_CLASS =
-  "inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-5 text-[13px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]";
+  "inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border)] bg-transparent px-5 text-[14px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]";
 
 type MarketingPageId = "home" | "products" | "workspace" | "files" | "pricing";
 
@@ -429,18 +429,25 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
           heroVisualLarge
           onLocaleChange={handleLocaleChange}
         >
+          <LogoBar locale={locale} />
+
           <SectionIntro eyebrow={copy.homeProductsEyebrow} title={copy.homeProductsTitle} body={copy.homeProductsBody} />
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+          <div className="mt-12 grid gap-5 lg:grid-cols-3">
             {productCards.map((card) => (
               <ProductLaneCard key={card.id} card={card} locale={locale} />
             ))}
           </div>
 
-          <section className="mt-20 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_24px_80px_rgba(17,17,16,0.05)]">
-            <div className="grid gap-px bg-[var(--border-light)] md:grid-cols-2 xl:grid-cols-4">
-              {copy.metrics.map((metric) => (
-                <div key={metric.label} className="bg-[var(--surface)] px-6 py-8">
-                  <div className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(2.2rem,3vw,3.1rem)] leading-none text-[var(--foreground)]`}>
+          <FeatureTabs productCards={productCards} locale={locale} />
+
+          <DarkContrastSection locale={locale} />
+
+          <section className="mt-32 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_24px_80px_rgba(17,17,16,0.05)]">
+            <div className="grid gap-px bg-[var(--border-light)] md:grid-cols-4">
+              {getIconMetrics(locale).map((metric) => (
+                <div key={metric.label} className="bg-[var(--surface)] px-6 py-10">
+                  <div className="text-[var(--muted-soft)]">{metric.icon}</div>
+                  <div className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2.2rem,3vw,3.1rem)] leading-none text-[var(--foreground)]`}>
                     {metric.value}
                   </div>
                   <div className="mt-3 text-[13px] text-[var(--muted)]">{metric.label}</div>
@@ -449,40 +456,14 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
             </div>
           </section>
 
-          <SocialProofSection locale={locale} />
-
-          <section className="mt-20 grid gap-6 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_70px_rgba(17,17,16,0.04)] lg:grid-cols-[0.95fr_1.05fr] lg:p-8">
-            <div>
-              <p className={EYEBROW_CLASS}>
-                {copy.homeOperationsEyebrow}
-              </p>
-              <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,3vw,3rem)] leading-[0.96] text-[var(--foreground)]`}>
-                {copy.homeOperationsTitle}
-              </h2>
-              <p className="mt-4 max-w-[520px] text-[15px] leading-7 text-[var(--muted)]">
-                {copy.homeOperationsBody}
-              </p>
-            </div>
-            <div className="grid gap-4">
-              {copy.homeOperationsRows.map((row) => (
-                <div key={row.title} className="grid gap-3 border-b border-[var(--border-light)] pb-4 last:border-b-0 last:pb-0 md:grid-cols-[140px_minmax(0,1fr)]">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-soft)]">
-                    {row.title}
-                  </div>
-                  <p className="text-[14px] leading-6 text-[var(--muted)]">{row.body}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-20">
+          <section className="mt-32">
             <SectionIntro eyebrow={copy.pricingGridEyebrow} title={copy.pricingGridTitle} body={copy.pricingGridBody} />
             <PricingIntervalToggle
               locale={locale}
               value={pricingInterval}
               onChange={setPricingInterval}
             />
-            <div className="mt-10 grid gap-5 xl:grid-cols-4">
+            <div className="mt-12 grid gap-5 xl:grid-cols-4">
               {pricingPlans.map((plan) => (
                 <PricingPlanCard key={plan.id} plan={plan} locale={locale} compact />
               ))}
@@ -548,7 +529,6 @@ function PageFrame({
 }: PageFrameProps) {
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[var(--surface)] text-[var(--foreground)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(26,79,175,0.08),transparent_28%),radial-gradient(circle_at_top_right,rgba(17,17,16,0.06),transparent_24%),radial-gradient(circle_at_50%_35%,rgba(17,17,16,0.05),transparent_34%)]" />
       <MarketingHeader
         navItems={navItems}
         loginLabel={loginLabel}
@@ -556,6 +536,7 @@ function PageFrame({
         locale={locale}
         onLocaleChange={onLocaleChange}
       />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(26,79,175,0.08),transparent_28%),radial-gradient(circle_at_top_right,rgba(17,17,16,0.06),transparent_24%),radial-gradient(circle_at_50%_35%,rgba(17,17,16,0.05),transparent_34%)]" />
       {activePage === "products" || activePage === "workspace" || activePage === "files" ? (
         <ProductTabs
           activePage={activePage}
@@ -567,7 +548,7 @@ function PageFrame({
         <section
           className={[
             "grid gap-12 border-b border-[var(--border)] pb-20 lg:items-center",
-            heroVisualLarge ? "lg:grid-cols-[0.8fr_1.2fr]" : "lg:grid-cols-[0.92fr_1.08fr]"
+            heroVisualLarge ? "lg:grid-cols-[0.75fr_1.25fr]" : "lg:grid-cols-[0.92fr_1.08fr]"
           ].join(" ")}
         >
           <div className="max-w-[560px]">
@@ -598,31 +579,20 @@ function PageFrame({
 
         <div className="pt-20">{children}</div>
 
-        <section className="mt-28 px-1 py-2 lg:px-2">
-          <div className="grid gap-6 lg:grid-cols-[0.95fr_0.45fr] lg:items-end">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
-                / {cta.eyebrow}
-              </p>
-              <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2rem,3vw,3.1rem)] leading-[0.95] text-[var(--foreground)]`}>
-                {cta.title}
-              </h2>
-              <p className="mt-4 max-w-[620px] text-[15px] leading-7 text-[var(--muted)]">
-                {cta.body}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 lg:justify-end">
+        <section className="mt-32 -mx-5 rounded-[28px] bg-[var(--foreground)] px-6 py-20 text-center sm:mx-0 sm:px-8 lg:px-12">
+          <div className="mx-auto max-w-[640px]">
+            <h2 className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(2.2rem,4vw,3.6rem)] leading-[0.92] text-[var(--surface)]`}>
+              {cta.title}
+            </h2>
+            <p className="mx-auto mt-5 max-w-[480px] text-[16px] leading-8 text-[var(--surface)]/60">
+              {cta.body}
+            </p>
+            <div className="mt-10">
               <Link
                 href="/register"
-                className={PRIMARY_BUTTON_CLASS}
+                className="inline-flex h-14 items-center justify-center rounded-[16px] bg-[var(--surface)] px-10 text-[16px] font-semibold text-[var(--foreground)] transition hover:opacity-90"
               >
                 {cta.primary}
-              </Link>
-              <Link
-                href="/login"
-                className={SECONDARY_BUTTON_CLASS}
-              >
-                {cta.secondary}
               </Link>
             </div>
           </div>
@@ -647,76 +617,181 @@ function MarketingHeader({
   locale: "de" | "en";
   onLocaleChange: (locale: "de" | "en") => void;
 }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
-    <header className="sticky top-0 z-50 relative border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.9)] backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-6 px-5 py-4 sm:px-7 lg:px-8">
-        <Link href="/" className="flex items-center gap-3">
-          <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--foreground)]">
-            <BrandMark />
-          </span>
-          <span className="text-[16px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">Translayr</span>
-        </Link>
+    <>
+      <header className="sticky top-0 z-[100] border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.9)] backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-6 px-5 py-4 sm:px-7 lg:px-8">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--foreground)]">
+              <BrandMark />
+            </span>
+            <span className="text-[16px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">Translayr</span>
+          </Link>
 
-        <nav className="hidden items-center gap-8 md:flex">
-          {navItems.map((item) => (
+          <nav className="hidden items-center gap-8 md:flex">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={[
+                  "relative py-2 text-[14px] font-medium transition",
+                  item.active
+                    ? "text-[var(--foreground)]"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                ].join(" ")}
+              >
+                {item.label}
+                {item.active ? <span className="absolute inset-x-0 -bottom-4 h-0.5 bg-[var(--foreground)]" /> : null}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <div className="pointer-events-auto relative hidden items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 md:flex">
+              <button
+                type="button"
+                onClick={() => onLocaleChange("en")}
+                className={[
+                  "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
+                  locale === "en"
+                    ? "bg-[var(--foreground)] text-[var(--surface)]"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                ].join(" ")}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => onLocaleChange("de")}
+                className={[
+                  "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
+                  locale === "de"
+                    ? "bg-[var(--foreground)] text-[var(--surface)]"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                ].join(" ")}
+              >
+                DE
+              </button>
+            </div>
             <Link
-              key={item.href}
-              href={item.href}
-              className={[
-                "relative py-2 text-[14px] font-medium transition",
-                item.active
-                  ? "text-[var(--foreground)]"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-              ].join(" ")}
+              href="/login"
+              className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
             >
-              {item.label}
-              {item.active ? <span className="absolute inset-x-0 -bottom-4 h-0.5 bg-[var(--foreground)]" /> : null}
+              {loginLabel}
             </Link>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-3">
-          <Link
-            href="/login"
-            className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
-          >
-            {loginLabel}
-          </Link>
-          <Link
-            href="/register"
-            className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
-          >
-            {registerLabel}
-          </Link>
-          <div className="pointer-events-auto relative flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1">
+            <Link
+              href="/register"
+              className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
+            >
+              {registerLabel}
+            </Link>
             <button
               type="button"
-              onClick={() => onLocaleChange("en")}
-              className={[
-                "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
-                locale === "en"
-                  ? "bg-[var(--foreground)] text-[var(--surface)]"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-              ].join(" ")}
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="pointer-events-auto relative z-10 flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] transition hover:bg-[var(--background-strong)] md:hidden"
             >
-              EN
-            </button>
-            <button
-              type="button"
-              onClick={() => onLocaleChange("de")}
-              className={[
-                "relative z-10 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition",
-                locale === "de"
-                  ? "bg-[var(--foreground)] text-[var(--surface)]"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-              ].join(" ")}
-            >
-              DE
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                {mobileOpen ? (
+                  <path d="M4 4L14 14M14 4L4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                ) : (
+                  <>
+                    <path d="M3 5H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                    <path d="M3 9H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                    <path d="M3 13H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                  </>
+                )}
+              </svg>
             </button>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[100] md:hidden">
+          <div className="absolute inset-0 bg-[var(--background)]/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="absolute right-0 top-0 h-full w-[280px] border-l border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-semibold text-[var(--foreground)]">
+                {locale === "de" ? "Menü" : "Menu"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-[8px] text-[var(--muted)] transition hover:bg-[var(--background-strong)] hover:text-[var(--foreground)]"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+
+            <nav className="mt-8 flex flex-col gap-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={[
+                    "rounded-[10px] px-4 py-3 text-[14px] font-medium transition",
+                    item.active
+                      ? "bg-[var(--background-strong)] text-[var(--foreground)]"
+                      : "text-[var(--muted)] hover:bg-[var(--background-strong)] hover:text-[var(--foreground)]"
+                  ].join(" ")}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+
+            <div className="mt-6 flex flex-col gap-2 border-t border-[var(--border)] pt-6">
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-[10px] px-4 py-3 text-center text-[14px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]"
+              >
+                {loginLabel}
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-[10px] bg-[var(--foreground)] px-4 py-3 text-center text-[14px] font-medium text-[var(--surface)] transition hover:opacity-90"
+              >
+                {registerLabel}
+              </Link>
+            </div>
+
+            <div className="mt-4 flex items-center justify-center gap-1 rounded-full border border-[var(--border)] bg-[var(--background-strong)] p-1">
+              <button
+                type="button"
+                onClick={() => { onLocaleChange("en"); setMobileOpen(false); }}
+                className={[
+                  "rounded-full px-4 py-2 text-[12px] font-medium transition",
+                  locale === "en"
+                    ? "bg-[var(--foreground)] text-[var(--surface)]"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                ].join(" ")}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => { onLocaleChange("de"); setMobileOpen(false); }}
+                className={[
+                  "rounded-full px-4 py-2 text-[12px] font-medium transition",
+                  locale === "de"
+                    ? "bg-[var(--foreground)] text-[var(--surface)]"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                ].join(" ")}
+              >
+                DE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -810,12 +885,16 @@ function PricingPlanCard({
   locale: "de" | "en";
   compact?: boolean;
 }) {
+  const [showMore, setShowMore] = useState(false);
+  const visibleFeatures = showMore ? plan.features : plan.features.slice(0, 3);
+  const hasMore = plan.features.length > 3;
+
   const card = (
     <div
       className={[
         "rounded-[26px] border px-6 py-6",
         plan.featured
-          ? "border-transparent bg-[linear-gradient(180deg,#fbfdff_0%,#f5f9ff_58%,#f3faf6_100%)] text-[var(--foreground)]"
+          ? "border-[var(--processing)] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f9ff_58%,#f3faf6_100%)] text-[var(--foreground)] shadow-[0_12px_40px_rgba(26,79,175,0.12)]"
           : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]"
       ].join(" ")}
     >
@@ -831,7 +910,7 @@ function PricingPlanCard({
               {plan.name}
             </p>
             {plan.featured ? (
-              <span className="rounded-full border border-[var(--processing-border)] bg-[var(--processing-bg)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--processing)]">
+              <span className="rounded-full bg-[var(--processing)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
                 {locale === "de" ? "Beliebtester Plan" : "Most popular"}
               </span>
             ) : null}
@@ -856,12 +935,8 @@ function PricingPlanCard({
         </span>
       </div>
 
-      <p className="mt-5 text-[14px] leading-7 text-[var(--muted)]">
-        {plan.description}
-      </p>
-
       <ul className="mt-6 space-y-3 text-[13px] leading-6">
-        {plan.features.map((feature) => (
+        {visibleFeatures.map((feature) => (
           <li key={feature} className="flex gap-3">
             <span className={["mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full", plan.featured ? "bg-[var(--processing)]" : "bg-[var(--foreground)]"].join(" ")} />
             <span>{feature}</span>
@@ -869,10 +944,22 @@ function PricingPlanCard({
         ))}
       </ul>
 
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setShowMore(!showMore)}
+          className="mt-4 text-[12px] font-medium text-[var(--processing)] transition hover:opacity-80"
+        >
+          {showMore
+            ? locale === "de" ? "Weniger anzeigen" : "Show less"
+            : locale === "de" ? "Mehr anzeigen" : "Show more"}
+        </button>
+      )}
+
       <Link
         href="/register"
         className={[
-          "mt-7 inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-medium transition",
+          "mt-5 inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-medium transition",
           plan.featured
             ? "bg-[var(--foreground)] text-white hover:opacity-90"
             : "border border-[var(--border)] bg-[var(--background-strong)] text-[var(--foreground)] hover:bg-[var(--background)]"
@@ -894,7 +981,7 @@ function PricingPlanCard({
   }
 
   return (
-    <div className="rounded-[28px] bg-[linear-gradient(135deg,rgba(26,79,175,0.32)_0%,rgba(26,127,75,0.24)_55%,rgba(17,17,16,0.08)_100%)] p-[1px]">
+    <div className="rounded-[28px] bg-[linear-gradient(135deg,var(--processing)_0%,rgba(26,127,75,0.6)_55%,rgba(17,17,16,0.15)_100%)] p-[2px]">
       {card}
     </div>
   );
@@ -997,6 +1084,336 @@ function SocialProofSection({ locale }: { locale: "de" | "en" }) {
       </div>
     </section>
   );
+}
+
+function LogoBar({ locale }: { locale: "de" | "en" }) {
+  const logos = ["Northstar", "Sora Labs", "Hello", "Wello", "Corresgot", "Clorfito"];
+
+  return (
+    <section className="mt-28 border-t border-[var(--border)] pt-12">
+      <p className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
+        {locale === "de" ? "Vertraut von Teams weltweit" : "Trusted by teams worldwide"}
+      </p>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+        {logos.map((logo) => (
+          <div key={logo} className="text-[15px] font-semibold tracking-[-0.03em] text-[var(--muted)]">
+            {logo}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FeatureTabs({ productCards, locale }: { productCards: ProductCard[]; locale: "de" | "en" }) {
+  const [activeTab, setActiveTab] = useState<"workspace" | "files">("workspace");
+
+  const workspaceData =
+    locale === "de"
+      ? {
+          eyebrow: "Übersetzungs-Workspace",
+          title: "Die operative Fläche für Projekte, Prüfung und Abrechnung.",
+          body: "Translayr bündelt Projektstatus, letzte Übersetzungen, Glossar und Verbrauch in einer klaren Oberfläche.",
+          points: [
+            "Dashboard, Projekte und Verbrauch in einem Ablauf",
+            "Prüfstatus und Fortschritt direkt sichtbar",
+            "Abrechnung und Credits ohne Seitensprünge"
+          ],
+          visual: (
+            <div className="overflow-hidden rounded-[20px] border border-[var(--border)] bg-[var(--background-strong)] p-5">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-[var(--muted-soft)]">Workspace</span>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {["Mobile-App-Texte", "Help-Center-Update", "Website-Checkout"].map((item, i) => (
+                  <div key={item} className="flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                    <div>
+                      <div className="text-[12px] font-medium text-[var(--foreground)]">{item}</div>
+                      <div className="mt-0.5 text-[10px] text-[var(--muted-soft)]">EN → DE, FR, ES</div>
+                    </div>
+                    <span
+                      className={[
+                        "rounded-full px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]",
+                        i === 0
+                          ? "border border-[var(--processing-border)] bg-[var(--processing-bg)] text-[var(--processing)]"
+                          : i === 1
+                            ? "border border-[var(--review-border)] bg-[var(--review-bg)] text-[var(--review)]"
+                            : "border border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success)]"
+                      ].join(" ")}
+                    >
+                      {i === 0 ? "Processing" : i === 1 ? "Review" : "Done"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        }
+      : {
+          eyebrow: "Translation workspace",
+          title: "The operating surface for projects, review, and billing.",
+          body: "Translayr pulls project state, recent translations, glossary context, and usage into one clean surface.",
+          points: [
+            "Dashboard, projects, and usage in one flow",
+            "Review state and progress visible at a glance",
+            "Billing and credits without leaving the product"
+          ],
+          visual: (
+            <div className="overflow-hidden rounded-[20px] border border-[var(--border)] bg-[var(--background-strong)] p-5">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-[var(--muted-soft)]">Workspace</span>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {["Mobile app strings", "Help center update", "Website checkout"].map((item, i) => (
+                  <div key={item} className="flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                    <div>
+                      <div className="text-[12px] font-medium text-[var(--foreground)]">{item}</div>
+                      <div className="mt-0.5 text-[10px] text-[var(--muted-soft)]">EN → DE, FR, ES</div>
+                    </div>
+                    <span
+                      className={[
+                        "rounded-full px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]",
+                        i === 0
+                          ? "border border-[var(--processing-border)] bg-[var(--processing-bg)] text-[var(--processing)]"
+                          : i === 1
+                            ? "border border-[var(--review-border)] bg-[var(--review-bg)] text-[var(--review)]"
+                            : "border border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success)]"
+                      ].join(" ")}
+                    >
+                      {i === 0 ? "Processing" : i === 1 ? "Review" : "Done"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        };
+
+  const filesData =
+    locale === "de"
+      ? {
+          eyebrow: "Dateiübersetzung",
+          title: "Dateiübersetzung für reale Release-Dateien statt Demo-Uploads.",
+          body: "Arbeite mit XLIFF, PO, STRINGS, RESX, CSV, TXT, DOCX und PPTX, ohne Struktur manuell neu aufzubauen.",
+          points: [
+            "Mehrformat-Upload mit wortbasiertem Credit-Modell",
+            "Seitenvergleich in der Prüfung und Download im Originalformat",
+            "Tag- und Struktur-Schutz für Lokalisierungsdateien"
+          ],
+          visual: (
+            <div className="overflow-hidden rounded-[20px] border border-[var(--border)] bg-[var(--background-strong)] p-5">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-[var(--muted-soft)]">Files</span>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--muted-soft)]">
+                    {locale === "de" ? "Quelle" : "Source"}
+                  </div>
+                  <div className="mt-2 space-y-1.5 text-[11px] text-[var(--muted)]">
+                    <div>Release notes for onboarding</div>
+                    <div>New billing cycle logic</div>
+                    <div>Review state improvements</div>
+                  </div>
+                </div>
+                <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--muted-soft)]">
+                    {locale === "de" ? "Übersetzung" : "Translation"}
+                  </div>
+                  <div className="mt-2 space-y-1.5 text-[11px] text-[var(--foreground)]">
+                    <div>Versionshinweise für Onboarding</div>
+                    <div>Neue Billing-Cycle-Logik</div>
+                    <div>Verbesserte Review-Zustände</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        }
+      : {
+          eyebrow: "File translation",
+          title: "File translation for real release assets, not demo uploads.",
+          body: "Work with XLIFF, PO, STRINGS, RESX, CSV, TXT, DOCX, and PPTX without manually rebuilding structure.",
+          points: [
+            "Multi-format upload with word-based credits",
+            "Side-by-side review and original-format download",
+            "Tag and structure protection for localization files"
+          ],
+          visual: (
+            <div className="overflow-hidden rounded-[20px] border border-[var(--border)] bg-[var(--background-strong)] p-5">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--border)]" />
+                <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-[var(--muted-soft)]">Files</span>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--muted-soft)]">Source</div>
+                  <div className="mt-2 space-y-1.5 text-[11px] text-[var(--muted)]">
+                    <div>Release notes for onboarding</div>
+                    <div>New billing cycle logic</div>
+                    <div>Review state improvements</div>
+                  </div>
+                </div>
+                <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--muted-soft)]">Translation</div>
+                  <div className="mt-2 space-y-1.5 text-[11px] text-[var(--foreground)]">
+                    <div>Versionshinweise für Onboarding</div>
+                    <div>Neue Billing-Cycle-Logik</div>
+                    <div>Verbesserte Review-Zustände</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        };
+
+  const active = activeTab === "workspace" ? workspaceData : filesData;
+
+  return (
+    <section className="mt-32 grid gap-8 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_70px_rgba(17,17,16,0.04)] lg:p-8">
+      <div className="flex gap-1 rounded-full border border-[var(--border)] bg-[var(--background-strong)] p-1">
+        <button
+          type="button"
+          onClick={() => setActiveTab("workspace")}
+          className={[
+            "rounded-full px-5 py-2.5 text-[13px] font-medium transition",
+            activeTab === "workspace"
+              ? "bg-[var(--foreground)] text-[var(--surface)]"
+              : "text-[var(--muted)] hover:text-[var(--foreground)]"
+          ].join(" ")}
+        >
+          {locale === "de" ? "Übersetzungs-Workspace" : "Translation Workspace"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("files")}
+          className={[
+            "rounded-full px-5 py-2.5 text-[13px] font-medium transition",
+            activeTab === "files"
+              ? "bg-[var(--foreground)] text-[var(--surface)]"
+              : "text-[var(--muted)] hover:text-[var(--foreground)]"
+          ].join(" ")}
+        >
+          {locale === "de" ? "Dateiübersetzung" : "File Translation"}
+        </button>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
+        <div>
+          <p className={EYEBROW_CLASS}>{active.eyebrow}</p>
+          <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(1.8rem,2.5vw,2.6rem)] leading-[0.96] text-[var(--foreground)]`}>
+            {active.title}
+          </h2>
+          <p className="mt-4 max-w-[520px] text-[15px] leading-7 text-[var(--muted)]">{active.body}</p>
+          <ul className="mt-6 space-y-3 text-[13px] leading-6 text-[var(--foreground)]">
+            {active.points.map((point) => (
+              <li key={point} className="flex gap-3">
+                <span className="mt-[2px] inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--foreground)] text-[11px] text-white">
+                  ✓
+                </span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>{active.visual}</div>
+      </div>
+    </section>
+  );
+}
+
+function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
+  return (
+    <section className="mt-32 -mx-5 rounded-[28px] bg-[var(--foreground)] px-6 py-20 sm:mx-0 sm:px-8 lg:px-12">
+      <div className="mx-auto max-w-[720px] text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--surface)]/60">
+          {locale === "de" ? "Warum Translayr" : "Why Translayr"}
+        </p>
+        <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-6 text-[clamp(2rem,3.5vw,3.2rem)] leading-[0.95] text-[var(--surface)]`}>
+          {locale === "de"
+            ? "Übersetzung ist kein Nebenprozess. Sie ist dein Release-Flow."
+            : "Translation is not a side process. It is your release flow."}
+        </h2>
+        <p className="mx-auto mt-5 max-w-[560px] text-[16px] leading-8 text-[var(--surface)]/70">
+          {locale === "de"
+            ? "Teams nutzen Translayr, um Projekte, Dateien und Reviews in einer einzigen Oberfläche zu betreiben – ohne Kontextwechsel, ohne Tool-Salat."
+            : "Teams use Translayr to run projects, files, and reviews in a single surface – no context switching, no tool sprawl."}
+        </p>
+        <div className="mt-10 grid gap-8 sm:grid-cols-3">
+          {[
+            {
+              stat: locale === "de" ? "320+ Teams" : "320+ teams",
+              desc: locale === "de" ? "nutzen Translayr aktiv im Rollout" : "actively using Translayr in rollout"
+            },
+            {
+              stat: "99.9%",
+              desc: locale === "de" ? "erfolgreiche Datei-Exporte im ersten Anlauf" : "successful file exports on first run"
+            },
+            {
+              stat: "183",
+              desc: locale === "de" ? "durchschnittliche Workflows pro Monat" : "average workflows per month"
+            }
+          ].map((item) => (
+            <div key={item.stat}>
+              <div className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(1.8rem,2.5vw,2.4rem)] leading-none text-[var(--surface)]`}>
+                {item.stat}
+              </div>
+              <div className="mt-3 text-[13px] text-[var(--surface)]/60">{item.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function getIconMetrics(locale: "de" | "en") {
+  const teamIcon = (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <circle cx="9" cy="7" r="3" stroke="currentColor" strokeWidth="1.5"/>
+      <circle cx="17" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M17 13a3 3 0 013 3v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+  const uptimeIcon = (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+  const workflowIcon = (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+      <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M10 6.5h4a2 2 0 012 2v1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M14 17.5h-4a2 2 0 01-2-2V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+  const formatIcon = (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+
+  return [
+    { value: "320+", label: locale === "de" ? "Teams im aktiven Rollout" : "teams shipping actively", icon: teamIcon },
+    { value: "99.9%", label: locale === "de" ? "Exporte im ersten Anlauf" : "exports passing on first run", icon: uptimeIcon },
+    { value: "183", label: locale === "de" ? "Workflows pro Monat" : "active workflows per month", icon: workflowIcon },
+    { value: "8+", label: locale === "de" ? "Produktive Dateiformate" : "production file formats", icon: formatIcon }
+  ];
 }
 
 function MarketingFooter({ footer, locale }: { footer: MarketingFooterCopy; locale: "de" | "en" }) {
@@ -1121,7 +1538,7 @@ function HomeHeroVisual({ locale }: { locale: "de" | "en" }) {
           {locale === "de" ? "Workspace-Vorschau" : "Workspace preview"}
         </div>
       </div>
-      <div className="grid min-h-[560px] grid-cols-[94px_minmax(0,1fr)]">
+      <div className="grid min-h-[640px] grid-cols-[94px_minmax(0,1fr)]">
         <aside className="border-r border-[var(--border)] bg-[var(--background-strong)] px-3 py-4">
           <div className="space-y-2">
             {[
