@@ -247,7 +247,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
           onLocaleChange={handleLocaleChange}
         >
           <SectionIntro eyebrow={copy.productsGridEyebrow} title={copy.productsGridTitle} body={copy.productsGridBody} />
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+          <div className="mt-10 grid gap-5 lg:grid-cols-2">
             {productCards.map((card) => (
               <ProductLaneCard key={card.id} card={card} locale={locale} />
             ))}
@@ -433,7 +433,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
         >
 
           <SectionIntro eyebrow={copy.homeProductsEyebrow} title={copy.homeProductsTitle} body={copy.homeProductsBody} />
-          <div className="mt-12 grid gap-5 lg:grid-cols-3">
+          <div className="mt-12 grid gap-5 lg:grid-cols-2">
             {productCards.map((card) => (
               <ProductLaneCard key={card.id} card={card} locale={locale} />
             ))}
@@ -1024,16 +1024,14 @@ function SocialProofSection({ locale }: { locale: "de" | "en" }) {
   const stats =
     locale === "de"
       ? [
-          { value: "320+", label: "Teams im aktiven Rollout" },
-          { value: "18", label: "Durchschnittliche Zielsprachen pro Team" },
-          { value: "183", label: "aktive Workflows pro Monat" },
+          { value: "Viele Teams", label: "nutzen Translayr aktiv im Rollout" },
+          { value: "300k+", label: "Wörter bereits übersetzt" },
           { value: "99.9%", label: "Datei-Exporte im ersten Durchlauf" }
         ]
       : [
-          { value: "320+", label: "teams shipping actively" },
-          { value: "18", label: "average target locales per team" },
-          { value: "183", label: "active workflows per month" },
-          { value: "99.9%", label: "exports passing on the first handoff" }
+          { value: "Many Teams", label: "actively using Translayr in rollout" },
+          { value: "300k+", label: "words already translated" },
+          { value: "99.9%", label: "successful file exports on first run" }
         ];
 
   return (
@@ -1051,10 +1049,8 @@ function SocialProofSection({ locale }: { locale: "de" | "en" }) {
                   index === 0
                     ? "text-[var(--foreground)]"
                     : index === 1
-                      ? "text-[var(--foreground)]"
-                      : index === 2
-                        ? "text-[var(--processing)]"
-                        : "text-[var(--success)]"
+                      ? "text-[var(--processing)]"
+                      : "text-[var(--success)]"
                 ].join(" ")}
               >
                 {stat.value}
@@ -1325,7 +1321,7 @@ function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
         <div className="mt-10 grid gap-8 sm:grid-cols-3">
           {[
             {
-              stat: locale === "de" ? "320+ Teams" : "320+ teams",
+              stat: locale === "de" ? "Viele Teams" : "Many Teams",
               desc: locale === "de" ? "nutzen Translayr aktiv im Rollout" : "actively using Translayr in rollout"
             },
             {
@@ -1333,8 +1329,8 @@ function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
               desc: locale === "de" ? "erfolgreiche Datei-Exporte im ersten Anlauf" : "successful file exports on first run"
             },
             {
-              stat: "183",
-              desc: locale === "de" ? "durchschnittliche Workflows pro Monat" : "average workflows per month"
+              stat: "300k+",
+              desc: locale === "de" ? "Wörter bereits übersetzt" : "words already translated"
             }
           ].map((item) => (
             <div key={item.stat}>
@@ -1381,9 +1377,9 @@ function getIconMetrics(locale: "de" | "en") {
   );
 
   return [
-    { value: "320+", label: locale === "de" ? "Teams im aktiven Rollout" : "teams shipping actively", icon: teamIcon },
+    { value: "Many Teams", label: locale === "de" ? "Teams im aktiven Rollout" : "actively using Translayr in rollout", icon: teamIcon },
     { value: "99.9%", label: locale === "de" ? "Exporte im ersten Anlauf" : "exports passing on first run", icon: uptimeIcon },
-    { value: "183", label: locale === "de" ? "Workflows pro Monat" : "active workflows per month", icon: workflowIcon },
+    { value: "300k+", label: locale === "de" ? "Wörter bereits übersetzt" : "words already translated", icon: workflowIcon },
     { value: "8+", label: locale === "de" ? "Produktive Dateiformate" : "production file formats", icon: formatIcon }
   ];
 }
