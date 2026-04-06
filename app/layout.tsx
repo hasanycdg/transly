@@ -33,7 +33,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} className={`${manrope.variable} ${bodoni.variable}`} suppressHydrationWarning>
-      <body>
+      <body suppressHydrationWarning>
         <AppLocaleProvider locale={locale}>{children}</AppLocaleProvider>
       </body>
     </html>
