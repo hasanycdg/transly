@@ -524,7 +524,7 @@ export default function BlogPage() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/register"
-              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--foreground)] px-5 text-[13px] font-medium text-[var(--surface)] transition hover:opacity-90"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-black px-5 text-[13px] font-medium text-white transition hover:bg-black"
             >
               {lang === "de" ? "Kostenlos starten" : "Start free"}
             </Link>

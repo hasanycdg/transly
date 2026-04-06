@@ -10,6 +10,8 @@ const DISPLAY_FONT_CLASS_NAME = "[font-family:var(--font-display)] font-medium t
 const EYEBROW_CLASS = "text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]";
 const PRIMARY_BUTTON_CLASS =
   "inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--foreground)] px-6 text-[14px] font-medium text-[var(--surface)] transition hover:opacity-90";
+const REGISTER_BUTTON_CLASS =
+  "inline-flex h-11 items-center justify-center rounded-[14px] !bg-black px-6 text-[14px] font-medium !text-white transition hover:!bg-black";
 const SECONDARY_BUTTON_CLASS =
   "inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border)] bg-transparent px-5 text-[14px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]";
 
@@ -566,7 +568,13 @@ function PageFrame({
                 <Link
                   key={action.href + action.label}
                   href={action.href}
-                  className={action.tone === "primary" ? PRIMARY_BUTTON_CLASS : SECONDARY_BUTTON_CLASS}
+                  className={
+                    action.href === "/register"
+                      ? REGISTER_BUTTON_CLASS
+                      : action.tone === "primary"
+                        ? PRIMARY_BUTTON_CLASS
+                        : SECONDARY_BUTTON_CLASS
+                  }
                 >
                   {action.label}
                 </Link>
@@ -590,7 +598,7 @@ function PageFrame({
             <div className="mt-10">
               <Link
                 href="/register"
-                className="inline-flex h-14 items-center justify-center rounded-[16px] bg-[var(--surface)] px-10 text-[16px] font-semibold text-[var(--foreground)] transition hover:opacity-90"
+                className="inline-flex h-14 items-center justify-center rounded-[16px] bg-black px-10 text-[16px] font-semibold text-white ring-1 ring-white/20 transition hover:bg-black"
               >
                 {cta.primary}
               </Link>
@@ -665,6 +673,18 @@ function MarketingHeader({
         </nav>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
+          >
+            {loginLabel}
+          </Link>
+          <Link
+            href="/register"
+            className="hidden rounded-full !bg-black px-4 py-2 text-[14px] font-medium !text-white transition hover:!bg-black md:inline-flex"
+          >
+            {registerLabel}
+          </Link>
           <div className="pointer-events-auto relative hidden items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 md:flex">
             <button
               type="button"
@@ -691,18 +711,6 @@ function MarketingHeader({
               DE
             </button>
           </div>
-          <Link
-            href="/login"
-            className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
-          >
-            {loginLabel}
-          </Link>
-          <Link
-            href="/register"
-            className="hidden px-2 py-2 text-[14px] font-medium text-[var(--foreground)] transition hover:opacity-70 md:inline-flex"
-          >
-            {registerLabel}
-          </Link>
           <button
             type="button"
             aria-expanded={mobileOpen}
@@ -758,7 +766,7 @@ function MarketingHeader({
               <Link
                 href="/register"
                 onClick={() => setMobileOpen(false)}
-                className="rounded-[10px] bg-[var(--foreground)] px-4 py-3 text-center text-[14px] font-medium text-[var(--surface)] transition hover:opacity-90"
+                className="rounded-[10px] !bg-black px-4 py-3 text-center text-[14px] font-medium !text-white transition hover:!bg-black"
               >
                 {registerLabel}
               </Link>
@@ -963,7 +971,7 @@ function PricingPlanCard({
         className={[
           "mt-5 inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-medium transition",
           plan.featured
-            ? "bg-[var(--foreground)] text-white hover:opacity-90"
+            ? "!bg-black !text-white hover:!bg-black"
             : "border border-[var(--border)] bg-[var(--background-strong)] text-[var(--foreground)] hover:bg-[var(--background)]"
         ].join(" ")}
       >
