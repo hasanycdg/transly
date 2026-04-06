@@ -431,7 +431,6 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
           heroVisualLarge
           onLocaleChange={handleLocaleChange}
         >
-          <LogoBar locale={locale} />
 
           <SectionIntro eyebrow={copy.homeProductsEyebrow} title={copy.homeProductsTitle} body={copy.homeProductsBody} />
           <div className="mt-12 grid gap-5 lg:grid-cols-3">
@@ -586,25 +585,6 @@ function PageFrame({
         </section>
 
         <div className="pt-20">{children}</div>
-
-        <section className="mt-32 -mx-5 rounded-[28px] bg-[var(--foreground)] px-6 py-20 text-center sm:mx-0 sm:px-8 lg:px-12">
-          <div className="mx-auto max-w-[640px]">
-            <h2 className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(2.2rem,4vw,3.6rem)] leading-[0.92] text-[var(--surface)]`}>
-              {cta.title}
-            </h2>
-            <p className="mx-auto mt-5 max-w-[480px] text-[16px] leading-8 text-[var(--surface)]/60">
-              {cta.body}
-            </p>
-            <div className="mt-10">
-              <Link
-                href="/register"
-                className="inline-flex h-14 items-center justify-center rounded-[16px] bg-black px-10 text-[16px] font-semibold text-white ring-1 ring-white/20 transition hover:bg-black"
-              >
-                {cta.primary}
-              </Link>
-            </div>
-          </div>
-        </section>
       </div>
 
       <MarketingFooter footer={footer} locale={locale} />
@@ -1041,7 +1021,6 @@ function PricingIntervalToggle({
 }
 
 function SocialProofSection({ locale }: { locale: "de" | "en" }) {
-  const logos = ["Northstar", "Hello", "Sora Labs", "Community", "Wello", "Corresgot", "Clorfito", "nebsiiitt", "pumbel"];
   const stats =
     locale === "de"
       ? [
@@ -1060,15 +1039,8 @@ function SocialProofSection({ locale }: { locale: "de" | "en" }) {
   return (
     <section className="mt-24 border-t border-[var(--border)] pt-16">
       <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-        <div>
+        <div className="hidden">
           <p className={EYEBROW_CLASS}>/ {locale === "de" ? "Vertrauen" : "Social proof"}</p>
-          <div className="mt-8 grid gap-8 sm:grid-cols-3">
-            {logos.map((logo) => (
-              <div key={logo} className="text-[14px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
-                {logo}
-              </div>
-            ))}
-          </div>
         </div>
         <div className="grid gap-8 sm:grid-cols-2">
           {stats.map((stat, index) => (
@@ -1091,25 +1063,6 @@ function SocialProofSection({ locale }: { locale: "de" | "en" }) {
             </div>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-function LogoBar({ locale }: { locale: "de" | "en" }) {
-  const logos = ["Northstar", "Sora Labs", "Hello", "Wello", "Corresgot", "Clorfito"];
-
-  return (
-    <section className="mt-28 border-t border-[var(--border)] pt-12">
-      <p className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
-        {locale === "de" ? "Vertraut von Teams weltweit" : "Trusted by teams worldwide"}
-      </p>
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
-        {logos.map((logo) => (
-          <div key={logo} className="text-[15px] font-semibold tracking-[-0.03em] text-[var(--muted)]">
-            {logo}
-          </div>
-        ))}
       </div>
     </section>
   );
