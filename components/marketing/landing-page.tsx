@@ -111,6 +111,10 @@ type MarketingCopy = {
   homeProductsEyebrow: string;
   homeProductsTitle: string;
   homeProductsBody: string;
+  solutionEyebrow: string;
+  solutionTitle: string;
+  solutionBody: string;
+  featureCards: Array<{ title: string; body: string }>;
   metrics: Array<{ value: string; label: string }>;
   homeOperationsEyebrow: string;
   homeOperationsTitle: string;
@@ -439,19 +443,15 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
             ))}
           </div>
 
-          <FeatureTabs locale={locale} />
-
-          <DarkContrastSection locale={locale} />
-
-          <section className="mt-32 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_24px_80px_rgba(17,17,16,0.05)]">
-            <div className="grid gap-px bg-[var(--border-light)] md:grid-cols-4">
-              {getIconMetrics(locale).map((metric) => (
-                <div key={metric.label} className="bg-[var(--surface)] px-6 py-10">
-                  <div className="text-[var(--muted-soft)]">{metric.icon}</div>
-                  <div className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(2.2rem,3vw,3.1rem)] leading-none text-[var(--foreground)]`}>
-                    {metric.value}
-                  </div>
-                  <div className="mt-3 text-[13px] text-[var(--muted)]">{metric.label}</div>
+          <section className="mt-32">
+            <SectionIntro eyebrow={copy.solutionEyebrow} title={copy.solutionTitle} body={copy.solutionBody} />
+            <div className="mt-12 grid gap-5 lg:grid-cols-3">
+              {copy.featureCards.map((card) => (
+                <div key={card.title} className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-6 py-6">
+                  <h3 className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(1.6rem,2vw,2rem)] leading-[0.94] text-[var(--foreground)]`}>
+                    {card.title}
+                  </h3>
+                  <p className="mt-4 text-[15px] leading-7 text-[var(--muted)]">{card.body}</p>
                 </div>
               ))}
             </div>
@@ -1306,17 +1306,17 @@ function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
     <section className="mt-32 -mx-5 rounded-[28px] bg-[var(--foreground)] px-6 py-20 sm:mx-0 sm:px-8 lg:px-12">
       <div className="mx-auto max-w-[720px] text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--surface)]/60">
-          {locale === "de" ? "Warum Translayr" : "Why Translayr"}
+          {locale === "de" ? "Statement" : "Statement"}
         </p>
         <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-6 text-[clamp(2rem,3.5vw,3.2rem)] leading-[0.95] text-[var(--surface)]`}>
           {locale === "de"
-            ? "Übersetzung ist kein Nebenprozess. Sie ist dein Release-Flow."
-            : "Translation is not a side process. It is your release flow."}
+            ? "Übersetzung ist Teil deines Produkts — keine Nebenaufgabe."
+            : "Translation is part of your product — not a side task."}
         </h2>
         <p className="mx-auto mt-5 max-w-[560px] text-[16px] leading-8 text-[var(--surface)]/70">
           {locale === "de"
-            ? "Teams nutzen Translayr, um Projekte, Dateien und Reviews in einer einzigen Oberfläche zu betreiben – ohne Kontextwechsel, ohne Tool-Salat."
-            : "Teams use Translayr to run projects, files, and reviews in a single surface – no context switching, no tool sprawl."}
+            ? "Behandle Übersetzung nicht als separaten Schritt. Behalte alles in einem Flow, vom Inhalt bis zum Release."
+            : "Stop treating translation as a separate step. Keep everything in one flow, from content to release."}
         </p>
         <div className="mt-10 grid gap-8 sm:grid-cols-3">
           {[
@@ -2017,6 +2017,23 @@ function getGermanMarketingCopy(): MarketingCopy {
     homeProductsEyebrow: "Produktfamilie",
     homeProductsTitle: "Nicht eine Scrollseite, sondern eine echte Produktstruktur.",
     homeProductsBody: "Die Startseite führt in die drei Kernflächen. Jede Produktseite erklärt einen klaren Job statt alles in einen langen One-Pager zu drücken.",
+    solutionEyebrow: "Die Lösung",
+    solutionTitle: "Ein System für alles, was du übersetzt.",
+    solutionBody: "Vom Website-Inhalt bis zu Release-Dateien – alles bleibt strukturiert, verbunden und einsatzbereit.",
+    featureCards: [
+      {
+        title: "Workspace",
+        body: "Verwalte Übersetzungsprojekte an einem Ort. Verfolge Fortschritt, überprüfe Inhalte und verwalte die Nutzung, ohne Tools zu wechseln."
+      },
+      {
+        title: "Dateiübersetzung",
+        body: "Übersetze echte Dateien, ohne die Struktur zu brechen. Lade XLIFF, DOCX, PPTX und mehr hoch – erhalte saubere, einsatzbereite Ergebnisse."
+      },
+      {
+        title: "Direkte Übersetzung",
+        body: "Übersetze Inhalte sofort. Sende Inhalte direkt oder füge Text ein und erhalte strukturierte Übersetzungen zurück."
+      }
+    ],
     metrics: [
       { value: "1K–700K", label: "Monatliche Credits über die Planleiter" },
       { value: "8+", label: "Produktive Dateiformate im Live-Flow" },
@@ -2042,16 +2059,16 @@ function getGermanMarketingCopy(): MarketingCopy {
     ],
     productsHero: {
       eyebrow: "Produkte",
-      title: "Drei Flächen, drei Aufgaben, ein zusammenhängender Release-Flow.",
-      body: "Statt alles auf die Homepage zu legen, hat Translayr jetzt eigene Seiten für Workspace, Dateiübersetzung und schnelle Textübersetzung.",
+      title: "Drei Workflows. Ein Übersetzungssystem.",
+      body: "Unterschiedliche Aufgaben erfordern unterschiedliche Tools – aber sie sollten zusammenarbeiten.",
       actions: [
         { href: "/products/workspace", label: "Workspace öffnen", tone: "primary" as const },
         { href: "/pricing", label: "Preise ansehen", tone: "secondary" as const }
       ]
     },
-    productsGridEyebrow: "Produktseiten",
-    productsGridTitle: "Jede Seite erklärt einen klaren Job im Produkt.",
-    productsGridBody: "Das ist näher an DeepL-ähnlichen Produktseiten: separate Flächen mit eigenem Fokus statt alles als Scroll-Stack.",
+    productsGridEyebrow: "Jeder Workflow löst eine spezifische Aufgabe",
+    productsGridTitle: "Statt einer überladenen Oberfläche konzentriert sich jeder Teil des Produkts auf eine klare Aufgabe.",
+    productsGridBody: "Projekte verwalten deine laufende Arbeit. Dateien verarbeiten strukturierte Assets. Text deckt schnelle Übersetzungen ab. Alles in einem System verbunden.",
     compareEyebrow: "Vergleich",
     compareTitle: "So greifen die drei Flächen ineinander.",
     compareBody: "Workspace ist der operative Kern. Dateien bringen strukturierte Assets hinein. Text deckt schnelle Einzel-Ausgaben ab, die keinen Projektcontainer brauchen.",
@@ -2071,8 +2088,8 @@ function getGermanMarketingCopy(): MarketingCopy {
     ],
     workspaceHero: {
       eyebrow: "Workspace",
-      title: "Die Übersetzungszentrale für laufende Produktarbeit.",
-        body: "Der Workspace hält Projekte, Fortschritt, Prüfung, Verbrauch, Glossar und Abrechnung an derselben Stelle. Genau dort, wo Teams täglich Entscheidungen treffen.",
+      title: "Deine Übersetzungszentrale",
+      body: "Verwalte Projekte, verfolge Fortschritt und überprüfe Übersetzungen — alles an einem Ort.",
       actions: [
         { href: "/register", label: "Workspace testen", tone: "primary" as const },
         { href: "/dashboard", label: "Dashboard ansehen", tone: "secondary" as const }
@@ -2080,40 +2097,40 @@ function getGermanMarketingCopy(): MarketingCopy {
     },
     workspaceBlocks: [
       {
-        eyebrow: "Operativ",
-        title: "Ein Dashboard statt vier Nebentools.",
-        body: "Monatsverbrauch, letzte Übersetzungen, Zielsprachen und Projektstatus liegen an einem Ort und müssen nicht aus mehreren Systemen zusammengesucht werden.",
+        eyebrow: "Dashboard",
+        title: "Alles in einem Dashboard",
+        body: "Projekte, Verbrauch und letzte Aktivitäten — alles auf einen Blick sichtbar.",
         points: [
-          "Wörter diesen Monat, Kosten und Einsparungen sichtbar",
-          "Letzte Übersetzungen direkt auf der Startfläche",
-          "Zielsprachen und Projektaktivität ohne Kontextwechsel"
+          "Projekte, Verbrauch und letzte Aktivitäten an einem Ort",
+          "Fortschritt auf einen Blick verfolgen",
+          "Kein Kontextwechsel nötig"
         ]
       },
       {
         eyebrow: "Prüfung",
-        title: "Projektarbeit mit sichtbarem Prüfzustand.",
-        body: "Nicht nur hochladen und hoffen: Prüfung, Qualitätsstatus und offene Dateien bleiben im Projektkontext verankert.",
+        title: "Prüfung in den Workflow eingebaut",
+        body: "Sieh was erledigt ist, was geprüft werden muss und was bereit ist.",
         points: [
-          "Review-Warteschlange im Dashboard",
-          "Projekt-Workspace mit Datei-Status und Fortschritt",
-          "Download und Review bleiben im selben Ablauf"
+          "Klare Prüfstatus im Dashboard sichtbar",
+          "Projekt-Workspaces mit Datei-Status und Fortschritt",
+          "Download und Prüfung im selben Ablauf"
         ]
       },
       {
-        eyebrow: "Kontrolle",
-        title: "Credits, Limits und Abrechnung ohne Black Box.",
-        body: "Verbrauch, verbleibende Credits und Upgrade-Pfade sind direkt im Produkt sichtbar. Das macht Translayr operativ steuerbar statt nur technisch funktionsfähig.",
+        eyebrow: "Abrechnung",
+        title: "Klarer Verbrauch und Abrechnung",
+        body: "Wisse genau, was du nutzt und was es kostet — keine Überraschungen.",
         points: [
           "Credit-Checks vor jeder Übersetzung",
-          "Verbrauchs- und Abrechnungsflächen mit echten Summen",
-          "Planleiter von Free bis Scale im selben System"
+          "Verbrauch direkt im Produkt sichtbar",
+          "Upgrade-Pfade wenn du mehr brauchst"
         ]
       }
     ],
     filesHero: {
       eyebrow: "Dateiübersetzung",
-      title: "Mehrformat-Übersetzung für die Dateien, mit denen Teams wirklich releasen.",
-      body: "Translayr ist nicht mehr nur XLIFF-first. Die Produktseite erklärt jetzt klar den Ablauf für strukturierte Dateien, Prüfung und Exporte.",
+      title: "Übersetze Dateien ohne sie zu zerstören",
+      body: "Lade strukturierte Dateien und Dokumente hoch — erhalte Ergebnisse, die sofort einsatzbereit sind.",
       actions: [
         { href: "/register", label: "Datei hochladen", tone: "primary" as const },
         { href: "/pricing", label: "Preise ansehen", tone: "secondary" as const }
@@ -2122,8 +2139,8 @@ function getGermanMarketingCopy(): MarketingCopy {
     filesBlocks: [
       {
         eyebrow: "Formate",
-        title: "Von Lokalisierungsdateien bis Office-Dokumente.",
-        body: "Die Dateifläche nimmt reale Formate an und hält dabei das Credit-Modell und die Dateistruktur konsistent.",
+        title: "Unterstützt echte Formate",
+        body: "XLIFF, XLF, DOCX, PPTX, CSV, TXT und mehr.",
         points: [
           "XLIFF, XLF, PO, STRINGS, RESX, XML",
           "CSV, TXT, DOCX und PPTX",
@@ -2131,23 +2148,23 @@ function getGermanMarketingCopy(): MarketingCopy {
         ]
       },
       {
-        eyebrow: "Prozess",
-        title: "Upload, Übersetzung, Review, Export.",
-        body: "Die Dateiübersetzung ist als echter Ablauf dargestellt, nicht als generischer Demo-Upload mit einem einzigen Button.",
+        eyebrow: "Struktur",
+        title: "Struktur bleibt erhalten",
+        body: "Tags, Platzhalter und Formatierung bleiben während der Übersetzung erhalten.",
         points: [
-          "Drag-and-drop-Upload mit Status",
-          "Zielsprache und Dateifortschritt je Artefakt",
-          "Download im übersetzten Originalformat"
+          "Tag-Schutz im Übersetzungsprozess",
+          "Seitenvergleich in der Prüfung",
+          "Kein manuelles Neuformatieren vor dem Release"
         ]
       },
       {
-        eyebrow: "Sicherheit",
-        title: "Struktur und Tags bleiben unter Kontrolle.",
-        body: "Gerade bei strukturierten Dateiformaten ist die Sicherheit im Workflow entscheidend. Die Seite macht diesen Aspekt klar sichtbar.",
+        eyebrow: "Prüfung",
+        title: "Prüfung vor dem Export",
+        body: "Überprüfe Übersetzungen, bevor du die finalen Dateien herunterlädst.",
         points: [
-          "Tag-Schutz im Übersetzungsprozess",
-          "Seitenvergleich in der Prüfung für Dateiinhalt",
-          "Kein manuelles Neuformatieren vor dem Release"
+          "Übersetzungen im Kontext prüfen",
+          "Download im übersetzten Originalformat",
+          "Qualitätsprüfungen im Workflow integriert"
         ]
       }
     ],
@@ -2194,16 +2211,16 @@ function getGermanMarketingCopy(): MarketingCopy {
     ],
     pricingHero: {
       eyebrow: "Preise",
-      title: "Eine klare Planleiter statt einer langen Scrollsektion.",
-      body: "Preise leben jetzt auf einer eigenen Seite. Das wirkt sauberer, verständlicher und näher an einer echten Produktseite mit eigenem Fokus.",
+      title: "Klare Preise. Keine Überraschungen.",
+      body: "Bezahle was du nutzt. Skaliere wenn du mehr brauchst.",
       actions: [
         { href: "/register", label: "Kostenlos starten", tone: "primary" as const },
-        { href: "/products", label: "Produktseiten ansehen", tone: "secondary" as const }
+        { href: "/products", label: "Pläne ansehen", tone: "secondary" as const }
       ]
     },
-    pricingGridEyebrow: "Planleiter",
-    pricingGridTitle: "Von Free bis Scale mit echten Monats-Credits.",
-    pricingGridBody: "Die Preise kommen direkt aus euren echten Produktplänen. Kein Demo-Pricing mehr auf der Landingpage.",
+    pricingGridEyebrow: "Von Free bis Scale",
+    pricingGridTitle: "Wähle einen Plan basierend auf deiner Nutzung. Upgrade jederzeit wenn deine Bedürfnisse wachsen.",
+    pricingGridBody: "Alle Pläne beinhalten strukturierte Übersetzung mit steigenden Limits und Features.",
     pricingNotes: [
       {
         title: "Credits",
@@ -2353,16 +2370,33 @@ function getEnglishMarketingCopy(): MarketingCopy {
     productCards,
     homeHero: {
       eyebrow: "Language operations",
-      title: "Translation as a product surface, not a folder structure.",
-      body: "Translayr brings projects, files, direct text translation, and credits into one coherent system. Instead of one-off uploads, teams work in a release-ready flow.",
+      title: "Translate your website and files — without breaking anything.",
+      body: "No more messy exports, broken layouts, or manual fixes. Translate WordPress, XLIFF, and documents in one clean workflow.",
       actions: [
         { href: "/register", label: "Start free", tone: "primary" as const },
-        { href: "/products", label: "Explore products", tone: "secondary" as const }
+        { href: "/products", label: "See how it works", tone: "secondary" as const }
       ]
     },
-    homeProductsEyebrow: "Product family",
-    homeProductsTitle: "Not one long scroll page, but a real product structure.",
-    homeProductsBody: "The homepage now introduces the core surfaces. Each product page explains a distinct job instead of cramming everything into one long landing page.",
+    homeProductsEyebrow: "The problem",
+    homeProductsTitle: "Translation today is still messy.",
+    homeProductsBody: "You export files, lose structure, fix layouts, and import everything again. Most tools weren't built for real product workflows.",
+    solutionEyebrow: "The solution",
+    solutionTitle: "One system for everything you translate.",
+    solutionBody: "From website content to release files — everything stays structured, connected, and ready to use.",
+    featureCards: [
+      {
+        title: "Workspace",
+        body: "Manage translation projects in one place. Track progress, review content, and manage usage without switching tools."
+      },
+      {
+        title: "File Translation",
+        body: "Translate real files without breaking structure. Upload XLIFF, DOCX, PPTX, and more — get clean, ready-to-use outputs."
+      },
+      {
+        title: "Direct Translation",
+        body: "Translate content instantly. Send content directly or paste text and get structured translations back."
+      }
+    ],
     metrics: [
       { value: "1K–700K", label: "Monthly credits across the plan ladder" },
       { value: "8+", label: "Production file formats in the live flow" },
@@ -2388,16 +2422,16 @@ function getEnglishMarketingCopy(): MarketingCopy {
     ],
     productsHero: {
       eyebrow: "Products",
-      title: "Three surfaces, three jobs, one connected release flow.",
-      body: "Instead of putting everything on the homepage, Translayr now has dedicated pages for workspace, file translation, and direct text translation.",
+      title: "Three workflows. One translation system.",
+      body: "Different tasks need different tools — but they should still work together.",
       actions: [
         { href: "/products/workspace", label: "Open workspace page", tone: "primary" as const },
         { href: "/pricing", label: "View pricing", tone: "secondary" as const }
       ]
     },
-    productsGridEyebrow: "Product pages",
-    productsGridTitle: "Each page explains one distinct job in the product.",
-    productsGridBody: "This is closer to a DeepL-style product site: separate surfaces with their own focus instead of one giant scroll stack.",
+    productsGridEyebrow: "Each workflow solves a specific job",
+    productsGridTitle: "Instead of one overloaded interface, each part of the product focuses on one clear task.",
+    productsGridBody: "Projects manage your ongoing work. Files handle structured assets. Text covers quick translations. All connected in one system.",
     compareEyebrow: "Comparison",
     compareTitle: "How the three surfaces fit together.",
     compareBody: "Workspace is the operating core. Files bring structured assets into the system. Text handles fast one-off outputs that do not need a project wrapper.",
@@ -2417,49 +2451,49 @@ function getEnglishMarketingCopy(): MarketingCopy {
     ],
     workspaceHero: {
       eyebrow: "Workspace",
-      title: "The translation command center for ongoing product work.",
-      body: "The workspace keeps projects, progress, review, usage, glossary, and billing in one place. Right where teams actually make daily decisions.",
+      title: "Your translation command center",
+      body: "Manage projects, track progress, and review translations — all in one place.",
       actions: [
-        { href: "/register", label: "Try the workspace", tone: "primary" as const },
+        { href: "/register", label: "Try workspace", tone: "primary" as const },
         { href: "/dashboard", label: "View dashboard", tone: "secondary" as const }
       ]
     },
     workspaceBlocks: [
       {
-        eyebrow: "Operations",
-        title: "One dashboard instead of four side tools.",
-        body: "Monthly usage, recent translations, target languages, and project state live in one place instead of being stitched together from multiple tools.",
+        eyebrow: "Dashboard",
+        title: "Everything in one dashboard",
+        body: "Projects, usage, and recent activity — all visible in one place.",
         points: [
-          "Words this month, spend, and savings on one surface",
-          "Recent translations visible on the home screen",
-          "Target languages and project activity without context switching"
+          "Projects, usage, and recent activity all in one place",
+          "Track progress at a glance",
+          "No context switching needed"
         ]
       },
       {
         eyebrow: "Review",
-        title: "Project work with visible review state.",
-        body: "Not just upload and hope: review, quality signals, and open files stay anchored to the project context.",
+        title: "Review built into the workflow",
+        body: "See what's done, what needs review, and what's ready.",
         points: [
-          "Review queue visible in the dashboard",
+          "Clear review states visible in the dashboard",
           "Project workspaces with file status and progress",
-          "Download and review stay in the same flow"
+          "Download and review in the same flow"
         ]
       },
       {
-        eyebrow: "Control",
-        title: "Credits, limits, and billing without a black box.",
-        body: "Usage, remaining credits, and upgrade paths are visible directly in the product. That makes Translayr operationally manageable instead of merely technically functional.",
+        eyebrow: "Billing",
+        title: "Clear usage and billing",
+        body: "Know exactly what you use and what it costs — no surprises.",
         points: [
           "Credit checks before every translation",
-          "Usage and billing surfaces with real totals",
-          "Plan ladder from Free to Scale inside one system"
+          "Usage visible directly in the product",
+          "Upgrade paths when you need more"
         ]
       }
     ],
     filesHero: {
       eyebrow: "File translation",
-      title: "Multi-format translation for the files teams actually release.",
-      body: "Translayr is no longer framed as only XLIFF-first. This page clearly explains the flow for structured files, review, and export.",
+      title: "Translate files without breaking them",
+      body: "Upload structured files and documents — get outputs that are ready to use.",
       actions: [
         { href: "/register", label: "Upload a file", tone: "primary" as const },
         { href: "/pricing", label: "View pricing", tone: "secondary" as const }
@@ -2468,8 +2502,8 @@ function getEnglishMarketingCopy(): MarketingCopy {
     filesBlocks: [
       {
         eyebrow: "Formats",
-        title: "From localization assets to Office documents.",
-        body: "The file surface accepts real formats while keeping the credit model and file structure consistent.",
+        title: "Supports real formats",
+        body: "XLIFF, XLF, DOCX, PPTX, CSV, TXT and more.",
         points: [
           "XLIFF, XLF, PO, STRINGS, RESX, XML",
           "CSV, TXT, DOCX, and PPTX",
@@ -2477,23 +2511,23 @@ function getEnglishMarketingCopy(): MarketingCopy {
         ]
       },
       {
-        eyebrow: "Process",
-        title: "Upload, translate, review, export.",
-        body: "File translation is presented as a real product workflow, not as a generic demo upload with a single button.",
-        points: [
-          "Drag-and-drop upload with state",
-          "Target language and progress per asset",
-          "Download in the translated original format"
-        ]
-      },
-      {
-        eyebrow: "Safety",
-        title: "Structure and tags stay under control.",
-        body: "For structured formats, workflow safety matters as much as speed. This page makes that explicit.",
+        eyebrow: "Structure",
+        title: "Structure stays intact",
+        body: "Tags, placeholders, and formatting are preserved during translation.",
         points: [
           "Tag protection during translation",
           "Side-by-side review for translated content",
           "No manual reformatting before release"
+        ]
+      },
+      {
+        eyebrow: "Review",
+        title: "Review before export",
+        body: "Check translations before downloading final files.",
+        points: [
+          "Review translations in context",
+          "Download in the translated original format",
+          "Quality checks built into the workflow"
         ]
       }
     ],
@@ -2540,16 +2574,16 @@ function getEnglishMarketingCopy(): MarketingCopy {
     ],
     pricingHero: {
       eyebrow: "Pricing",
-      title: "A clear plan ladder instead of a long landing page section.",
-      body: "Pricing now lives on its own page. That feels cleaner, more focused, and closer to a real product site with dedicated intent.",
+      title: "Clear pricing. No surprises.",
+      body: "Pay for what you use. Scale when you need more.",
       actions: [
-        { href: "/register", label: "Start Free", tone: "primary" as const },
-        { href: "/products", label: "Browse products", tone: "secondary" as const }
+        { href: "/register", label: "Start free", tone: "primary" as const },
+        { href: "/products", label: "Browse plans", tone: "secondary" as const }
       ]
     },
-    pricingGridEyebrow: "Plan ladder",
-    pricingGridTitle: "From Free to Scale with real monthly credits.",
-    pricingGridBody: "Pricing is now sourced directly from your live product plans. No more demo pricing on the landing page.",
+    pricingGridEyebrow: "From free to scale",
+    pricingGridTitle: "Choose a plan based on your usage. Upgrade anytime as your needs grow.",
+    pricingGridBody: "All plans include structured translation, with increasing limits and features.",
     pricingNotes: [
       {
         title: "Credits",
