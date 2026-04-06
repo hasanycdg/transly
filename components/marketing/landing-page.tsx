@@ -1549,14 +1549,14 @@ function HomeHeroVisual({ locale }: { locale: "de" | "en" }) {
               <div className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">$1,759</div>
               <div className="mt-4 space-y-3">
                 {[
-                  { label: locale === "de" ? "Wörter" : "Words", value: "200", tone: "bg-[var(--processing)]" },
+                  { label: locale === "de" ? "Wörter" : "Words", value: "100", tone: "bg-[var(--processing)]" },
                   { label: locale === "de" ? "Dateien" : "Files", value: "48", tone: "bg-[var(--success)]" },
                   { label: locale === "de" ? "Dokumente" : "Documents", value: "12", tone: "bg-[var(--review)]" },
                   { label: locale === "de" ? "OCR" : "OCR", value: "8", tone: "bg-[var(--border-strong)]" }
                 ].map((item) => (
                   <div key={item.label} className="grid grid-cols-[72px_minmax(0,1fr)_32px] items-center gap-3 text-[11px] text-[var(--muted)]">
                     <span>{item.label}</span>
-                    <div className="h-2 rounded-full bg-[var(--background-strong)]">
+                    <div className="h-2 rounded-full bg-[var(--background-strong)] overflow-hidden">
                       <div className={`h-full rounded-full ${item.tone}`} style={{ width: `${Math.max(Number(item.value), 8)}%` }} />
                     </div>
                     <span className="text-right">{item.value}</span>
