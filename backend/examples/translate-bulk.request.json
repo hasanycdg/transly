@@ -1,0 +1,29 @@
+{
+  "continueOnError": true,
+  "jobs": [
+    {
+      "siteUrl": "https://example.com",
+      "postId": 1842,
+      "postType": "page",
+      "sourceLanguage": "en",
+      "targetLanguage": "de",
+      "title": "AI Translation Platform",
+      "content": "Launch globally with multilingual pages.",
+      "meta": {
+        "seo_title": "Fast translation workflows"
+      }
+    },
+    {
+      "siteUrl": "https://example.com",
+      "postId": 1843,
+      "postType": "post",
+      "sourceLanguage": "en",
+      "targetLanguage": "fr",
+      "title": "Release notes",
+      "excerpt": "New translation memory improvements.",
+      "acf": {
+        "feature_summary": "Segment caching for repeated strings."
+      }
+    }
+  ]
+}

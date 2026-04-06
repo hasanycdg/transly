@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TranslationJob {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  siteUrl         String   @map("site_url")
+  postId          String   @map("post_id")
+  postType        String   @map("post_type")
+  sourceLanguage  String   @map("source_language")
+  targetLanguage  String   @map("target_language")
+  status          String   @default("queued")
+  requestPayload  Json     @map("request_payload")
+  responsePayload Json?    @map("response_payload")
+  warnings        Json     @default(dbgenerated("'[]'::jsonb"))
+  errors          Json     @default(dbgenerated("'[]'::jsonb"))
+  provider        String?
+  attempts        Int      @default(0)
+  durationMs      Int?     @map("duration_ms")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  startedAt       DateTime? @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([postId, siteUrl])
+  @@map("wp_translation_jobs")
+}

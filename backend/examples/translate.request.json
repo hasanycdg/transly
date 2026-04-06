@@ -1,0 +1,46 @@
+{
+  "siteUrl": "https://example.com",
+  "postId": 1842,
+  "postType": "page",
+  "sourceLanguage": "en",
+  "targetLanguage": "de",
+  "title": "AI Translation Platform",
+  "excerpt": "Translate your WordPress content while preserving JSON structure.",
+  "content": "<p>Launch globally with multilingual pages.</p>",
+  "meta": {
+    "_edit_last": "1",
+    "seo_title": "Fast translation workflows",
+    "seo_description": "Preserve field structure and re-import safely."
+  },
+  "acf": {
+    "hero_heading": "Ship multilingual product pages",
+    "hero_cta_label": "Start free",
+    "hero_cta_url": "https://example.com/signup",
+    "features": [
+      {
+        "title": "Structured payload handling",
+        "description": "Nested repeaters and flexible content are preserved."
+      },
+      {
+        "title": "WordPress-safe output",
+        "description": "Return the same JSON shape expected by your plugin."
+      }
+    ],
+    "related_posts": [301, 302, 303]
+  },
+  "raw": {
+    "blocks": [
+      {
+        "type": "text",
+        "data": {
+          "heading": "Global content operations",
+          "body": "Automate multilingual publishing pipelines."
+        }
+      }
+    ]
+  },
+  "options": {
+    "translateSlugs": false,
+    "translateUrls": false
+  }
+}

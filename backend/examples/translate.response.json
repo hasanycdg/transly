@@ -1,0 +1,64 @@
+{
+  "jobId": "clx1abc1230000l90job1",
+  "status": "completed_with_warnings",
+  "sourceLanguage": "en",
+  "targetLanguage": "de",
+  "translatedPayload": {
+    "siteUrl": "https://example.com",
+    "postId": "1842",
+    "postType": "page",
+    "sourceLanguage": "en",
+    "targetLanguage": "de",
+    "title": "[de] AI Translation Platform",
+    "excerpt": "[de] Translate your WordPress content while preserving JSON structure.",
+    "content": "[de] <p>Launch globally with multilingual pages.</p>",
+    "meta": {
+      "_edit_last": "1",
+      "seo_title": "[de] Fast translation workflows",
+      "seo_description": "[de] Preserve field structure and re-import safely."
+    },
+    "acf": {
+      "hero_heading": "[de] Ship multilingual product pages",
+      "hero_cta_label": "[de] Start free",
+      "hero_cta_url": "https://example.com/signup",
+      "features": [
+        {
+          "title": "[de] Structured payload handling",
+          "description": "[de] Nested repeaters and flexible content are preserved."
+        },
+        {
+          "title": "[de] WordPress-safe output",
+          "description": "[de] Return the same JSON shape expected by your plugin."
+        }
+      ],
+      "related_posts": [301, 302, 303]
+    },
+    "raw": {
+      "blocks": [
+        {
+          "type": "text",
+          "data": {
+            "heading": "[de] Global content operations",
+            "body": "[de] Automate multilingual publishing pipelines."
+          }
+        }
+      ]
+    }
+  },
+  "warnings": [
+    "Some id/url/file-like fields were skipped based on preservation rules."
+  ],
+  "processingMetadata": {
+    "provider": "stub-provider",
+    "durationMs": 34,
+    "queueMode": "sync",
+    "stats": {
+      "totalStringFields": 16,
+      "translatedStringFields": 12,
+      "skippedStringFields": 4,
+      "failedStringFields": 0
+    },
+    "startedAt": "2026-04-06T10:00:00.000Z",
+    "completedAt": "2026-04-06T10:00:00.034Z"
+  }
+}

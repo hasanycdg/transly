@@ -1,0 +1,58 @@
+{
+  "status": "completed",
+  "totalJobs": 2,
+  "succeeded": 2,
+  "failed": 0,
+  "results": [
+    {
+      "index": 0,
+      "jobId": "clx1abc1230000l90job1",
+      "status": "completed",
+      "sourceLanguage": "en",
+      "targetLanguage": "de",
+      "translatedPayload": {
+        "siteUrl": "https://example.com",
+        "postId": "1842",
+        "postType": "page",
+        "sourceLanguage": "en",
+        "targetLanguage": "de",
+        "title": "[de] AI Translation Platform",
+        "content": "[de] Launch globally with multilingual pages.",
+        "meta": {
+          "seo_title": "[de] Fast translation workflows"
+        }
+      },
+      "warnings": [],
+      "processingMetadata": {
+        "provider": "stub-provider",
+        "durationMs": 14,
+        "queueMode": "sync"
+      }
+    },
+    {
+      "index": 1,
+      "jobId": "clx1abc1230000l90job2",
+      "status": "completed",
+      "sourceLanguage": "en",
+      "targetLanguage": "fr",
+      "translatedPayload": {
+        "siteUrl": "https://example.com",
+        "postId": "1843",
+        "postType": "post",
+        "sourceLanguage": "en",
+        "targetLanguage": "fr",
+        "title": "[fr] Release notes",
+        "excerpt": "[fr] New translation memory improvements.",
+        "acf": {
+          "feature_summary": "[fr] Segment caching for repeated strings."
+        }
+      },
+      "warnings": [],
+      "processingMetadata": {
+        "provider": "stub-provider",
+        "durationMs": 13,
+        "queueMode": "sync"
+      }
+    }
+  ]
+}
