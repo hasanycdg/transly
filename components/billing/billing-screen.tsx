@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
-import type { BillingInvoiceItem, BillingPlanOption, BillingScreenData, UsageMetricItem } from "@/types/workspace";
+import type {
+  BillingInvoiceItem,
+  BillingPlanOption,
+  BillingScreenData,
+  CreditPackOption,
+  UsageMetricItem
+} from "@/types/workspace";
 
 type BillingScreenProps = {
   data: BillingScreenData;
@@ -21,6 +27,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
   const locale = useAppLocale();
   const router = useRouter();
   const [isUpdatingPlanId, setIsUpdatingPlanId] = useState<string | null>(null);
+  const [isBuyingCreditPackId, setIsBuyingCreditPackId] = useState<string | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -30,6 +37,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
           updateFailed: "Der Abrechnungsplan konnte nicht aktualisiert werden.",
           updated: "Abo aktualisiert.",
           portalFailed: "Das Billing-Portal konnte nicht geöffnet werden.",
+          creditPackFailed: "Der Credit-Kauf konnte nicht gestartet werden.",
           eyebrow: "/ Abrechnung",
           heading: "Abo & Abrechnung",
           intro: "Verwalte deinen Plan, beobachte den aktuellen Abrechnungszyklus und prüfe letzte Rechnungen an einem Ort.",
@@ -37,6 +45,11 @@ export function BillingScreen({ data }: BillingScreenProps) {
           plans: "/ Pläne",
           choosePlan: "Abo auswählen",
           paidPlans: "Bezahlte Pläne werden monatlich exkl. USt. berechnet. Neue kostenpflichtige Abos öffnen in Stripe Checkout.",
+          creditPacks: "/ Credit-Pakete",
+          buyMoreCredits: "Zusätzliche Credits kaufen",
+          creditPackHint: "Credit-Pakete sind einmalige Top-ups und gelten für den laufenden Zyklus.",
+          creditPackLocked: "Credit-Pakete sind erst mit aktivem Abo verfügbar.",
+          buyNow: "Jetzt kaufen",
           invoices: "/ Rechnungen",
           history: "Abrechnungsverlauf",
           invoiceHeaders: ["Zeitraum", "Ausgestellt", "Betrag", "Status", "Credits"],
@@ -51,12 +64,14 @@ export function BillingScreen({ data }: BillingScreenProps) {
           current: "Aktuell",
           currentPlan: "Aktueller Plan",
           updating: "Wird aktualisiert...",
+          buying: "Wird vorbereitet...",
           switchTo: (planName: string) => `Zu ${planName} wechseln`
         }
       : {
           updateFailed: "Billing plan could not be updated.",
           updated: "Subscription updated.",
           portalFailed: "Billing portal could not be opened.",
+          creditPackFailed: "Credit purchase could not be started.",
           eyebrow: "/ Billing",
           heading: "Billing",
           intro: "Manage your subscription plan, monitor the current billing cycle, and review recent invoices in one focused space.",
@@ -64,6 +79,11 @@ export function BillingScreen({ data }: BillingScreenProps) {
           plans: "/ Plans",
           choosePlan: "Choose your subscription",
           paidPlans: "Paid plans are billed monthly excl. VAT. New paid subscriptions open in Stripe Checkout.",
+          creditPacks: "/ Credit packs",
+          buyMoreCredits: "Buy additional credits",
+          creditPackHint: "Credit packs are one-time top-ups for the active billing cycle.",
+          creditPackLocked: "Credit packs are only available with an active subscription.",
+          buyNow: "Buy now",
           invoices: "/ Invoices",
           history: "Billing history",
           invoiceHeaders: ["Period", "Issued", "Amount", "Status", "Credits"],
@@ -78,6 +98,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
           current: "Current",
           currentPlan: "Current plan",
           updating: "Updating...",
+          buying: "Preparing checkout...",
           switchTo: (planName: string) => `Switch to ${planName}`
         };
 
@@ -92,6 +113,12 @@ export function BillingScreen({ data }: BillingScreenProps) {
 
     return () => window.clearTimeout(timeoutId);
   }, [successMessage]);
+
+  function redirectToLogin() {
+    const redirectTarget = `${window.location.pathname}${window.location.search}`;
+    const loginUrl = `/login?redirectTo=${encodeURIComponent(redirectTarget)}`;
+    window.location.assign(loginUrl);
+  }
 
   async function handleSelectPlan(planId: string) {
     if (isUpdatingPlanId) {
@@ -110,6 +137,11 @@ export function BillingScreen({ data }: BillingScreenProps) {
         body: JSON.stringify({ planId })
       });
       const payload = (await response.json().catch(() => null)) as BillingMutationResponse | null;
+
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(payload?.error ?? copy.updateFailed);
@@ -131,6 +163,41 @@ export function BillingScreen({ data }: BillingScreenProps) {
     }
   }
 
+  async function handleBuyCreditPack(packId: string) {
+    if (isBuyingCreditPackId) {
+      return;
+    }
+
+    try {
+      setIsBuyingCreditPackId(packId);
+      setErrorMessage(null);
+
+      const response = await fetch("/api/billing/credits", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ packId })
+      });
+      const payload = (await response.json().catch(() => null)) as BillingMutationResponse | null;
+
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
+      if (!response.ok || !payload?.redirectUrl) {
+        throw new Error(payload?.error ?? copy.creditPackFailed);
+      }
+
+      window.location.assign(payload.redirectUrl);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : copy.creditPackFailed);
+    } finally {
+      setIsBuyingCreditPackId(null);
+    }
+  }
+
   async function handleOpenPortal() {
     if (isOpeningPortal) {
       return;
@@ -144,6 +211,11 @@ export function BillingScreen({ data }: BillingScreenProps) {
         method: "POST"
       });
       const payload = (await response.json().catch(() => null)) as BillingMutationResponse | null;
+
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
 
       if (!response.ok || !payload?.redirectUrl) {
         throw new Error(payload?.error ?? copy.portalFailed);
@@ -223,6 +295,36 @@ export function BillingScreen({ data }: BillingScreenProps) {
                     disabled={Boolean(isUpdatingPlanId)}
                     onSelect={() => {
                       void handleSelectPlan(plan.id);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[14px] border border-[var(--border)] bg-white">
+              <div className="border-b border-[var(--border-light)] px-5 py-4">
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--muted-soft)]">
+                  {copy.creditPacks}
+                </p>
+                <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
+                  {copy.buyMoreCredits}
+                </h2>
+                <p className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
+                  {data.canBuyCredits ? copy.creditPackHint : copy.creditPackLocked}
+                </p>
+              </div>
+
+              <div className="grid gap-4 p-5 md:grid-cols-3">
+                {data.creditPacks.map((pack) => (
+                  <CreditPackCard
+                    key={pack.id}
+                    pack={pack}
+                    buying={isBuyingCreditPackId === pack.id}
+                    disabled={Boolean(isBuyingCreditPackId) || !data.canBuyCredits}
+                    buyLabel={copy.buyNow}
+                    buyingLabel={copy.buying}
+                    onBuy={() => {
+                      void handleBuyCreditPack(pack.id);
                     }}
                   />
                 ))}
@@ -424,6 +526,52 @@ function BillingPlanCard({
         ].join(" ")}
       >
         {plan.current ? copy.currentPlan : updating ? copy.updating : copy.switchTo(plan.name)}
+      </button>
+    </div>
+  );
+}
+
+function CreditPackCard({
+  pack,
+  buying,
+  disabled,
+  buyLabel,
+  buyingLabel,
+  onBuy
+}: {
+  pack: CreditPackOption;
+  buying: boolean;
+  disabled: boolean;
+  buyLabel: string;
+  buyingLabel: string;
+  onBuy: () => void;
+}) {
+  return (
+    <div className="rounded-[14px] border border-[var(--border)] bg-white px-4 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[15px] font-semibold text-[var(--foreground)]">{pack.name}</p>
+          <p className="mt-1 text-[12px] leading-6 text-[var(--muted)]">{pack.description}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[22px] font-semibold tracking-[-0.05em] text-[var(--foreground)]">{pack.price}</p>
+          <p className="text-[11.5px] text-[var(--muted-soft)]">{pack.priceMeta}</p>
+        </div>
+        <span className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[11px] text-[var(--muted)]">
+          {pack.credits}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={onBuy}
+        disabled={disabled}
+        className="mt-5 rounded-[12px] bg-[var(--foreground)] px-4 py-2.5 text-[12px] font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+      >
+        {buying ? buyingLabel : buyLabel}
       </button>
     </div>
   );

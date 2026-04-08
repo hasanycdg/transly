@@ -3,6 +3,7 @@ import "server-only";
 import { unstable_noStore as noStore } from "next/cache";
 import type { User } from "@supabase/supabase-js";
 
+import { BILLING_CREDIT_PACKS } from "@/lib/billing/credit-packs";
 import { mergeGlossaryTranslations, parseGlossaryCsv } from "@/lib/glossary/csv";
 import { containsGlossaryTerm, type GlossaryRuntimeEntry } from "@/lib/glossary/runtime";
 import {
@@ -45,6 +46,7 @@ import type {
   BillingInvoiceItem,
   BillingPlanOption,
   BillingScreenData,
+  CreditPackOption,
   DashboardShellData,
   NotificationChannelItem,
   NotificationEventItem,
@@ -1231,6 +1233,9 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
   const reviewProjects = projects.filter((project) => project.status === "In Review").length;
   const billingEmail = metadata.profileEmail ?? `${workspace.slug}@translayr.app`;
   const manageBillingAvailable = Boolean(metadata.stripeCustomerId);
+  const normalizedSubscriptionStatus = metadata.stripeSubscriptionStatus?.trim().toLowerCase();
+  const canBuyCredits =
+    normalizedSubscriptionStatus === "active" || normalizedSubscriptionStatus === "trialing";
   const subscriptionStatusLabel = metadata.stripeSubscriptionStatus
     ? formatStripeStatusLabel(metadata.stripeSubscriptionStatus, locale)
     : null;
@@ -1293,6 +1298,23 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
     features: getLocalizedPlanFeatures(plan, locale),
     current: plan.name.toLowerCase() === currentPlan.name.toLowerCase()
   }));
+  const creditPacks: CreditPackOption[] = BILLING_CREDIT_PACKS.map((pack) => ({
+    id: pack.id,
+    name: pack.name,
+    price: formatCurrency(pack.priceCents / 100, locale),
+    priceMeta:
+      locale === "de"
+        ? "Einmalig exkl. USt."
+        : "One-time excl. VAT",
+    credits:
+      locale === "de"
+        ? `${formatCompactNumber(pack.credits, locale)} Credits`
+        : `${formatCompactNumber(pack.credits, locale)} credits`,
+    description:
+      locale === "de"
+        ? "Zusätzliche Credits für den laufenden Abrechnungszyklus."
+        : "Additional credits for the current billing cycle."
+  }));
 
   const invoices = (
     billingCycles.length > 0
@@ -1348,7 +1370,9 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
         ? "Preise werden monatlich berechnet und exkl. USt. angezeigt."
         : "Prices are billed monthly and shown excl. VAT.",
     manageBillingAvailable,
+    canBuyCredits,
     plans,
+    creditPacks,
     invoices
   };
 }

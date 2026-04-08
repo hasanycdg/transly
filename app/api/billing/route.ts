@@ -36,6 +36,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
+    console.error("Billing PATCH failed", error);
     const message = error instanceof Error ? error.message : "Billing plan could not be updated.";
 
     return NextResponse.json(

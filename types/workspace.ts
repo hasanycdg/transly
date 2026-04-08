@@ -199,6 +199,15 @@ export interface BillingPlanOption {
   current: boolean;
 }
 
+export interface CreditPackOption {
+  id: string;
+  name: string;
+  price: string;
+  priceMeta: string;
+  credits: string;
+  description: string;
+}
+
 export interface BillingInvoiceItem {
   id: string;
   periodLabel: string;
@@ -224,7 +233,9 @@ export interface BillingScreenData {
   paymentMethodMeta: string;
   paymentNotice: string;
   manageBillingAvailable: boolean;
+  canBuyCredits: boolean;
   plans: BillingPlanOption[];
+  creditPacks: CreditPackOption[];
   invoices: BillingInvoiceItem[];
 }
 

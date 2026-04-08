@@ -17,36 +17,36 @@ export const BILLING_PLANS: BillingPlanDefinition[] = [
     id: "free",
     name: "Free",
     basePriceCents: 0,
-    creditsLimit: 1_000,
+    creditsLimit: 5_000,
     description: "For trying the product, smaller file sets, and low-volume localization work.",
-    features: ["1k monthly words", "Core XLIFF translation", "Glossary basics"],
+    features: ["5k monthly words", "Core XLIFF translation", "Glossary basics"],
     paid: false
   },
   {
     id: "starter",
     name: "Starter",
     basePriceCents: 1_900,
-    creditsLimit: 50_000,
+    creditsLimit: 100_000,
     description: "For smaller localization workloads and lightweight weekly release cycles.",
-    features: ["50k monthly words", "Project workspaces", "Glossary support"],
+    features: ["100k monthly words", "Project workspaces", "Glossary support"],
     paid: true
   },
   {
     id: "pro",
     name: "Pro",
     basePriceCents: 4_900,
-    creditsLimit: 200_000,
+    creditsLimit: 500_000,
     description: "For product teams shipping continuously across multiple locales.",
-    features: ["200k monthly words", "Review workflow", "Priority glossary injection"],
+    features: ["500k monthly words", "Review workflow", "Priority glossary injection"],
     paid: true
   },
   {
     id: "scale",
     name: "Scale",
     basePriceCents: 9_900,
-    creditsLimit: 700_000,
+    creditsLimit: 1_000_000,
     description: "For larger teams coordinating launches, QA, and exports at higher volume.",
-    features: ["700k monthly words", "Faster throughput", "Shared team operations"],
+    features: ["1M monthly words", "Faster throughput", "Shared team operations"],
     paid: true
   }
 ];

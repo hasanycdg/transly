@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
-import { syncWorkspaceBillingFromStripe } from "@/lib/stripe/billing";
+import { handleStripeCheckoutSessionCompleted, syncWorkspaceBillingFromStripe } from "@/lib/stripe/billing";
 import { getStripeClient } from "@/lib/stripe/server";
 
 export const runtime = "nodejs";
@@ -38,9 +38,12 @@ export async function POST(request: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        await syncWorkspaceBillingFromStripe({
-          sessionId: session.id
-        });
+        await handleStripeCheckoutSessionCompleted(session.id);
+        break;
+      }
+      case "checkout.session.async_payment_succeeded": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await handleStripeCheckoutSessionCompleted(session.id);
         break;
       }
       case "customer.subscription.created":

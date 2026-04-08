@@ -3,16 +3,20 @@ import "server-only";
 import type Stripe from "stripe";
 
 import {
-  BILLING_PLANS,
+  BILLING_CREDIT_PACKS,
+  getCreditPackDefinition,
+  type CreditPackDefinition
+} from "@/lib/billing/credit-packs";
+import {
   DEFAULT_WORKSPACE_PLAN_ID,
   getBillingPlanDefinition,
   isPaidBillingPlan,
-  type BillingPlanDefinition,
-  type BillingPlanId
+  type BillingPlanDefinition
 } from "@/lib/billing/plans";
 import { createServerSupabaseClient } from "@/lib/supabase/admin";
 import { getBillingScreenData } from "@/lib/supabase/workspace";
 import {
+  ensureStripeCreditPackPrice,
   ensureStripePrice,
   getStripeBillingPortalConfigId,
   getStripeClient,
@@ -40,7 +44,14 @@ type BillingCycleRow = {
   period_end: string;
   credits_used: number;
   projected_spend_cents: number;
+  credits_limit: number;
   status: "active" | "closed" | "projected";
+  metadata: Record<string, unknown> | null;
+};
+
+type WorkspaceCreditPurchaseRow = {
+  id: string;
+  status: "pending" | "completed" | "failed";
 };
 
 type StripeWorkspaceMetadata = {
@@ -121,6 +132,86 @@ export async function startBillingPlanSelection(
     redirectMode: "checkout",
     redirectUrl: checkoutUrl
   };
+}
+
+export async function startCreditPackPurchase(
+  packId: string,
+  origin: string
+): Promise<BillingMutationResult> {
+  const pack = getCreditPackDefinition(packId);
+
+  if (!pack) {
+    throw new Error("A supported credit pack is required.");
+  }
+
+  const context = await getStripeWorkspaceContext();
+  const subscription = await getCurrentStripeSubscription(context);
+
+  if (!subscription || !isEligibleSubscriptionForCreditPackPurchase(subscription)) {
+    throw new Error("An active subscription is required before purchasing credit packs.");
+  }
+
+  const stripe = getStripeClient();
+  const customerId = await ensureStripeCustomer(context);
+  const price = await ensureStripeCreditPackPrice(pack);
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: customerId,
+    client_reference_id: context.workspace.id,
+    success_url: `${sanitizeOrigin(origin)}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}&intent=credits`,
+    cancel_url: `${sanitizeOrigin(origin)}/billing?checkout=cancel&intent=credits`,
+    line_items: [
+      {
+        price: price.id,
+        quantity: 1
+      }
+    ],
+    allow_promotion_codes: true,
+    invoice_creation: {
+      enabled: true
+    },
+    metadata: {
+      workspace_id: context.workspace.id,
+      checkout_kind: "credit_pack",
+      credit_pack_id: pack.id,
+      credits: String(pack.credits),
+      amount_cents: String(pack.priceCents)
+    }
+  });
+
+  if (!session.url) {
+    throw new Error("Stripe did not return a Checkout URL.");
+  }
+
+  await updateWorkspaceStripeMetadata(context, {
+    stripeCustomerId: customerId
+  });
+
+  return {
+    redirectMode: "checkout",
+    redirectUrl: session.url
+  };
+}
+
+export async function handleStripeCheckoutSessionCompleted(sessionId: string) {
+  const normalizedSessionId = sessionId.trim();
+
+  if (!normalizedSessionId) {
+    throw new Error("A Stripe Checkout session id is required.");
+  }
+
+  const stripe = getStripeClient();
+  const session = await stripe.checkout.sessions.retrieve(normalizedSessionId, {
+    expand: ["customer", "subscription", "line_items.data.price.product"]
+  });
+
+  if (isCreditPackCheckoutSession(session)) {
+    await applyCreditPackPurchaseFromCheckoutSession(session);
+  }
+
+  await syncWorkspaceBillingFromStripe({
+    sessionId: session.id
+  });
 }
 
 export async function createBillingPortalSession(origin: string): Promise<string> {
@@ -208,6 +299,7 @@ async function createStripeCheckoutUrl(
     allow_promotion_codes: true,
     metadata: {
       workspace_id: context.workspace.id,
+      checkout_kind: "subscription_plan",
       plan_id: plan.id
     },
     subscription_data: {
@@ -281,7 +373,21 @@ async function createStripePortalUrl(context: StripeWorkspaceContext, origin: st
 
 async function ensureStripeCustomer(context: StripeWorkspaceContext) {
   if (context.metadata.stripeCustomerId) {
-    return context.metadata.stripeCustomerId;
+    const stripe = getStripeClient();
+
+    try {
+      const existingCustomer = await stripe.customers.retrieve(context.metadata.stripeCustomerId);
+
+      if (typeof existingCustomer === "object" && "deleted" in existingCustomer && existingCustomer.deleted) {
+        throw new Error("Deleted Stripe customer.");
+      }
+
+      return context.metadata.stripeCustomerId;
+    } catch (error) {
+      if (!isStripeResourceMissingError(error)) {
+        throw error;
+      }
+    }
   }
 
   const stripe = getStripeClient();
@@ -326,17 +432,304 @@ async function getCurrentStripeSubscription(context: StripeWorkspaceContext) {
 
 async function findPrimarySubscription(customerId: string) {
   const stripe = getStripeClient();
-  const subscriptions = await stripe.subscriptions.list({
-    customer: customerId,
-    status: "all",
-    limit: 10
-  });
+
+  let subscriptions: Stripe.ApiList<Stripe.Subscription>;
+
+  try {
+    subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 10
+    });
+  } catch (error) {
+    if (isStripeResourceMissingError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
 
   return (
     subscriptions.data.find((subscription) => isManagedInStripe(subscription)) ??
     subscriptions.data[0] ??
     null
   );
+}
+
+async function applyCreditPackPurchaseFromCheckoutSession(session: Stripe.Checkout.Session) {
+  const pack = resolveCreditPackFromCheckoutSession(session);
+
+  if (!pack) {
+    return;
+  }
+
+  const context = await getStripeWorkspaceContext();
+  const workspaceIdFromSession = session.metadata?.workspace_id?.trim();
+
+  if (workspaceIdFromSession && workspaceIdFromSession !== context.workspace.id) {
+    return;
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data: existingPurchaseData, error: existingPurchaseError } = await supabase
+    .from("workspace_credit_purchases")
+    .select("id, status")
+    .eq("stripe_checkout_session_id", session.id)
+    .maybeSingle();
+
+  if (existingPurchaseError) {
+    throw new Error(`Failed to load the credit purchase status: ${existingPurchaseError.message}`);
+  }
+
+  const existingPurchase = (existingPurchaseData as WorkspaceCreditPurchaseRow | null) ?? null;
+
+  if (existingPurchase?.status === "completed") {
+    return;
+  }
+
+  const customerId = getStripeObjectId(session.customer) ?? context.metadata.stripeCustomerId ?? null;
+  const paymentIntentId = getStripeObjectId(session.payment_intent);
+  const purchaseRecordId =
+    existingPurchase?.id ??
+    (await insertPendingCreditPurchase({
+      workspaceId: context.workspace.id,
+      checkoutSessionId: session.id,
+      customerId,
+      paymentIntentId,
+      pack
+    }));
+  const activeCycle = await getOrCreateActiveCycleForCreditPackPurchase(context);
+  const cycleMetadata = normalizeCycleMetadata(activeCycle.metadata);
+  const appliedSessionIds = getAppliedCreditPurchaseSessionIds(cycleMetadata);
+
+  if (appliedSessionIds.includes(session.id)) {
+    await markCreditPurchaseCompleted(purchaseRecordId, activeCycle.id);
+    return;
+  }
+
+  const nextCreditsLimit = activeCycle.credits_limit + pack.credits;
+  const nextProjectedSpend = activeCycle.projected_spend_cents + pack.priceCents;
+  const nextCycleMetadata: Record<string, unknown> = {
+    ...cycleMetadata,
+    credit_topup_credits_total: getCycleCreditTopUpTotal(cycleMetadata) + pack.credits,
+    credit_topup_spend_cents_total: getCycleSpendTopUpTotal(cycleMetadata) + pack.priceCents,
+    applied_credit_purchase_session_ids: [...appliedSessionIds, session.id],
+    last_credit_topup_session_id: session.id,
+    last_credit_topup_pack_id: pack.id,
+    last_credit_topup_at: new Date().toISOString()
+  };
+  const { error: cycleUpdateError } = await supabase
+    .from("workspace_billing_cycles")
+    .update({
+      credits_limit: nextCreditsLimit,
+      projected_spend_cents: nextProjectedSpend,
+      metadata: nextCycleMetadata
+    })
+    .eq("id", activeCycle.id);
+
+  if (cycleUpdateError) {
+    await markCreditPurchaseFailed(purchaseRecordId, cycleUpdateError.message);
+    throw new Error(`Failed to apply purchased credits: ${cycleUpdateError.message}`);
+  }
+
+  const { error: workspaceUpdateError } = await supabase
+    .from("workspaces")
+    .update({
+      credits_limit: Math.max(context.workspace.credits_limit ?? 0, nextCreditsLimit)
+    })
+    .eq("id", context.workspace.id);
+
+  if (workspaceUpdateError) {
+    await markCreditPurchaseFailed(purchaseRecordId, workspaceUpdateError.message);
+    throw new Error(`Failed to update workspace credits after purchase: ${workspaceUpdateError.message}`);
+  }
+
+  await markCreditPurchaseCompleted(purchaseRecordId, activeCycle.id);
+}
+
+async function insertPendingCreditPurchase(input: {
+  workspaceId: string;
+  checkoutSessionId: string;
+  customerId: string | null;
+  paymentIntentId: string | null;
+  pack: CreditPackDefinition;
+}) {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("workspace_credit_purchases")
+    .insert({
+      workspace_id: input.workspaceId,
+      stripe_checkout_session_id: input.checkoutSessionId,
+      stripe_customer_id: input.customerId,
+      stripe_payment_intent_id: input.paymentIntentId,
+      credit_pack_id: input.pack.id,
+      credits: input.pack.credits,
+      amount_cents: input.pack.priceCents,
+      currency: "eur",
+      status: "pending",
+      metadata: {}
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    if ("code" in error && error.code === "23505") {
+      const { data: existingData, error: existingError } = await supabase
+        .from("workspace_credit_purchases")
+        .select("id")
+        .eq("stripe_checkout_session_id", input.checkoutSessionId)
+        .single();
+
+      if (existingError) {
+        throw new Error(`Failed to load an existing credit purchase record: ${existingError.message}`);
+      }
+
+      return (existingData as Pick<WorkspaceCreditPurchaseRow, "id">).id;
+    }
+
+    throw new Error(`Failed to create the credit purchase record: ${error.message}`);
+  }
+
+  const purchase = data as Pick<WorkspaceCreditPurchaseRow, "id">;
+
+  return purchase.id;
+}
+
+async function markCreditPurchaseCompleted(purchaseId: string, billingCycleId: string) {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("workspace_credit_purchases")
+    .update({
+      status: "completed",
+      billing_cycle_id: billingCycleId
+    })
+    .eq("id", purchaseId);
+
+  if (error) {
+    throw new Error(`Failed to finalize the credit purchase record: ${error.message}`);
+  }
+}
+
+async function markCreditPurchaseFailed(purchaseId: string, failureReason: string) {
+  const supabase = createServerSupabaseClient();
+  const { data, error: selectError } = await supabase
+    .from("workspace_credit_purchases")
+    .select("metadata")
+    .eq("id", purchaseId)
+    .maybeSingle();
+
+  if (selectError) {
+    throw new Error(`Failed to load purchase metadata after an error: ${selectError.message}`);
+  }
+
+  const purchase = data as { metadata: Record<string, unknown> | null } | null;
+  const metadata = purchase?.metadata && typeof purchase.metadata === "object" ? { ...purchase.metadata } : {};
+  const { error } = await supabase
+    .from("workspace_credit_purchases")
+    .update({
+      status: "failed",
+      metadata: {
+        ...metadata,
+        last_failure_message: failureReason,
+        failed_at: new Date().toISOString()
+      }
+    })
+    .eq("id", purchaseId);
+
+  if (error) {
+    throw new Error(`Failed to mark the credit purchase as failed: ${error.message}`);
+  }
+}
+
+async function getOrCreateActiveCycleForCreditPackPurchase(context: StripeWorkspaceContext) {
+  const supabase = createServerSupabaseClient();
+  const { data: activeCycleData, error: activeCycleError } = await supabase
+    .from("workspace_billing_cycles")
+    .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status, metadata")
+    .eq("workspace_id", context.workspace.id)
+    .eq("status", "active")
+    .order("period_start", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeCycleError) {
+    throw new Error(`Failed to load active billing cycle: ${activeCycleError.message}`);
+  }
+
+  if (activeCycleData) {
+    return activeCycleData as BillingCycleRow;
+  }
+
+  const plan = getBillingPlanDefinition(context.workspace.plan_name);
+  const now = new Date();
+  const periodStart = normalizeStripePeriodDate(context.metadata.stripeCurrentPeriodStart) ?? now.toISOString().slice(0, 10);
+  const periodEnd =
+    normalizeStripePeriodDate(context.metadata.stripeCurrentPeriodEnd) ?? addOneUtcMonthToDateKey(periodStart);
+  const { data: createdCycleData, error: createdCycleError } = await supabase
+    .from("workspace_billing_cycles")
+    .insert({
+      workspace_id: context.workspace.id,
+      period_start: periodStart,
+      period_end: periodEnd,
+      credits_limit: plan.creditsLimit,
+      credits_used: 0,
+      projected_spend_cents: plan.basePriceCents,
+      status: "active",
+      metadata: {}
+    })
+    .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status, metadata")
+    .single();
+
+  if (createdCycleError) {
+    throw new Error(`Failed to create active billing cycle for credit purchases: ${createdCycleError.message}`);
+  }
+
+  return createdCycleData as BillingCycleRow;
+}
+
+function resolveCreditPackFromCheckoutSession(session: Stripe.Checkout.Session) {
+  const metadataPackId = session.metadata?.credit_pack_id?.trim().toLowerCase();
+
+  if (metadataPackId) {
+    return getCreditPackDefinition(metadataPackId);
+  }
+
+  const lineItem = session.line_items?.data?.[0];
+  const lineItemPrice = lineItem?.price;
+  const lineItemPackId = lineItemPrice?.metadata?.credit_pack_id?.trim().toLowerCase();
+
+  if (lineItemPackId) {
+    return getCreditPackDefinition(lineItemPackId);
+  }
+
+  if (lineItemPrice?.unit_amount) {
+    return BILLING_CREDIT_PACKS.find((pack) => pack.priceCents === lineItemPrice.unit_amount) ?? null;
+  }
+
+  const metadataCredits = parseStrictPositiveInteger(session.metadata?.credits);
+  const metadataAmountCents = parseStrictPositiveInteger(session.metadata?.amount_cents);
+
+  if (metadataCredits && metadataAmountCents) {
+    return (
+      BILLING_CREDIT_PACKS.find(
+        (pack) => pack.credits === metadataCredits && pack.priceCents === metadataAmountCents
+      ) ?? null
+    );
+  }
+
+  return null;
+}
+
+function isCreditPackCheckoutSession(session: Stripe.Checkout.Session) {
+  return (
+    session.mode === "payment" &&
+    (session.metadata?.checkout_kind === "credit_pack" ||
+      typeof session.metadata?.credit_pack_id === "string")
+  );
+}
+
+function isEligibleSubscriptionForCreditPackPurchase(subscription: Stripe.Subscription) {
+  return subscription.status === "active" || subscription.status === "trialing";
 }
 
 async function persistWorkspacePlanState(
@@ -366,7 +759,7 @@ async function persistWorkspacePlanState(
 
   const { data: cycleData, error: cycleError } = await supabase
     .from("workspace_billing_cycles")
-    .select("id, period_start, period_end, credits_used, projected_spend_cents, status")
+    .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status, metadata")
     .eq("workspace_id", context.workspace.id)
     .order("period_start", { ascending: false })
     .limit(12);
@@ -385,11 +778,16 @@ async function persistWorkspacePlanState(
     );
 
     if (matchingCycle) {
+      const extraCredits = getCycleCreditTopUpTotal(matchingCycle.metadata);
+      const extraSpendCents = getCycleSpendTopUpTotal(matchingCycle.metadata);
       const { error: updateCycleError } = await supabase
         .from("workspace_billing_cycles")
         .update({
-          credits_limit: plan.creditsLimit,
-          projected_spend_cents: Math.max(plan.basePriceCents, matchingCycle.projected_spend_cents),
+          credits_limit: plan.creditsLimit + extraCredits,
+          projected_spend_cents: Math.max(
+            plan.basePriceCents + extraSpendCents,
+            matchingCycle.projected_spend_cents
+          ),
           status: "active"
         })
         .eq("id", matchingCycle.id);
@@ -437,11 +835,13 @@ async function persistWorkspacePlanState(
     const cycle = cycles.find((entry) => entry.status === "active");
 
     if (cycle) {
+      const extraCredits = getCycleCreditTopUpTotal(cycle.metadata);
+      const extraSpendCents = getCycleSpendTopUpTotal(cycle.metadata);
       const { error: updateCycleError } = await supabase
         .from("workspace_billing_cycles")
         .update({
-          credits_limit: plan.creditsLimit,
-          projected_spend_cents: Math.max(plan.basePriceCents, cycle.projected_spend_cents)
+          credits_limit: plan.creditsLimit + extraCredits,
+          projected_spend_cents: Math.max(plan.basePriceCents + extraSpendCents, cycle.projected_spend_cents)
         })
         .eq("id", cycle.id);
 
@@ -602,7 +1002,16 @@ function parseStripeWorkspaceMetadata(metadata: Record<string, unknown>) {
 }
 
 function resolveBillingEmail(context: StripeWorkspaceContext) {
-  return context.metadata.profileEmail ?? `${context.workspace.slug}@translayr.app`;
+  const preferredEmail = sanitizeEmailAddress(context.metadata.profileEmail);
+
+  if (preferredEmail) {
+    return preferredEmail;
+  }
+
+  const workspaceSlug = context.workspace.slug.trim().toLowerCase();
+  const safeLocalPart = workspaceSlug.length > 0 ? workspaceSlug : "workspace";
+
+  return `${safeLocalPart}@translayr.app`;
 }
 
 function sanitizeOrigin(origin: string) {
@@ -647,9 +1056,92 @@ function normalizeStripePeriodDate(value: string | null | undefined) {
   return parsed.toISOString().slice(0, 10);
 }
 
+function addOneUtcMonthToDateKey(dateKey: string) {
+  const parsed = new Date(`${dateKey}T00:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    const fallback = new Date();
+
+    return new Date(
+      Date.UTC(
+        fallback.getUTCFullYear(),
+        fallback.getUTCMonth() + 1,
+        fallback.getUTCDate()
+      )
+    )
+      .toISOString()
+      .slice(0, 10);
+  }
+
+  return new Date(
+    Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1, parsed.getUTCDate())
+  )
+    .toISOString()
+    .slice(0, 10);
+}
+
+function getCycleCreditTopUpTotal(metadata: Record<string, unknown> | null | undefined) {
+  return parseNonNegativeInteger(metadata?.credit_topup_credits_total);
+}
+
+function getCycleSpendTopUpTotal(metadata: Record<string, unknown> | null | undefined) {
+  return parseNonNegativeInteger(metadata?.credit_topup_spend_cents_total);
+}
+
+function getAppliedCreditPurchaseSessionIds(metadata: Record<string, unknown> | null | undefined) {
+  const rawValue = metadata?.applied_credit_purchase_session_ids;
+
+  if (!Array.isArray(rawValue)) {
+    return [] as string[];
+  }
+
+  return rawValue.filter((entry): entry is string => typeof entry === "string" && entry.length > 0);
+}
+
+function normalizeCycleMetadata(metadata: Record<string, unknown> | null | undefined) {
+  if (!metadata || typeof metadata !== "object") {
+    return {} as Record<string, unknown>;
+  }
+
+  return { ...metadata };
+}
+
+function parseStrictPositiveInteger(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.round(value);
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number.parseInt(value.trim(), 10);
+
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parseNonNegativeInteger(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return Math.round(value);
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number.parseInt(value.trim(), 10);
+
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+
+  return 0;
+}
+
 function getStripeObjectId(
   value:
     | Stripe.Checkout.Session["customer"]
+    | Stripe.Checkout.Session["payment_intent"]
     | Stripe.Checkout.Session["subscription"]
     | Stripe.Subscription["customer"]
     | null
@@ -663,4 +1155,40 @@ function getStripeObjectId(
 
 function isManagedInStripe(subscription: Stripe.Subscription) {
   return subscription.status !== "canceled" && subscription.status !== "incomplete_expired";
+}
+
+function sanitizeEmailAddress(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim();
+
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) ? normalized : null;
+}
+
+function isStripeResourceMissingError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const maybeStripeError = error as {
+    code?: string;
+    message?: string;
+    type?: string;
+  };
+
+  if (maybeStripeError.code === "resource_missing") {
+    return true;
+  }
+
+  return (
+    maybeStripeError.type === "StripeInvalidRequestError" &&
+    typeof maybeStripeError.message === "string" &&
+    /no such/i.test(maybeStripeError.message)
+  );
 }
