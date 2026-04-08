@@ -44,7 +44,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           usage: "Nutzung",
           glossary: "Glossar",
           notifications: "Benachrichtigungen",
-          developerApi: "API",
           support: "Support",
           billing: "Abrechnung",
           settings: "Einstellungen",
@@ -66,7 +65,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           usage: "Usage",
           glossary: "Glossary",
           notifications: "Notifications",
-          developerApi: "API",
           support: "Support",
           billing: "Billing",
           settings: "Settings",
@@ -95,13 +93,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
       icon: BellIcon,
       prefetch: shouldPrefetch,
       active: pathname.startsWith("/notifications")
-    },
-    {
-      label: copy.developerApi,
-      href: "/developer-api",
-      icon: ApiIcon,
-      prefetch: shouldPrefetch,
-      active: pathname.startsWith("/developer-api")
     },
     {
       label: copy.support,
@@ -493,14 +484,6 @@ function BellIcon({ className }: NavIconProps) {
         strokeLinejoin="round"
       />
       <path d="M5.75 11.25c.22.47.7.75 1.25.75s1.03-.28 1.25-.75" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ApiIcon({ className }: NavIconProps) {
-  return (
-    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M4.2 4.2 2.2 7l2 2.8M9.8 4.2l2 2.8-2 2.8M8.2 3l-2.4 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
 import type {
   WorkspaceMemberInviteResult,
   WorkspaceMemberListItem,
+  WorkspaceMemberRemoveResult,
   WorkspaceMemberRole,
   WorkspaceMembersResponse
 } from "@/types/workspace";
@@ -21,6 +22,7 @@ export function WorkspaceMembersPanel() {
   const [inviteRole, setInviteRole] = useState<WorkspaceMemberRole>("editor");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [directory, setDirectory] = useState<WorkspaceMembersResponse | null>(null);
@@ -46,6 +48,13 @@ export function WorkspaceMembersPanel() {
           canInviteNote:
             "Die Mail wird von Supabase verschickt. Der Empfänger akzeptiert die Einladung und landet danach direkt in diesem Workspace.",
           noInvitePermission: "Nur Owner und Admins können neue Einladungen versenden.",
+          removeMember: "Entfernen",
+          removingMember: "Wird entfernt...",
+          removeSuccess: "Mitglied wurde entfernt.",
+          removeFailed: "Mitglied konnte nicht entfernt werden.",
+          removeSelfBlocked: "Du kannst deinen eigenen Zugriff nicht entfernen.",
+          noRemovePermission: "Nur Owner und Admins können Mitglieder entfernen.",
+          removeConfirm: (email: string) => `Mitglied ${email} wirklich aus diesem Workspace entfernen?`,
           role: {
             owner: "Owner",
             admin: "Admin",
@@ -79,6 +88,13 @@ export function WorkspaceMembersPanel() {
           canInviteNote:
             "The email is sent by Supabase. The recipient accepts the invite and then lands directly in this workspace.",
           noInvitePermission: "Only owners and admins can send new invitations.",
+          removeMember: "Remove",
+          removingMember: "Removing...",
+          removeSuccess: "Member removed.",
+          removeFailed: "Member could not be removed.",
+          removeSelfBlocked: "You cannot remove your own access.",
+          noRemovePermission: "Only owners and admins can remove members.",
+          removeConfirm: (email: string) => `Remove ${email} from this workspace?`,
           role: {
             owner: "Owner",
             admin: "Admin",
@@ -93,11 +109,7 @@ export function WorkspaceMembersPanel() {
           }
         };
 
-  useEffect(() => {
-    void loadMembers();
-  }, []);
-
-  async function loadMembers() {
+  const loadMembers = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch("/api/workspace-members", { method: "GET" });
@@ -116,7 +128,11 @@ export function WorkspaceMembersPanel() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [copy.reloadFailed]);
+
+  useEffect(() => {
+    void loadMembers();
+  }, [loadMembers]);
 
   async function handleInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -157,6 +173,54 @@ export function WorkspaceMembersPanel() {
       setErrorMessage(error instanceof Error ? error.message : copy.inviteFailed);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleRemoveMember(member: WorkspaceMemberListItem) {
+    if (!directory?.canRemoveMembers || removingMemberId) {
+      return;
+    }
+
+    if (normalizeEmail(member.email) === directory.currentUserEmail) {
+      setErrorMessage(copy.removeSelfBlocked);
+      return;
+    }
+
+    const confirmed = window.confirm(copy.removeConfirm(member.email));
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setRemovingMemberId(member.id);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+
+      const response = await fetch("/api/workspace-members", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          memberId: member.id
+        })
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | WorkspaceMemberRemoveResult
+        | { error?: string }
+        | null;
+
+      if (!response.ok || !payload || !("memberId" in payload)) {
+        throw new Error(payload && "error" in payload ? payload.error ?? copy.removeFailed : copy.removeFailed);
+      }
+
+      setSuccessMessage(copy.removeSuccess);
+      await loadMembers();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : copy.removeFailed);
+    } finally {
+      setRemovingMemberId(null);
     }
   }
 
@@ -278,6 +342,24 @@ export function WorkspaceMembersPanel() {
                     >
                       {copy.status[member.status]}
                     </span>
+                    {directory?.canRemoveMembers ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleRemoveMember(member)}
+                        disabled={
+                          Boolean(removingMemberId) ||
+                          normalizeEmail(member.email) === directory.currentUserEmail
+                        }
+                        title={
+                          normalizeEmail(member.email) === directory.currentUserEmail
+                            ? copy.removeSelfBlocked
+                            : copy.removeMember
+                        }
+                        className="rounded-[10px] border border-[var(--danger-border)] bg-[var(--danger-bg)] px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--danger)] transition hover:bg-[color-mix(in_oklab,var(--danger-bg)_70%,white)] disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {removingMemberId === member.id ? copy.removingMember : copy.removeMember}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ))
@@ -291,6 +373,10 @@ export function WorkspaceMembersPanel() {
       </div>
     </section>
   );
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
 }
 
 function ChevronDownIcon() {

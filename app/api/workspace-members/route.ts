@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getWorkspaceMembers, inviteWorkspaceMember } from "@/lib/supabase/workspace";
+import { getWorkspaceMembers, inviteWorkspaceMember, removeWorkspaceMember } from "@/lib/supabase/workspace";
 import type { WorkspaceMemberRole } from "@/types/workspace";
 
 export async function GET() {
@@ -46,6 +46,44 @@ export async function POST(request: Request) {
       },
       {
         status: /permission/i.test(message) ? 403 : /required|valid|supported|already/i.test(message) ? 400 : 500
+      }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const payload = (await request.json()) as { memberId?: string } | null;
+
+    if (!payload?.memberId) {
+      return NextResponse.json(
+        {
+          error: "Member id is required."
+        },
+        { status: 400 }
+      );
+    }
+
+    const result = await removeWorkspaceMember({
+      memberId: payload.memberId
+    });
+
+    return NextResponse.json(result, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Workspace member could not be removed.";
+
+    return NextResponse.json(
+      {
+        error: message
+      },
+      {
+        status: /permission/i.test(message)
+          ? 403
+          : /required|valid|supported|already|cannot|must remain/i.test(message)
+            ? 400
+            : /not found/i.test(message)
+              ? 404
+              : 500
       }
     );
   }

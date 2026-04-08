@@ -90,10 +90,18 @@ export interface WorkspaceMemberListItem {
 export interface WorkspaceMembersResponse {
   members: WorkspaceMemberListItem[];
   canInvite: boolean;
+  canRemoveMembers: boolean;
+  currentUserEmail: string;
 }
 
 export interface WorkspaceMemberInviteResult {
   member: WorkspaceMemberListItem;
+  message: string;
+}
+
+export interface WorkspaceMemberRemoveResult {
+  memberId: string;
+  email: string;
   message: string;
 }
 

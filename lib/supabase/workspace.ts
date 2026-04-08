@@ -68,6 +68,7 @@ import type {
   UsageTrendPoint,
   WorkspaceMemberInviteResult,
   WorkspaceMemberListItem,
+  WorkspaceMemberRemoveResult,
   WorkspaceMemberRole,
   WorkspaceMembersResponse,
   WorkspaceMemberStatus
@@ -1788,7 +1789,7 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
 export async function getWorkspaceMembers(): Promise<WorkspaceMembersResponse> {
   noStore();
 
-  const { supabase, workspace, member } = await getWorkspaceContext();
+  const { supabase, workspace, member, user } = await getWorkspaceContext();
   const { data, error } = await supabase
     .from("workspace_members")
     .select("id, workspace_id, email, display_name, role, status, metadata, created_at, updated_at")
@@ -1801,7 +1802,9 @@ export async function getWorkspaceMembers(): Promise<WorkspaceMembersResponse> {
 
   return {
     members: ((data as WorkspaceMemberRow[] | null) ?? []).map(mapWorkspaceMemberListItem),
-    canInvite: canManageWorkspaceMembers(member.role)
+    canInvite: canManageWorkspaceMembers(member.role),
+    canRemoveMembers: canManageWorkspaceMembers(member.role),
+    currentUserEmail: normalizeMemberEmail(user.email)
   };
 }
 
@@ -1893,6 +1896,79 @@ export async function inviteWorkspaceMember(input: {
   return {
     member: mapWorkspaceMemberListItem(upsertedMember),
     message: "Invitation sent."
+  };
+}
+
+export async function removeWorkspaceMember(input: {
+  memberId: string;
+}): Promise<WorkspaceMemberRemoveResult> {
+  const { supabase, workspace, member, user } = await getWorkspaceContext();
+  const memberId = input.memberId?.trim();
+
+  if (!canManageWorkspaceMembers(member.role)) {
+    throw new Error("You do not have permission to remove users from this workspace.");
+  }
+
+  if (!memberId) {
+    throw new Error("Member id is required.");
+  }
+
+  const { data: targetMemberData, error: targetMemberError } = await supabase
+    .from("workspace_members")
+    .select("id, workspace_id, email, display_name, role, status, metadata, created_at, updated_at")
+    .eq("workspace_id", workspace.id)
+    .eq("id", memberId)
+    .maybeSingle();
+
+  if (targetMemberError) {
+    throw new Error(`Failed to validate workspace member access: ${targetMemberError.message}`);
+  }
+
+  const targetMember = targetMemberData as WorkspaceMemberRow | null;
+
+  if (!targetMember) {
+    throw new Error("Workspace member not found.");
+  }
+
+  if (normalizeMemberEmail(targetMember.email) === normalizeMemberEmail(user.email)) {
+    throw new Error("You cannot remove your own workspace access.");
+  }
+
+  if (targetMember.role === "owner" && member.role !== "owner") {
+    throw new Error("Only owners can remove other owners from this workspace.");
+  }
+
+  if (targetMember.role === "owner") {
+    const { count: ownerCount, error: ownerCountError } = await supabase
+      .from("workspace_members")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspace.id)
+      .eq("role", "owner")
+      .neq("status", "disabled");
+
+    if (ownerCountError) {
+      throw new Error(`Failed to validate owner access: ${ownerCountError.message}`);
+    }
+
+    if ((ownerCount ?? 0) <= 1) {
+      throw new Error("At least one owner must remain in the workspace.");
+    }
+  }
+
+  const { error: removeMemberError } = await supabase
+    .from("workspace_members")
+    .delete()
+    .eq("workspace_id", workspace.id)
+    .eq("id", targetMember.id);
+
+  if (removeMemberError) {
+    throw new Error(`Failed to remove workspace member: ${removeMemberError.message}`);
+  }
+
+  return {
+    memberId: targetMember.id,
+    email: targetMember.email,
+    message: "Member removed."
   };
 }
 
