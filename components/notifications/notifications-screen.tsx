@@ -74,7 +74,7 @@ export function NotificationsScreen({ data }: NotificationsScreenProps) {
             </div>
             <Link
               href={data.settingsHref}
-              className="inline-flex items-center justify-center rounded-[10px] bg-[var(--foreground)] px-4 py-2.5 text-[12.5px] font-medium text-white transition hover:opacity-90"
+              className="inline-flex items-center justify-center rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-2.5 text-[12.5px] font-medium text-[var(--foreground)] shadow-[0_8px_20px_rgba(17,17,16,0.06)] transition hover:border-[var(--foreground)] hover:bg-[var(--background-strong)]"
             >
               {copy.manageRules}
             </Link>
