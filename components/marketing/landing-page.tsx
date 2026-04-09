@@ -11,7 +11,7 @@ const EYEBROW_CLASS = "text-[11px] font-semibold uppercase tracking-[0.18em] tex
 const PRIMARY_BUTTON_CLASS =
   "inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--foreground)] px-6 text-[14px] font-medium text-[var(--surface)] transition hover:opacity-90";
 const REGISTER_BUTTON_CLASS =
-  "inline-flex h-11 items-center justify-center rounded-[14px] !bg-[#1a4faf] px-6 text-[14px] font-medium !text-white transition hover:!bg-[#173f8f]";
+  "inline-flex h-11 items-center justify-center rounded-[14px] bg-[#2d2d2a] px-6 text-[14px] font-medium !text-white transition hover:bg-[#3a3a36]";
 const SECONDARY_BUTTON_CLASS =
   "inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border)] bg-transparent px-5 text-[14px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]";
 
@@ -677,7 +677,7 @@ function MarketingHeader({
           </Link>
           <Link
             href="/register"
-            className="hidden rounded-full !bg-[#1a4faf] px-4 py-2 text-[14px] font-medium !text-white transition hover:!bg-[#173f8f] md:inline-flex"
+            className="hidden rounded-full bg-[#2d2d2a] px-4 py-2 text-[14px] font-medium !text-white transition hover:bg-[#3a3a36] md:inline-flex"
           >
             {registerLabel}
           </Link>
@@ -762,7 +762,7 @@ function MarketingHeader({
               <Link
                 href="/register"
                 onClick={() => setMobileOpen(false)}
-                className="rounded-[10px] !bg-[#1a4faf] px-4 py-3 text-center text-[14px] font-medium !text-white transition hover:!bg-[#173f8f]"
+                className="rounded-[10px] bg-[#2d2d2a] px-4 py-3 text-center text-[14px] font-medium !text-white transition hover:bg-[#3a3a36]"
               >
                 {registerLabel}
               </Link>
@@ -918,8 +918,8 @@ function LandingFaqCtaSection({ locale }: { locale: "de" | "en" }) {
       <div className="mt-6 flex flex-wrap gap-3">
         <Link
           href="/register"
-          className="inline-flex h-12 items-center justify-center rounded-[15px] !bg-[#111110] px-6 text-[14px] font-medium !text-white transition hover:!bg-[#111110]"
-          style={{ backgroundColor: "#111110", color: "#ffffff" }}
+          className="inline-flex h-12 items-center justify-center rounded-[15px] !bg-[#2d2d2a] px-6 text-[14px] font-medium !text-white transition hover:!bg-[#3a3a36]"
+          style={{ backgroundColor: "#2d2d2a", color: "#ffffff" }}
         >
           {locale === "de" ? "Kostenlos starten" : "Start free"}
         </Link>
@@ -1050,7 +1050,7 @@ function PricingPlanCard({
         className={[
           "mt-5 inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-medium transition",
           plan.featured
-            ? "!bg-[#1a4faf] !text-white hover:!bg-[#173f8f]"
+            ? "bg-[#2d2d2a] !text-white hover:bg-[#3a3a36]"
             : "border border-[var(--border)] bg-[var(--background-strong)] text-[var(--foreground)] hover:bg-[var(--background)]"
         ].join(" ")}
       >
@@ -1407,7 +1407,7 @@ function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
     <section className="mt-24 overflow-hidden rounded-[32px] bg-[var(--foreground)] px-5 py-10 sm:rounded-[36px] sm:px-7 lg:px-8">
       <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--surface)]/60">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">
             {locale === "de" ? "Statement" : "Statement"}
           </p>
           <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(1.8rem,2.8vw,2.8rem)] leading-[0.92] text-[var(--surface)]`}>
@@ -1415,7 +1415,7 @@ function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
               ? "Übersetzung ist Teil deines Produkts — keine Nebenaufgabe."
               : "Translation is part of your product — not a side task."}
           </h2>
-          <p className="mt-3 max-w-[640px] text-[15px] leading-7 text-[var(--surface)]/72">
+          <p className="mt-3 max-w-[640px] text-[15px] leading-7 text-white/85">
             {locale === "de"
               ? "Viele Teams nutzen Translayr bereits täglich. Mehr als 400.000 Wörter wurden schon in produktiven Flows übersetzt."
               : "Many teams already use Translayr every day. More than 400,000 words have already been translated in production flows."}
@@ -1445,10 +1445,10 @@ function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
               <div className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-white/90">
                 {item.icon}
               </div>
-              <div className={`${DISPLAY_FONT_CLASS_NAME} mt-2 text-[clamp(1.3rem,1.8vw,1.7rem)] leading-none text-[var(--surface)]`}>
+              <div className={`${DISPLAY_FONT_CLASS_NAME} mt-2 text-[clamp(1.3rem,1.8vw,1.7rem)] leading-none text-white`}>
                 {item.value}
               </div>
-              <div className="mt-1 text-[12.5px] leading-5 text-[var(--surface)]/70">{item.label}</div>
+              <div className="mt-1 text-[12.5px] leading-5 text-white/90">{item.label}</div>
             </div>
           ))}
         </div>

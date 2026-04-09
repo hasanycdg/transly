@@ -172,8 +172,8 @@ export default function DocsPage() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/register"
-              className="inline-flex h-11 items-center justify-center rounded-[14px] !bg-[#111110] px-5 text-[13px] font-medium !text-white transition hover:opacity-90"
-              style={{ backgroundColor: "#111110", color: "#ffffff" }}
+              className="inline-flex h-11 items-center justify-center rounded-[14px] !bg-[#2d2d2a] px-5 text-[13px] font-medium !text-white transition hover:!bg-[#3a3a36]"
+              style={{ backgroundColor: "#2d2d2a", color: "#ffffff" }}
             >
               {t(locale, "Start free", "Kostenlos starten")}
             </Link>
