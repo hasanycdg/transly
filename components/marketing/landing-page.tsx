@@ -11,7 +11,7 @@ const EYEBROW_CLASS = "text-[11px] font-semibold uppercase tracking-[0.18em] tex
 const PRIMARY_BUTTON_CLASS =
   "inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--foreground)] px-6 text-[14px] font-medium text-[var(--surface)] transition hover:opacity-90";
 const REGISTER_BUTTON_CLASS =
-  "inline-flex h-11 items-center justify-center rounded-[14px] !bg-black px-6 text-[14px] font-medium !text-white transition hover:!bg-black";
+  "inline-flex h-11 items-center justify-center rounded-[14px] !bg-[#1a4faf] px-6 text-[14px] font-medium !text-white transition hover:!bg-[#173f8f]";
 const SECONDARY_BUTTON_CLASS =
   "inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border)] bg-transparent px-5 text-[14px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]";
 
@@ -462,6 +462,8 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
             </div>
           </section>
 
+          <DarkContrastSection locale={locale} />
+
           <section className="mt-32">
             <SectionIntro eyebrow={copy.pricingGridEyebrow} title={copy.pricingGridTitle} body={copy.pricingGridBody} />
             <PricingIntervalToggle
@@ -675,7 +677,7 @@ function MarketingHeader({
           </Link>
           <Link
             href="/register"
-            className="hidden rounded-full !bg-black px-4 py-2 text-[14px] font-medium !text-white transition hover:!bg-black md:inline-flex"
+            className="hidden rounded-full !bg-[#1a4faf] px-4 py-2 text-[14px] font-medium !text-white transition hover:!bg-[#173f8f] md:inline-flex"
           >
             {registerLabel}
           </Link>
@@ -760,7 +762,7 @@ function MarketingHeader({
               <Link
                 href="/register"
                 onClick={() => setMobileOpen(false)}
-                className="rounded-[10px] !bg-black px-4 py-3 text-center text-[14px] font-medium !text-white transition hover:!bg-black"
+                className="rounded-[10px] !bg-[#1a4faf] px-4 py-3 text-center text-[14px] font-medium !text-white transition hover:!bg-[#173f8f]"
               >
                 {registerLabel}
               </Link>
@@ -1048,7 +1050,7 @@ function PricingPlanCard({
         className={[
           "mt-5 inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-medium transition",
           plan.featured
-            ? "!bg-black !text-white hover:!bg-black"
+            ? "!bg-[#1a4faf] !text-white hover:!bg-[#173f8f]"
             : "border border-[var(--border)] bg-[var(--background-strong)] text-[var(--foreground)] hover:bg-[var(--background)]"
         ].join(" ")}
       >
@@ -1399,42 +1401,54 @@ function FeatureTabs({ locale }: { locale: "de" | "en" }) {
 }
 
 function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
+  const metrics = getIconMetrics(locale);
+
   return (
-    <section className="mt-32 -mx-5 rounded-[28px] bg-[var(--foreground)] px-6 py-20 sm:mx-0 sm:px-8 lg:px-12">
-      <div className="mx-auto max-w-[720px] text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--surface)]/60">
-          {locale === "de" ? "Statement" : "Statement"}
-        </p>
-        <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-6 text-[clamp(2rem,3.5vw,3.2rem)] leading-[0.95] text-[var(--surface)]`}>
-          {locale === "de"
-            ? "Übersetzung ist Teil deines Produkts — keine Nebenaufgabe."
-            : "Translation is part of your product — not a side task."}
-        </h2>
-        <p className="mx-auto mt-5 max-w-[560px] text-[16px] leading-8 text-[var(--surface)]/70">
-          {locale === "de"
-            ? "Behandle Übersetzung nicht als separaten Schritt. Behalte alles in einem Flow, vom Inhalt bis zum Release."
-            : "Stop treating translation as a separate step. Keep everything in one flow, from content to release."}
-        </p>
-        <div className="mt-10 grid gap-8 sm:grid-cols-3">
-          {[
-            {
-              stat: locale === "de" ? "Viele Teams" : "Many Teams",
-              desc: locale === "de" ? "nutzen Translayr aktiv im Rollout" : "actively using Translayr in rollout"
-            },
-            {
-              stat: "99.9%",
-              desc: locale === "de" ? "erfolgreiche Datei-Exporte im ersten Anlauf" : "successful file exports on first run"
-            },
-            {
-              stat: "300k+",
-              desc: locale === "de" ? "Wörter bereits übersetzt" : "words already translated"
-            }
-          ].map((item) => (
-            <div key={item.stat}>
-              <div className={`${DISPLAY_FONT_CLASS_NAME} text-[clamp(1.8rem,2.5vw,2.4rem)] leading-none text-[var(--surface)]`}>
-                {item.stat}
+    <section className="mt-24 overflow-hidden rounded-[32px] bg-[var(--foreground)] px-5 py-10 sm:rounded-[36px] sm:px-7 lg:px-8">
+      <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--surface)]/60">
+            {locale === "de" ? "Statement" : "Statement"}
+          </p>
+          <h2 className={`${DISPLAY_FONT_CLASS_NAME} mt-4 text-[clamp(1.8rem,2.8vw,2.8rem)] leading-[0.92] text-[var(--surface)]`}>
+            {locale === "de"
+              ? "Übersetzung ist Teil deines Produkts — keine Nebenaufgabe."
+              : "Translation is part of your product — not a side task."}
+          </h2>
+          <p className="mt-3 max-w-[640px] text-[15px] leading-7 text-[var(--surface)]/72">
+            {locale === "de"
+              ? "Viele Teams nutzen Translayr bereits täglich. Mehr als 400.000 Wörter wurden schon in produktiven Flows übersetzt."
+              : "Many teams already use Translayr every day. More than 400,000 words have already been translated in production flows."}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/register"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-white px-6 text-[14px] font-medium text-[var(--foreground)] transition hover:bg-white/90"
+            >
+              {locale === "de" ? "Kostenlos starten" : "Start free"}
+            </Link>
+            <Link
+              href="/pricing"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] border border-white/30 px-6 text-[14px] font-medium text-white transition hover:bg-white/10"
+            >
+              {locale === "de" ? "Preise ansehen" : "View pricing"}
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {metrics.map((item) => (
+            <div
+              key={item.value + item.label}
+              className="rounded-[14px] border border-white/15 bg-white/5 px-4 py-3 text-left"
+            >
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-white/90">
+                {item.icon}
               </div>
-              <div className="mt-3 text-[13px] text-[var(--surface)]/60">{item.desc}</div>
+              <div className={`${DISPLAY_FONT_CLASS_NAME} mt-2 text-[clamp(1.3rem,1.8vw,1.7rem)] leading-none text-[var(--surface)]`}>
+                {item.value}
+              </div>
+              <div className="mt-1 text-[12.5px] leading-5 text-[var(--surface)]/70">{item.label}</div>
             </div>
           ))}
         </div>
@@ -1474,10 +1488,26 @@ function getIconMetrics(locale: "de" | "en") {
   );
 
   return [
-    { value: "Many Teams", label: locale === "de" ? "Teams im aktiven Rollout" : "actively using Translayr in rollout", icon: teamIcon },
-    { value: "99.9%", label: locale === "de" ? "Exporte im ersten Anlauf" : "exports passing on first run", icon: uptimeIcon },
-    { value: "300k+", label: locale === "de" ? "Wörter bereits übersetzt" : "words already translated", icon: workflowIcon },
-    { value: "8+", label: locale === "de" ? "Produktive Dateiformate" : "production file formats", icon: formatIcon }
+    {
+      value: locale === "de" ? "Viele Teams" : "Many teams",
+      label: locale === "de" ? "nutzen Translayr bereits im täglichen Rollout" : "are already using Translayr in daily rollout",
+      icon: teamIcon
+    },
+    {
+      value: "400k+",
+      label: locale === "de" ? "Wörter sind bereits übersetzt worden" : "words have already been translated",
+      icon: workflowIcon
+    },
+    {
+      value: "99.9%",
+      label: locale === "de" ? "Datei-Exporte laufen beim ersten Versuch" : "file exports succeed on first pass",
+      icon: uptimeIcon
+    },
+    {
+      value: "10+",
+      label: locale === "de" ? "Dateiformate im produktiven Einsatz" : "file formats supported in production",
+      icon: formatIcon
+    }
   ];
 }
 
