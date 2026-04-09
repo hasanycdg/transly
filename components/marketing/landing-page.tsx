@@ -483,6 +483,7 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
             body={copy.homeFaqBody}
             items={copy.homeFaqItems}
           />
+          <LandingFaqCtaSection locale={locale} />
         </PageFrame>
       );
   }
@@ -894,6 +895,39 @@ function LandingFaqSection({
           ? "Noch Fragen? Schreib uns über Support oder starte direkt im Produkt mit echten Dateien."
           : "Still have questions? Contact support or start directly in the product with real files."}
       </p>
+    </section>
+  );
+}
+
+function LandingFaqCtaSection({ locale }: { locale: "de" | "en" }) {
+  return (
+    <section className="mt-10 rounded-[30px] border border-[var(--border)] bg-[var(--surface)] p-7 lg:p-10">
+      <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-soft)]">
+        {locale === "de" ? "Nächster Schritt" : "Next step"}
+      </p>
+      <h3 className={`${DISPLAY_FONT_CLASS_NAME} mt-3 text-[clamp(1.9rem,2.9vw,2.8rem)] leading-[0.92] text-[var(--foreground)]`}>
+        {locale === "de" ? "Bereit für deinen ersten Run?" : "Ready for your first run?"}
+      </h3>
+      <p className="mt-3 max-w-[820px] text-[15px] leading-8 text-[var(--muted)]">
+        {locale === "de"
+          ? "Starte kostenlos, lade echte Dateien hoch und sieh direkt, wie der Workflow in deinem Team funktioniert."
+          : "Start free, upload real files, and see how the workflow behaves with your team setup."}
+      </p>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link
+          href="/register"
+          className="inline-flex h-12 items-center justify-center rounded-[15px] !bg-[#111110] px-6 text-[14px] font-medium !text-white transition hover:!bg-[#111110]"
+          style={{ backgroundColor: "#111110", color: "#ffffff" }}
+        >
+          {locale === "de" ? "Kostenlos starten" : "Start free"}
+        </Link>
+        <Link
+          href="/pricing"
+          className="inline-flex h-12 items-center justify-center rounded-[15px] border border-[var(--border)] bg-[var(--surface)] px-6 text-[14px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]"
+        >
+          {locale === "de" ? "Preise ansehen" : "View pricing"}
+        </Link>
+      </div>
     </section>
   );
 }
