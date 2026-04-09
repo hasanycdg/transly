@@ -2161,52 +2161,52 @@ function getGermanMarketingCopy(): MarketingCopy {
       {
         question: "Kann ich ZIP-Archive mit gemischten Dateitypen hochladen?",
         answer:
-          "Ja. ZIP-Dateien werden automatisch entpackt und alle unterstützten Übersetzungsdateien werden direkt in die Queue übernommen."
+          "Ja. ZIP-Dateien werden automatisch entpackt und alle unterstützten Übersetzungsdateien direkt in die Queue übernommen. Das ist praktisch, wenn ein Release aus vielen Assets besteht und du nicht jede Datei einzeln hochladen willst."
       },
       {
         question: "Was passiert mit Dateien im ZIP, die nicht unterstützt werden?",
         answer:
-          "Nicht unterstützte oder systeminterne Einträge werden ignoriert. Nur gültige Übersetzungsdateien werden verarbeitet."
+          "Nicht unterstützte oder systeminterne Einträge werden ignoriert, damit der Übersetzungsflow sauber bleibt. Verarbeitet werden nur gültige Formate wie XLIFF, PO, STRINGS, RESX, XML, CSV, TXT, DOCX und PPTX."
       },
       {
         question: "Bleiben Tags und Platzhalter in Lokalisierungsdateien erhalten?",
         answer:
-          "Ja. Der Übersetzungsflow enthält Schutzlogik für Tags und Platzhalter, damit Struktur und technische Tokens stabil bleiben."
+          "Ja. Der Übersetzungsflow enthält Schutzlogik für Tags und Platzhalter, damit Struktur und technische Tokens stabil bleiben. Zusätzlich kannst du in den Einstellungen strikten Tag-Schutz und ein hartes Stoppen bei Tag-Mismatch aktivieren."
       },
       {
         question: "Brauche ich für kurze Übersetzungen immer ein Projekt?",
         answer:
-          "Nein. Für schnelle Einzeltexte gibt es die Textfläche unter /translate, inklusive Tonalität, Copy und TXT-Export."
+          "Nein. Für schnelle Einzeltexte gibt es die Textfläche unter /translate, inklusive Tonalität, Copy und TXT-Export. Wenn der Inhalt später wiederkehrend wird oder in Releases eingebunden ist, lohnt sich ein Projekt-Workflow."
       },
       {
         question: "Kann ich Standardsprachen und Ton einmal global festlegen?",
         answer:
-          "Ja. In den Einstellungen definierst du Quelle, Ziel, Tonalität und KI-Verhalten als Defaults für neue Übersetzungen."
+          "Ja. In den Einstellungen definierst du Quelle, Ziel, Tonalität und KI-Verhalten als Defaults für neue Übersetzungen. Diese Defaults sparen Zeit bei jedem neuen Run, können aber pro Projekt oder Request weiterhin angepasst werden."
       },
       {
         question: "Unterstützt das Glossar geschützte Begriffe?",
         answer:
-          "Ja. Glossarbegriffe können als geschützt markiert werden, damit Markenbegriffe und feste Produktbezeichnungen nicht verändert werden."
+          "Ja. Glossarbegriffe können als geschützt markiert werden, damit Markenbegriffe und feste Produktbezeichnungen nicht verändert werden. Bei aktivem Glossar-Automodus werden relevante Begriffe zur Laufzeit eingebunden und konsistent angewendet."
       },
       {
         question: "Können mehrere Teammitglieder gleichzeitig im Workspace arbeiten?",
         answer:
-          "Ja. Du kannst Teammitglieder mit Rollen wie Admin, Editor, Reviewer oder Viewer einladen und die Zugriffe zentral verwalten."
+          "Ja. Du kannst Teammitglieder mit Rollen wie Admin, Editor, Reviewer oder Viewer einladen und die Zugriffe zentral verwalten. So bleibt klar geregelt, wer editieren, prüfen oder nur einsehen darf."
       },
       {
         question: "Wie sehe ich Verbrauch und verbleibende Credits im Zyklus?",
         answer:
-          "Auf der Usage-Seite siehst du verbrauchte Credits, verbleibendes Volumen, Prozentanteil und Reset-Datum des aktuellen Zyklus."
+          "Auf der Usage-Seite siehst du verbrauchte Credits, verbleibendes Volumen, Prozentanteil und Reset-Datum des aktuellen Zyklus. In Billing ergänzt du das Bild mit Planstatus, Abrechnungsdetails und möglichen Top-ups."
       },
       {
         question: "Was passiert, wenn das Credit-Limit erreicht ist?",
         answer:
-          "Neue Übersetzungen werden mit klarer Fehlermeldung gestoppt. Danach kannst du den Plan upgraden oder zusätzliche Credit-Pakete kaufen."
+          "Neue Übersetzungen werden vor der Ausführung per Credit-Check validiert und bei zu wenig Volumen mit klarer Meldung gestoppt. Danach kannst du sofort upgraden oder zusätzliche Credit-Pakete buchen, um ohne lange Unterbrechung weiterzuarbeiten."
       },
       {
         question: "Kann ich WordPress- oder CMS-Jobs per API anstoßen?",
         answer:
-          "Ja. Für Integrationen gibt es einen separaten Developer-API-Bereich mit Endpoints für Einzeljobs, Bulk-Requests und Job-Status."
+          "Ja. Für Integrationen gibt es einen separaten Developer-API-Bereich mit Endpoints für Einzeljobs, Bulk-Requests und Job-Status. Authentifizierung läuft über API-Key-Header, damit WordPress- oder CMS-Pipelines sauber angebunden werden können."
       }
     ],
     productsHero: {
@@ -2579,52 +2579,52 @@ function getEnglishMarketingCopy(): MarketingCopy {
       {
         question: "Can I upload ZIP archives with mixed file types?",
         answer:
-          "Yes. ZIP uploads are unpacked automatically and supported translation files are added to your queue."
+          "Yes. ZIP uploads are unpacked automatically and supported translation files are added to your queue right away. This is useful when a release contains many assets and you do not want to upload each file one by one."
       },
       {
         question: "What happens to unsupported files inside a ZIP?",
         answer:
-          "Unsupported or system entries are skipped. Only valid translation files are processed."
+          "Unsupported or system entries are skipped so the translation flow stays clean and predictable. Only valid formats such as XLIFF, PO, STRINGS, RESX, XML, CSV, TXT, DOCX, and PPTX are processed."
       },
       {
         question: "Are tags and placeholders preserved in localization files?",
         answer:
-          "Yes. The pipeline includes tag and placeholder protection so technical structure remains intact."
+          "Yes. The pipeline includes tag and placeholder protection so technical structure remains intact. You can also enable strict tag protection and fail-on-mismatch behavior in settings for stricter QA."
       },
       {
         question: "Do I always need a project for short translations?",
         answer:
-          "No. For quick one-off content you can use /translate with tone control, copy, and TXT export."
+          "No. For quick one-off content you can use /translate with tone control, copy, and TXT export. If the content becomes recurring or release-critical, moving it into a project gives you better tracking and review visibility."
       },
       {
         question: "Can I set default languages and tone once for the workspace?",
         answer:
-          "Yes. Settings let you define source mode, default target language, tone style, and AI behavior for new runs."
+          "Yes. Settings let you define source mode, default target language, tone style, and AI behavior for new runs. These defaults reduce repetitive setup while still allowing project-level or request-level overrides."
       },
       {
         question: "Does glossary support protected terms?",
         answer:
-          "Yes. Terms can be marked as protected to keep brand names and fixed terminology unchanged."
+          "Yes. Terms can be marked as protected to keep brand names and fixed terminology unchanged. With glossary auto mode enabled, relevant terms are injected during runtime to keep output consistent."
       },
       {
         question: "Can multiple teammates work in the same workspace?",
         answer:
-          "Yes. Invite members with roles such as admin, editor, reviewer, or viewer and manage access centrally."
+          "Yes. Invite members with roles such as admin, editor, reviewer, or viewer and manage access centrally. This keeps responsibility clear across editing, review, and read-only collaboration."
       },
       {
         question: "Where can I monitor usage and remaining credits?",
         answer:
-          "The Usage page shows consumed credits, remaining capacity, cycle percentage, and the reset date."
+          "The Usage page shows consumed credits, remaining capacity, cycle percentage, and the reset date. Billing complements that view with plan status, invoices, and available top-up options."
       },
       {
         question: "What happens when the credit limit is reached?",
         answer:
-          "New translations are blocked with a clear message. You can then upgrade your plan or purchase credit packs."
+          "New translations are validated before execution and blocked with a clear message when credits are insufficient. You can then upgrade your plan or buy credit packs and continue without reworking the workflow."
       },
       {
         question: "Can I trigger WordPress or CMS jobs via API?",
         answer:
-          "Yes. The Developer API section includes endpoints for single jobs, bulk requests, and job status tracking."
+          "Yes. The Developer API section includes endpoints for single jobs, bulk requests, and job status tracking. Authentication works via API key headers so WordPress or CMS pipelines can connect in a controlled way."
       }
     ],
     productsHero: {
