@@ -97,6 +97,7 @@ type PricingPlanView = {
 
 type PricingInterval = "monthly" | "yearly";
 type MarketingLocale = "de" | "en";
+type MarketingFaqItem = { question: string; answer: string };
 
 type MarketingCopy = {
   navHome: string;
@@ -120,6 +121,10 @@ type MarketingCopy = {
   homeOperationsTitle: string;
   homeOperationsBody: string;
   homeOperationsRows: Array<{ title: string; body: string }>;
+  homeFaqEyebrow: string;
+  homeFaqTitle: string;
+  homeFaqBody: string;
+  homeFaqItems: MarketingFaqItem[];
   productsHero: PageHero;
   productsGridEyebrow: string;
   productsGridTitle: string;
@@ -470,6 +475,14 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
               ))}
             </div>
           </section>
+
+          <LandingFaqSection
+            locale={locale}
+            eyebrow={copy.homeFaqEyebrow}
+            title={copy.homeFaqTitle}
+            body={copy.homeFaqBody}
+            items={copy.homeFaqItems}
+          />
         </PageFrame>
       );
   }
@@ -832,6 +845,56 @@ function SectionIntro({
       </h2>
       <p className="mt-4 text-[15px] leading-7 text-[var(--muted)]">{body}</p>
     </div>
+  );
+}
+
+function LandingFaqSection({
+  locale,
+  eyebrow,
+  title,
+  body,
+  items
+}: {
+  locale: "de" | "en";
+  eyebrow: string;
+  title: string;
+  body: string;
+  items: MarketingFaqItem[];
+}) {
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+  return (
+    <section className="mt-32 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-6 lg:p-8">
+      <SectionIntro eyebrow={eyebrow} title={title} body={body} />
+      <div className="mt-10 divide-y divide-[var(--border-light)] rounded-[20px] border border-[var(--border)] bg-[var(--background-strong)] px-5">
+        {items.map((item, index) => {
+          const isOpen = openIndex === index;
+
+          return (
+            <article key={item.question} className="py-4">
+              <button
+                type="button"
+                onClick={() => setOpenIndex((current) => (current === index ? null : index))}
+                className="flex w-full items-start justify-between gap-4 text-left"
+              >
+                <span className="text-[15px] font-semibold leading-7 text-[var(--foreground)]">{item.question}</span>
+                <span className="mt-[3px] inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-white text-[14px] text-[var(--muted)]">
+                  {isOpen ? "−" : "+"}
+                </span>
+              </button>
+              {isOpen ? (
+                <p className="mt-3 max-w-[920px] pr-10 text-[14px] leading-7 text-[var(--muted)]">{item.answer}</p>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+      <p className="mt-5 text-[12px] text-[var(--muted-soft)]">
+        {locale === "de"
+          ? "Noch Fragen? Schreib uns über Support oder starte direkt im Produkt mit echten Dateien."
+          : "Still have questions? Contact support or start directly in the product with real files."}
+      </p>
+    </section>
   );
 }
 
@@ -2057,6 +2120,61 @@ function getGermanMarketingCopy(): MarketingCopy {
         body: "Credits, monatliche Limits und aktuelle Kosten hängen direkt an derselben operativen Oberfläche."
       }
     ],
+    homeFaqEyebrow: "FAQ",
+    homeFaqTitle: "Häufige Fragen vor dem ersten produktiven Run.",
+    homeFaqBody: "Kurz und konkret: so arbeitet Translayr im echten Team- und Release-Alltag.",
+    homeFaqItems: [
+      {
+        question: "Kann ich ZIP-Archive mit gemischten Dateitypen hochladen?",
+        answer:
+          "Ja. ZIP-Dateien werden automatisch entpackt und alle unterstützten Übersetzungsdateien werden direkt in die Queue übernommen."
+      },
+      {
+        question: "Was passiert mit Dateien im ZIP, die nicht unterstützt werden?",
+        answer:
+          "Nicht unterstützte oder systeminterne Einträge werden ignoriert. Nur gültige Übersetzungsdateien werden verarbeitet."
+      },
+      {
+        question: "Bleiben Tags und Platzhalter in Lokalisierungsdateien erhalten?",
+        answer:
+          "Ja. Der Übersetzungsflow enthält Schutzlogik für Tags und Platzhalter, damit Struktur und technische Tokens stabil bleiben."
+      },
+      {
+        question: "Brauche ich für kurze Übersetzungen immer ein Projekt?",
+        answer:
+          "Nein. Für schnelle Einzeltexte gibt es die Textfläche unter /translate, inklusive Tonalität, Copy und TXT-Export."
+      },
+      {
+        question: "Kann ich Standardsprachen und Ton einmal global festlegen?",
+        answer:
+          "Ja. In den Einstellungen definierst du Quelle, Ziel, Tonalität und KI-Verhalten als Defaults für neue Übersetzungen."
+      },
+      {
+        question: "Unterstützt das Glossar geschützte Begriffe?",
+        answer:
+          "Ja. Glossarbegriffe können als geschützt markiert werden, damit Markenbegriffe und feste Produktbezeichnungen nicht verändert werden."
+      },
+      {
+        question: "Können mehrere Teammitglieder gleichzeitig im Workspace arbeiten?",
+        answer:
+          "Ja. Du kannst Teammitglieder mit Rollen wie Admin, Editor, Reviewer oder Viewer einladen und die Zugriffe zentral verwalten."
+      },
+      {
+        question: "Wie sehe ich Verbrauch und verbleibende Credits im Zyklus?",
+        answer:
+          "Auf der Usage-Seite siehst du verbrauchte Credits, verbleibendes Volumen, Prozentanteil und Reset-Datum des aktuellen Zyklus."
+      },
+      {
+        question: "Was passiert, wenn das Credit-Limit erreicht ist?",
+        answer:
+          "Neue Übersetzungen werden mit klarer Fehlermeldung gestoppt. Danach kannst du den Plan upgraden oder zusätzliche Credit-Pakete kaufen."
+      },
+      {
+        question: "Kann ich WordPress- oder CMS-Jobs per API anstoßen?",
+        answer:
+          "Ja. Für Integrationen gibt es einen separaten Developer-API-Bereich mit Endpoints für Einzeljobs, Bulk-Requests und Job-Status."
+      }
+    ],
     productsHero: {
       eyebrow: "Produkte",
       title: "Drei Workflows. Ein Übersetzungssystem.",
@@ -2418,6 +2536,61 @@ function getEnglishMarketingCopy(): MarketingCopy {
       {
         title: "Finance",
         body: "Credits, monthly limits, and current spend stay directly connected to the same operational experience."
+      }
+    ],
+    homeFaqEyebrow: "FAQ",
+    homeFaqTitle: "Common questions before your first production run.",
+    homeFaqBody: "Short and practical answers for how Translayr works in real release operations.",
+    homeFaqItems: [
+      {
+        question: "Can I upload ZIP archives with mixed file types?",
+        answer:
+          "Yes. ZIP uploads are unpacked automatically and supported translation files are added to your queue."
+      },
+      {
+        question: "What happens to unsupported files inside a ZIP?",
+        answer:
+          "Unsupported or system entries are skipped. Only valid translation files are processed."
+      },
+      {
+        question: "Are tags and placeholders preserved in localization files?",
+        answer:
+          "Yes. The pipeline includes tag and placeholder protection so technical structure remains intact."
+      },
+      {
+        question: "Do I always need a project for short translations?",
+        answer:
+          "No. For quick one-off content you can use /translate with tone control, copy, and TXT export."
+      },
+      {
+        question: "Can I set default languages and tone once for the workspace?",
+        answer:
+          "Yes. Settings let you define source mode, default target language, tone style, and AI behavior for new runs."
+      },
+      {
+        question: "Does glossary support protected terms?",
+        answer:
+          "Yes. Terms can be marked as protected to keep brand names and fixed terminology unchanged."
+      },
+      {
+        question: "Can multiple teammates work in the same workspace?",
+        answer:
+          "Yes. Invite members with roles such as admin, editor, reviewer, or viewer and manage access centrally."
+      },
+      {
+        question: "Where can I monitor usage and remaining credits?",
+        answer:
+          "The Usage page shows consumed credits, remaining capacity, cycle percentage, and the reset date."
+      },
+      {
+        question: "What happens when the credit limit is reached?",
+        answer:
+          "New translations are blocked with a clear message. You can then upgrade your plan or purchase credit packs."
+      },
+      {
+        question: "Can I trigger WordPress or CMS jobs via API?",
+        answer:
+          "Yes. The Developer API section includes endpoints for single jobs, bulk requests, and job status tracking."
       }
     ],
     productsHero: {
