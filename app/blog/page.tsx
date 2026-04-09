@@ -1767,12 +1767,20 @@ export default function BlogPage() {
     return (
       <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
         <div className="mx-auto max-w-[720px] px-5 py-12 sm:px-7 lg:px-8">
-          <button
-            onClick={() => { setView("list"); setActiveSlug(null); }}
-            className="text-[13px] font-medium text-[var(--muted)] transition hover:text-[var(--foreground)]"
-          >
-            ← {lang === "de" ? "Zurück zum Blog" : "Back to blog"}
-          </button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => { setView("list"); setActiveSlug(null); }}
+              className="text-[13px] font-medium text-[var(--muted)] transition hover:text-[var(--foreground)]"
+            >
+              ← {lang === "de" ? "Zurück zum Blog" : "Back to blog"}
+            </button>
+            <Link
+              href="/"
+              className="inline-flex h-9 items-center justify-center rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 text-[12px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]"
+            >
+              {lang === "de" ? "Zur Landingpage" : "To landing page"}
+            </Link>
+          </div>
 
           <article className="mt-8">
             <div className="flex flex-wrap items-center gap-3">
@@ -1855,6 +1863,14 @@ export default function BlogPage() {
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto max-w-[960px] px-5 py-12 sm:px-7 lg:px-8">
         <div className="mb-10">
+          <div className="mb-4 flex justify-end">
+            <Link
+              href="/"
+              className="inline-flex h-9 items-center justify-center rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 text-[12px] font-medium text-[var(--foreground)] transition hover:bg-[var(--background-strong)]"
+            >
+              {lang === "de" ? "Zur Landingpage" : "To landing page"}
+            </Link>
+          </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">
             / Blog
           </p>
@@ -1931,7 +1947,7 @@ export default function BlogPage() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/register"
-              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-black px-5 text-[13px] font-medium text-white transition hover:bg-black"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] !bg-black px-5 text-[13px] font-medium !text-white transition hover:!bg-black"
             >
               {lang === "de" ? "Kostenlos starten" : "Start free"}
             </Link>

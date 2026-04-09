@@ -69,7 +69,7 @@ export default function DocsPage() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/register"
-              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-black px-5 text-[13px] font-medium text-white transition hover:bg-black"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] !bg-black px-5 text-[13px] font-medium !text-white transition hover:!bg-black"
             >
               {t("Start free", "Kostenlos starten")}
             </Link>
