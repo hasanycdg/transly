@@ -2042,13 +2042,13 @@ function localizePlanFeatures(
 
   switch (planId) {
     case "free":
-      return ["1k monatliche Wörter", "Kern-Workspace für Übersetzungen", "Glossar-Basics"];
+      return ["5k monatliche Wörter", "Kern-Workspace für Übersetzungen", "Glossar-Basics"];
     case "starter":
-      return ["50k monatliche Wörter", "Projekt-Workspaces", "Review-fähige Exporte"];
+      return ["100k monatliche Wörter", "Projekt-Workspaces", "Glossar-Support"];
     case "pro":
-      return ["200k monatliche Wörter", "Review-Workflow", "Priorisierte Glossar-Injektion"];
+      return ["500k monatliche Wörter", "Review-Workflow", "Priorisierte Glossar-Injektion"];
     case "scale":
-      return ["700k monatliche Wörter", "Höherer Durchsatz", "Gemeinsame Team-Operationen"];
+      return ["1M monatliche Wörter", "Höherer Durchsatz", "Gemeinsame Team-Operationen"];
     default:
       return [];
   }
@@ -2389,36 +2389,36 @@ function getGermanMarketingCopy(): MarketingCopy {
     ],
     pricingComparison: [
       {
-        label: "1.000 Wörter / Monat",
+        label: "5.000 Wörter / Monat enthalten",
         values: [true, false, false, false]
       },
       {
-        label: "50.000 Wörter / Monat",
+        label: "100.000 Wörter / Monat enthalten",
         values: [false, true, false, false]
       },
       {
-        label: "200.000 Wörter / Monat",
+        label: "500.000 Wörter / Monat enthalten",
         values: [false, false, true, false]
       },
       {
-        label: "700.000 Wörter / Monat",
+        label: "1.000.000 Wörter / Monat enthalten",
         values: [false, false, false, true]
       },
       {
-        label: "XLIFF / XLF Übersetzung",
+        label: "Kernübersetzung für XLIFF / XLF",
         values: [true, true, true, true]
       },
       {
-        label: "PO / STRINGS / RESX / XML",
+        label: "Erweiterte Dateiformate (PO, STRINGS, RESX, XML)",
         values: [false, true, true, true]
       },
       {
-        label: "CSV / TXT / DOCX / PPTX",
+        label: "Dokumentformate (CSV, TXT, DOCX, PPTX)",
         values: [false, false, true, true]
       },
       {
         label: "Glossar-Basics",
-        values: [true, true, false, false]
+        values: [true, true, true, true]
       },
       {
         label: "Glossar-Support",
@@ -2443,26 +2443,6 @@ function getGermanMarketingCopy(): MarketingCopy {
       {
         label: "Gemeinsame Team-Operationen",
         values: [false, false, false, true]
-      },
-      {
-        label: "Seitenvergleich in der Prüfung",
-        values: [false, false, true, true]
-      },
-      {
-        label: "Tag & Struktur-Schutz",
-        values: [false, false, true, true]
-      },
-      {
-        label: "Auto-Detect Quellsprache",
-        values: [true, true, true, true]
-      },
-      {
-        label: "Tonalität-Steuerung",
-        values: [true, true, true, true]
-      },
-      {
-        label: "Wortzählung vor Übersetzung",
-        values: [true, true, true, true]
       },
       {
         label: "Credit-Check vor Übersetzung",
@@ -2807,36 +2787,36 @@ function getEnglishMarketingCopy(): MarketingCopy {
     ],
     pricingComparison: [
       {
-        label: "1,000 words / month",
+        label: "5,000 words / month included",
         values: [true, false, false, false]
       },
       {
-        label: "50,000 words / month",
+        label: "100,000 words / month included",
         values: [false, true, false, false]
       },
       {
-        label: "200,000 words / month",
+        label: "500,000 words / month included",
         values: [false, false, true, false]
       },
       {
-        label: "700,000 words / month",
+        label: "1,000,000 words / month included",
         values: [false, false, false, true]
       },
       {
-        label: "XLIFF / XLF translation",
+        label: "Core XLIFF / XLF translation",
         values: [true, true, true, true]
       },
       {
-        label: "PO / STRINGS / RESX / XML",
+        label: "Extended file formats (PO, STRINGS, RESX, XML)",
         values: [false, true, true, true]
       },
       {
-        label: "CSV / TXT / DOCX / PPTX",
+        label: "Document formats (CSV, TXT, DOCX, PPTX)",
         values: [false, false, true, true]
       },
       {
         label: "Glossary basics",
-        values: [true, true, false, false]
+        values: [true, true, true, true]
       },
       {
         label: "Glossary support",
@@ -2861,26 +2841,6 @@ function getEnglishMarketingCopy(): MarketingCopy {
       {
         label: "Shared team operations",
         values: [false, false, false, true]
-      },
-      {
-        label: "Side-by-side review",
-        values: [false, false, true, true]
-      },
-      {
-        label: "Tag & structure protection",
-        values: [false, false, true, true]
-      },
-      {
-        label: "Auto-detect source language",
-        values: [true, true, true, true]
-      },
-      {
-        label: "Tone control",
-        values: [true, true, true, true]
-      },
-      {
-        label: "Word count before translation",
-        values: [true, true, true, true]
       },
       {
         label: "Credit check before translation",
