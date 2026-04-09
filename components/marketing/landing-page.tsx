@@ -1429,7 +1429,7 @@ function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
             </Link>
             <Link
               href="/pricing"
-              className="inline-flex h-11 items-center justify-center rounded-[14px] border border-white/30 px-6 text-[14px] font-medium text-white transition hover:bg-white/10"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] border border-white/30 px-6 text-[14px] font-medium !text-white transition hover:bg-white/10"
             >
               {locale === "de" ? "Preise ansehen" : "View pricing"}
             </Link>
