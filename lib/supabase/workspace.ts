@@ -53,6 +53,7 @@ import type {
   NotificationsScreenData,
   ProjectsOverviewData,
   SettingsFilenameFormat,
+  SettingsNotificationsData,
   SettingsQualityPreset,
   SettingsScreenData,
   SettingsToneStyle,
@@ -1169,8 +1170,57 @@ export async function getNotificationsScreenData(): Promise<NotificationsScreenD
     channels,
     items,
     updatedLabel: formatUpdatedLabel(now, locale),
-    settingsHref: "/settings?section=notifications"
+    preferences: {
+      translationCompleteEmail: settings.email_notifications,
+      invoiceCreatedEmail: metadata.invoiceCreatedEmail ?? true,
+      paymentFailedEmail: metadata.paymentFailedEmail ?? true,
+      spendingLimitEmail: metadata.spendingLimitEmail ?? true,
+      reviewReminders: settings.review_reminders,
+      inAppNotifications: metadata.inAppNotifications ?? true
+    },
+    routingEmail: metadata.profileEmail ?? `${workspace.slug}@translayr.app`,
+    routingCompany: metadata.company ?? ""
   };
+}
+
+export async function updateNotificationPreferences(
+  input: SettingsNotificationsData
+): Promise<SettingsNotificationsData> {
+  const { supabase, workspace, settings } = await getWorkspaceContext();
+  const currentMetadata = parseWorkspaceSettingsMetadata(settings.metadata);
+  const rawMetadata =
+    settings.metadata && typeof settings.metadata === "object" ? settings.metadata : {};
+  const nextPreferences: SettingsNotificationsData = {
+    translationCompleteEmail: Boolean(input.translationCompleteEmail),
+    invoiceCreatedEmail: Boolean(input.invoiceCreatedEmail),
+    paymentFailedEmail: Boolean(input.paymentFailedEmail),
+    spendingLimitEmail: Boolean(input.spendingLimitEmail),
+    reviewReminders: Boolean(input.reviewReminders),
+    inAppNotifications: Boolean(input.inAppNotifications)
+  };
+  const nextMetadata: WorkspaceSettingsMetadata = {
+    ...rawMetadata,
+    ...currentMetadata,
+    invoiceCreatedEmail: nextPreferences.invoiceCreatedEmail,
+    paymentFailedEmail: nextPreferences.paymentFailedEmail,
+    spendingLimitEmail: nextPreferences.spendingLimitEmail,
+    inAppNotifications: nextPreferences.inAppNotifications
+  };
+
+  const { error } = await supabase
+    .from("workspace_settings")
+    .update({
+      email_notifications: nextPreferences.translationCompleteEmail,
+      review_reminders: nextPreferences.reviewReminders,
+      metadata: nextMetadata
+    })
+    .eq("workspace_id", workspace.id);
+
+  if (error) {
+    throw new Error(`Failed to save notification preferences: ${error.message}`);
+  }
+
+  return nextPreferences;
 }
 
 export async function getBillingScreenData(): Promise<BillingScreenData> {

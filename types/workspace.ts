@@ -72,7 +72,9 @@ export interface NotificationsScreenData {
   channels: NotificationChannelItem[];
   items: NotificationEventItem[];
   updatedLabel: string;
-  settingsHref: string;
+  preferences: SettingsNotificationsData;
+  routingEmail: string;
+  routingCompany: string;
 }
 
 export type WorkspaceMemberRole = "owner" | "admin" | "editor" | "reviewer" | "viewer";

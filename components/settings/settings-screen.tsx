@@ -12,7 +12,6 @@ import { createClient } from "@/lib/supabase/client";
 import { getAppUrl } from "@/lib/supabase/env";
 import type {
   SettingsFilenameFormat,
-  SettingsNotificationsData,
   SettingsPreferencesData,
   SettingsProfileData,
   SettingsQualityPreset,
@@ -68,15 +67,6 @@ const SECTION_ITEMS: SectionMeta[] = [
     heading: "Preferences",
     description: "Small delivery defaults that reduce repetitive setup after each translation run.",
     icon: PreferencesIcon
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    eyebrow: "/ Notifications",
-    sidebarDescription: "Email delivery, reminders, and in-app alerts.",
-    heading: "Notifications",
-    description: "Decide which delivery, billing, and review events should actively interrupt the team.",
-    icon: BellIcon
   },
   {
     id: "danger",
@@ -180,9 +170,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                 ? "Übersetzung"
                 : section.id === "preferences"
                   ? "Präferenzen"
-                  : section.id === "notifications"
-                    ? "Benachrichtigungen"
-                    : "Gefahrenzone",
+                  : "Gefahrenzone",
           eyebrow:
             section.id === "profile"
               ? "/ Profil"
@@ -190,9 +178,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                 ? "/ Übersetzung"
                 : section.id === "preferences"
                   ? "/ Präferenzen"
-                  : section.id === "notifications"
-                    ? "/ Benachrichtigungen"
-                    : "/ Gefahrenzone",
+                  : "/ Gefahrenzone",
           sidebarDescription:
             section.id === "profile"
               ? "Name, E-Mail und Passwortzugang."
@@ -200,9 +186,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                 ? "Sprache, Ton, Tags, Glossar und KI-Standards."
                 : section.id === "preferences"
                   ? "Liefer- und Export-Standards."
-                  : section.id === "notifications"
-                    ? "E-Mails, Erinnerungen und In-App-Hinweise."
-                    : "Dauerhafte Kontoaktionen.",
+                  : "Dauerhafte Kontoaktionen.",
           heading:
             section.id === "profile"
               ? "Profil"
@@ -210,9 +194,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                 ? "Übersetzungseinstellungen"
                 : section.id === "preferences"
                   ? "Präferenzen"
-                  : section.id === "notifications"
-                    ? "Benachrichtigungen"
-                    : "Gefahrenzone",
+                  : "Gefahrenzone",
           description:
             section.id === "profile"
               ? "Halte deine Kontodaten einfach, klar und leicht aktualisierbar."
@@ -220,9 +202,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                 ? "Lege die Standards fest, die Translayr anwenden soll, bevor ein Projekt oder eine Datei eigene Regeln mitbringt."
                 : section.id === "preferences"
                   ? "Kleine Liefer-Standards, die wiederholtes Setup nach jeder Übersetzung reduzieren."
-                  : section.id === "notifications"
-                    ? "Lege fest, welche Liefer-, Billing- und Review-Ereignisse dein Team aktiv unterbrechen dürfen."
-                    : "Sensible Aktionen bleiben visuell vom Rest der Workspace-Einstellungen getrennt."
+                  : "Sensible Aktionen bleiben visuell vom Rest der Workspace-Einstellungen getrennt."
         }))
       : SECTION_ITEMS;
   const activeSectionMeta = sectionItems.find((section) => section.id === activeSection) ?? sectionItems[0];
@@ -234,12 +214,12 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
           settingsEyebrow: "/ Einstellungen",
           heading: "Einstellungen",
           intro:
-            "Eine fokussierte Oberfläche für Kontodaten, Übersetzungsstandards, Liefer-Präferenzen, Benachrichtigungen und sensible Workspace-Aktionen.",
+            "Eine fokussierte Oberfläche für Kontodaten, Übersetzungsstandards, Liefer-Präferenzen und sensible Workspace-Aktionen.",
           reset: "Zurücksetzen",
           saving: "Speichert...",
           saveChanges: "Änderungen speichern",
           sections: "/ Bereiche",
-          sectionsIntro: "Minimale Kontrollen, gruppiert in fünf klare Einstellungsbereiche.",
+          sectionsIntro: "Minimale Kontrollen, gruppiert in vier klare Einstellungsbereiche.",
           language: "Sprache",
           appLanguage: "App-Sprache",
           appLanguageDesc: "Lege fest, ob die Oberfläche standardmäßig auf Englisch oder Deutsch erscheinen soll.",
@@ -251,12 +231,12 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
           settingsEyebrow: "/ Settings",
           heading: "Settings",
           intro:
-            "A focused control surface for account details, translation defaults, delivery preferences, notifications, and sensitive workspace actions.",
+            "A focused control surface for account details, translation defaults, delivery preferences, and sensitive workspace actions.",
           reset: "Reset",
           saving: "Saving...",
           saveChanges: "Save changes",
           sections: "/ Sections",
-          sectionsIntro: "Minimal controls, grouped into five clear settings areas.",
+          sectionsIntro: "Minimal controls, grouped into four clear settings areas.",
           language: "Language",
           appLanguage: "App language",
           appLanguageDesc: "Choose whether the interface should default to English or German.",
@@ -343,19 +323,6 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
       ...current,
       preferences: {
         ...current.preferences,
-        [key]: value
-      }
-    }));
-  }
-
-  function updateNotifications<Key extends keyof SettingsNotificationsData>(
-    key: Key,
-    value: SettingsNotificationsData[Key]
-  ) {
-    setDraft((current) => ({
-      ...current,
-      notifications: {
-        ...current.notifications,
         [key]: value
       }
     }));
@@ -968,167 +935,6 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
                   </div>
                 </SettingsCard>
               ) : null}
-
-              {activeSection === "notifications" ? (
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
-                  <SettingsCard
-                    eyebrow={screenLocale === "de" ? "/ Benachrichtigungen" : "/ Notifications"}
-                    title={screenLocale === "de" ? "E-Mail und In-App Alerts" : "Email and in-app alerts"}
-                    description={
-                      screenLocale === "de"
-                        ? "Steuere, welche Statuswechsel, Billing-Ereignisse und Review-Hinweise dein Team aktiv erreichen."
-                        : "Control which delivery states, billing events, and review nudges actively reach the team."
-                    }
-                  >
-                    <div className="space-y-5">
-                      <SettingRow
-                        label={screenLocale === "de" ? "E-Mail bei fertiger Übersetzung" : "Email when translation is ready"}
-                        description={
-                          screenLocale === "de"
-                            ? "Versendet eine Mail, sobald eine Übersetzung abgeschlossen und downloadbar ist."
-                            : "Sends an email once a translation run is completed and ready to download."
-                        }
-                        control={
-                          <div className="flex justify-start xl:justify-end">
-                            <Toggle
-                              checked={draft.notifications.translationCompleteEmail}
-                              onToggle={() =>
-                                updateNotifications(
-                                  "translationCompleteEmail",
-                                  !draft.notifications.translationCompleteEmail
-                                )
-                              }
-                            />
-                          </div>
-                        }
-                      />
-
-                      <SettingRow
-                        label={screenLocale === "de" ? "E-Mail bei neuer Rechnung" : "Email when invoice is created"}
-                        description={
-                          screenLocale === "de"
-                            ? "Nutzt die Workspace-Mailadresse für neue Billing-Dokumente."
-                            : "Uses the workspace email address for newly created billing documents."
-                        }
-                        control={
-                          <div className="flex justify-start xl:justify-end">
-                            <Toggle
-                              checked={draft.notifications.invoiceCreatedEmail}
-                              onToggle={() =>
-                                updateNotifications("invoiceCreatedEmail", !draft.notifications.invoiceCreatedEmail)
-                              }
-                            />
-                          </div>
-                        }
-                      />
-
-                      <SettingRow
-                        label={screenLocale === "de" ? "E-Mail bei fehlgeschlagener Zahlung" : "Email when payment fails"}
-                        description={
-                          screenLocale === "de"
-                            ? "Hebt kritische Billing-Probleme sofort hervor."
-                            : "Surfaces critical billing problems immediately."
-                        }
-                        control={
-                          <div className="flex justify-start xl:justify-end">
-                            <Toggle
-                              checked={draft.notifications.paymentFailedEmail}
-                              onToggle={() =>
-                                updateNotifications("paymentFailedEmail", !draft.notifications.paymentFailedEmail)
-                              }
-                            />
-                          </div>
-                        }
-                      />
-
-                      <SettingRow
-                        label={screenLocale === "de" ? "E-Mail bei Spending-Limit" : "Email when spending limit is reached"}
-                        description={
-                          screenLocale === "de"
-                            ? "Bereitet die Basis für verbrauchsbasierte Limits und Warnungen vor."
-                            : "Prepares the base for usage-based limits and warning emails."
-                        }
-                        control={
-                          <div className="flex justify-start xl:justify-end">
-                            <Toggle
-                              checked={draft.notifications.spendingLimitEmail}
-                              onToggle={() =>
-                                updateNotifications("spendingLimitEmail", !draft.notifications.spendingLimitEmail)
-                              }
-                            />
-                          </div>
-                        }
-                      />
-
-                      <SettingRow
-                        label={screenLocale === "de" ? "Review-Erinnerungen" : "Review reminders"}
-                        description={
-                          screenLocale === "de"
-                            ? "Erinnert an offene Review-Arbeit im Team."
-                            : "Keeps pending review work visible to the team."
-                        }
-                        control={
-                          <div className="flex justify-start xl:justify-end">
-                            <Toggle
-                              checked={draft.notifications.reviewReminders}
-                              onToggle={() =>
-                                updateNotifications("reviewReminders", !draft.notifications.reviewReminders)
-                              }
-                            />
-                          </div>
-                        }
-                      />
-
-                      <SettingRow
-                        label={screenLocale === "de" ? "In-App Notifications" : "In-app notifications"}
-                        description={
-                          screenLocale === "de"
-                            ? "Hält wichtige Produktzustände direkt im Workspace sichtbar."
-                            : "Keeps important product states visible directly inside the workspace."
-                        }
-                        control={
-                          <div className="flex justify-start xl:justify-end">
-                            <Toggle
-                              checked={draft.notifications.inAppNotifications}
-                              onToggle={() =>
-                                updateNotifications("inAppNotifications", !draft.notifications.inAppNotifications)
-                              }
-                            />
-                          </div>
-                        }
-                      />
-                    </div>
-                  </SettingsCard>
-
-                  <SettingsCard
-                    eyebrow={screenLocale === "de" ? "/ Routing" : "/ Routing"}
-                    title={screenLocale === "de" ? "Benachrichtigungsziel" : "Notification target"}
-                    description={
-                      screenLocale === "de"
-                        ? "Alle E-Mails laufen auf die primäre Workspace-Adresse, bis getrennte Empfänger pro Ereignis eingeführt werden."
-                        : "All emails route to the primary workspace address until per-event recipients are introduced."
-                    }
-                  >
-                    <div className="space-y-4">
-                      <DetailRow
-                        label={screenLocale === "de" ? "Empfänger" : "Recipient"}
-                        value={draft.profile.email}
-                      />
-                      <DetailRow
-                        label={screenLocale === "de" ? "Firma" : "Company"}
-                        value={draft.profile.company || (screenLocale === "de" ? "Nicht gesetzt" : "Not set")}
-                      />
-                      <div className="rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-3">
-                        <p className="text-[11.5px] leading-5 text-[var(--muted)]">
-                          {screenLocale === "de"
-                            ? "Die Zustelllogik ist jetzt konfigurierbar und vorbereitet für spätere Event-Auslieferung, In-App Center und verbrauchsbasierte Billing-Warnungen."
-                            : "Delivery preferences are now configurable and prepared for later event delivery, an in-app center, and usage-based billing warnings."}
-                        </p>
-                      </div>
-                    </div>
-                  </SettingsCard>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>
@@ -1232,22 +1038,6 @@ function SettingRow({
         </p>
       </div>
       <div className="w-full xl:w-[280px]">{control}</div>
-    </div>
-  );
-}
-
-function DetailRow({
-  label,
-  value
-}: {
-  label: string;
-  value: string;
-}) {
-  const locale = useAppLocale();
-  return (
-    <div className="flex items-center justify-between gap-4 text-[12px]">
-      <span className="text-[var(--muted-soft)]">{translateSettingsText(label, locale)}</span>
-      <span className="text-right font-medium text-[var(--foreground)]">{value}</span>
     </div>
   );
 }
@@ -1371,20 +1161,6 @@ function PreferencesIcon({ className = "h-4 w-4" }: IconProps) {
       <path d="M8 2.8v10.4M3.2 5.4H8m0 5.2h4.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       <circle cx="8" cy="5.4" r="1.6" fill="currentColor" />
       <circle cx="8" cy="10.6" r="1.6" fill="currentColor" />
-    </svg>
-  );
-}
-
-function BellIcon({ className = "h-4 w-4" }: IconProps) {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M5.2 11.8h5.6c-.55-.7-.8-1.45-.8-2.5V7.4a2.8 2.8 0 1 0-5.6 0v1.9c0 1.05-.25 1.8-.8 2.5Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-      <path d="M6.8 13.1a1.2 1.2 0 0 0 2.4 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
