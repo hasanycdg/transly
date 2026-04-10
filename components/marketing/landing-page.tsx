@@ -563,7 +563,12 @@ function PageFrame({
         />
       ) : null}
 
-      <div className="relative mx-auto max-w-[1280px] px-5 pb-24 pt-6 sm:px-7 lg:px-8 lg:pt-10">
+      <div
+        className={[
+          "relative mx-auto max-w-[1280px] px-5 pb-24 sm:px-7 lg:px-8",
+          activePage === "home" ? "pt-2 lg:pt-6" : "pt-6 lg:pt-10"
+        ].join(" ")}
+      >
         <section
           className={[
             "grid gap-12 border-b border-[var(--border)] pb-20 lg:items-center",
@@ -2752,7 +2757,7 @@ function getEnglishMarketingCopy(): MarketingCopy {
     productCards,
     homeHero: {
       eyebrow: "Language operations",
-      title: "Translate your website and files — without breaking anything.",
+      title: "Translate without breaking anything.",
       body: "No more messy exports, broken layouts, or manual fixes. Translate WordPress, XLIFF, and documents in one clean workflow.",
       actions: [
         { href: "/register", label: "Start free", tone: "primary" as const },
