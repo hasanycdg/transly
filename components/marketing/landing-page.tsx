@@ -461,8 +461,10 @@ export function MarketingPage({ pageId }: { pageId: MarketingPageId }) {
               ))}
             </div>
           </section>
+          <ComparisonTableSection locale={locale} />
 
           <DarkContrastSection locale={locale} />
+          <TestimonialsSection locale={locale} />
 
           <section className="mt-32">
             <SectionIntro eyebrow={copy.pricingGridEyebrow} title={copy.pricingGridTitle} body={copy.pricingGridBody} />
@@ -848,6 +850,212 @@ function SectionIntro({
       </h2>
       <p className="mt-4 text-[15px] leading-7 text-[var(--muted)]">{body}</p>
     </div>
+  );
+}
+
+function ComparisonTableSection({ locale }: { locale: "de" | "en" }) {
+  const headers =
+    locale === "de"
+      ? ["Kriterium", "Translayer", "Manueller Export", "Google Translate"]
+      : ["Criteria", "Translayer", "Manual export", "Google Translate"];
+  const rows =
+    locale === "de"
+      ? [
+          {
+            criterion: "Struktur bleibt erhalten",
+            translayer: "Ja, inkl. Platzhalter und Tags",
+            manual: "Oft fehleranfällig",
+            google: "Keine Garantie"
+          },
+          {
+            criterion: "Dateiformate",
+            translayer: "XLIFF, DOCX, PPTX und mehr",
+            manual: "Abhängig von Skripten und manueller Arbeit",
+            google: "Meist nur Plain Text"
+          },
+          {
+            criterion: "Glossar-Support",
+            translayer: "Integriert",
+            manual: "Möglich, aber schwer konsistent zu halten",
+            google: "Begrenzt"
+          },
+          {
+            criterion: "Review-Workflow",
+            translayer: "Workspace mit Status und Prüfung",
+            manual: "Spreadsheet + E-Mail",
+            google: "Nicht für Team-Review ausgelegt"
+          },
+          {
+            criterion: "Geschwindigkeit",
+            translayer: "Schnell in einem Ablauf",
+            manual: "Langsam durch Übergaben",
+            google: "Schnell im Output, oft Nacharbeit"
+          },
+          {
+            criterion: "Preis",
+            translayer: "Planbar als SaaS",
+            manual: "Versteckte Teamkosten",
+            google: "Niedriger Direktpreis, hohe Rework-Kosten"
+          }
+        ]
+      : [
+          {
+            criterion: "Structure stays intact",
+            translayer: "Yes, including placeholders and tags",
+            manual: "Error-prone",
+            google: "No guarantee"
+          },
+          {
+            criterion: "File formats",
+            translayer: "XLIFF, DOCX, PPTX, and more",
+            manual: "Depends on scripts and manual handling",
+            google: "Mostly plain text"
+          },
+          {
+            criterion: "Glossary support",
+            translayer: "Built-in",
+            manual: "Possible, but hard to enforce",
+            google: "Limited"
+          },
+          {
+            criterion: "Review workflow",
+            translayer: "Workspace with status and review",
+            manual: "Spreadsheet + email",
+            google: "Not built for team review"
+          },
+          {
+            criterion: "Speed",
+            translayer: "Fast in one workflow",
+            manual: "Slow handoffs",
+            google: "Fast output, frequent rework"
+          },
+          {
+            criterion: "Price",
+            translayer: "Predictable SaaS pricing",
+            manual: "Hidden team-time costs",
+            google: "Low direct cost, higher rework cost"
+          }
+        ];
+
+  return (
+    <section className="mt-24 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] px-6 py-7 lg:px-8">
+      <SectionIntro
+        eyebrow={locale === "de" ? "Vergleich" : "Comparison"}
+        title={locale === "de" ? "Translayer vs. alte Übersetzungs-Workflows" : "Translayer vs. older translation workflows"}
+        body={
+          locale === "de"
+            ? "Für Teams, die Layouts stabil halten und Releases ohne manuelle Reparaturen ausliefern müssen."
+            : "For teams that need stable layouts and release-ready output without manual repair loops."
+        }
+      />
+      <div className="mt-8 overflow-x-auto rounded-[20px] border border-[var(--border)] bg-[var(--background-strong)]">
+        <table className="w-full min-w-[760px] text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
+              {headers.map((header) => (
+                <th
+                  key={header}
+                  className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-soft)]"
+                >
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={row.criterion} className={index > 0 ? "border-t border-[var(--border-light)]" : ""}>
+                <td className="px-4 py-3 font-medium text-[var(--foreground)]">{row.criterion}</td>
+                <td className="px-4 py-3 text-[var(--foreground)]">{row.translayer}</td>
+                <td className="px-4 py-3 text-[var(--muted)]">{row.manual}</td>
+                <td className="px-4 py-3 text-[var(--muted)]">{row.google}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function TestimonialsSection({ locale }: { locale: "de" | "en" }) {
+  const testimonials =
+    locale === "de"
+      ? [
+          {
+            quote:
+              "Vor Translayer mussten wir bei jedem Release XLIFF exportieren, Platzhalter reparieren und alles neu importieren. Jetzt läuft Prüfung und Export in einem Workspace, und wir sind meist am selben Tag fertig. Unser Lokalisierungszyklus ist von zwei Tagen auf wenige Stunden gefallen.",
+            name: "Elena Novak",
+            role: "Product Operations Lead",
+            companyType: "B2B Analytics SaaS"
+          },
+          {
+            quote:
+              "Unsere DOCX- und PPTX-Dateien kamen früher oft mit Layout-Problemen zurück. Mit Translayer bleibt die Struktur stabil, deshalb prüft das Team jetzt Inhalte statt Formatierung. Eine komplette QA-Schleife konnten wir entfernen.",
+            name: "Martin Keller",
+            role: "Content Manager",
+            companyType: "Fintech Scale-up"
+          },
+          {
+            quote:
+              "Wir brauchten einen Übersetzungsflow, der sich ohne langes Setup integrieren lässt. Translayer war schnell eingebunden, und PMs sehen den Status direkt im Workspace statt in E-Mail-Threads. Das hat unseren Prozess deutlich robuster gemacht.",
+            name: "Sofia Lindberg",
+            role: "Localization Program Manager",
+            companyType: "Workflow SaaS"
+          }
+        ]
+      : [
+          {
+            quote:
+              "Before Translayer, every release meant exporting XLIFF, fixing placeholders, and re-importing files. Now review and export happen in one workspace, and we usually ship the same day. Our localization cycle dropped from two days to a few hours.",
+            name: "Elena Novak",
+            role: "Product Operations Lead",
+            companyType: "B2B analytics SaaS"
+          },
+          {
+            quote:
+              "Our DOCX and PPTX files used to come back with layout issues. With Translayer, structure stays stable, so the team reviews content instead of formatting. We removed one full QA step from the process.",
+            name: "Martin Keller",
+            role: "Content Manager",
+            companyType: "Fintech scale-up"
+          },
+          {
+            quote:
+              "We needed a translation flow that integrates without a long setup. Translayer was easy to plug in, and PMs now track status in the workspace instead of email threads. It gave us a process we can trust.",
+            name: "Sofia Lindberg",
+            role: "Localization Program Manager",
+            companyType: "Workflow SaaS"
+          }
+        ];
+
+  return (
+    <section className="mt-24">
+      <SectionIntro
+        eyebrow={locale === "de" ? "Kundenstimmen" : "Testimonials"}
+        title={locale === "de" ? "Was Teams im Alltag damit erreichen." : "What teams get in day-to-day use."}
+        body={
+          locale === "de"
+            ? "Konkrete Ergebnisse aus echten Produkt-, Content- und Lokalisierungs-Workflows."
+            : "Concrete outcomes from product, content, and localization workflows."
+        }
+      />
+      <div className="mt-10 grid gap-5 lg:grid-cols-3">
+        {testimonials.map((testimonial) => (
+          <article
+            key={testimonial.name}
+            className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-6 py-6"
+          >
+            <p className="text-[14px] leading-7 text-[var(--muted)]">“{testimonial.quote}”</p>
+            <div className="mt-5 text-[13px]">
+              <p className="font-semibold text-[var(--foreground)]">{testimonial.name}</p>
+              <p className="mt-1 text-[var(--muted)]">
+                {testimonial.role}, {testimonial.companyType}
+              </p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1417,8 +1625,8 @@ function DarkContrastSection({ locale }: { locale: "de" | "en" }) {
           </h2>
           <p className="mt-3 max-w-[640px] text-[15px] leading-7 text-white/85">
             {locale === "de"
-              ? "Viele Teams nutzen Translayr bereits täglich. Mehr als 400.000 Wörter wurden schon in produktiven Flows übersetzt."
-              : "Many teams already use Translayr every day. More than 400,000 words have already been translated in production flows."}
+              ? "Teams in mehreren Märkten nutzen Translayer als festen Teil ihres Release-Prozesses."
+              : "Teams shipping in multiple markets run Translayer as part of their normal release cycle."}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -1490,22 +1698,34 @@ function getIconMetrics(locale: "de" | "en") {
   return [
     {
       value: locale === "de" ? "Viele Teams" : "Many teams",
-      label: locale === "de" ? "nutzen Translayr bereits im täglichen Rollout" : "are already using Translayr in daily rollout",
+      label:
+        locale === "de"
+          ? "behandeln Lokalisierung als festen Teil jedes Releases"
+          : "treat localization as part of every release",
       icon: teamIcon
     },
     {
-      value: "400k+",
-      label: locale === "de" ? "Wörter sind bereits übersetzt worden" : "words have already been translated",
+      value: "400k",
+      label:
+        locale === "de"
+          ? "Wörter wurden bereits ohne Copy-Paste-Nacharbeit ausgeliefert"
+          : "words shipped without copy-paste cleanup",
       icon: workflowIcon
     },
     {
       value: "99.9%",
-      label: locale === "de" ? "Datei-Exporte laufen beim ersten Versuch" : "file exports succeed on first pass",
+      label:
+        locale === "de"
+          ? "First-pass-Erfolg, damit Dateien meist nur einmal durchlaufen"
+          : "first-pass success rate, so files usually run once",
       icon: uptimeIcon
     },
     {
       value: "10+",
-      label: locale === "de" ? "Dateiformate im produktiven Einsatz" : "file formats supported in production",
+      label:
+        locale === "de"
+          ? "Dateiformate in einem durchgehenden Web- und Dokument-Workflow"
+          : "file formats across one web and document workflow",
       icon: formatIcon
     }
   ];
