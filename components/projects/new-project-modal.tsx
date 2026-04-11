@@ -287,7 +287,7 @@ export function NewProjectModal({
             type="button"
             onClick={handleCreate}
             disabled={!name.trim() || targetLanguages.length === 0 || submitting}
-            className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium text-white transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-[7px] bg-[var(--foreground)] px-3 py-2 text-[12.5px] font-medium !text-white transition hover:opacity-85 hover:!text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting ? copy.creating : copy.createProject}
           </button>

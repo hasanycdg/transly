@@ -185,7 +185,7 @@ export function ProjectsOverviewScreen({
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--foreground)] px-[15px] py-2 text-[12.5px] font-medium text-white transition hover:opacity-85"
+            className="inline-flex items-center gap-1.5 rounded-[7px] bg-[var(--foreground)] px-[15px] py-2 text-[12.5px] font-medium !text-white transition hover:opacity-85 hover:!text-white"
           >
             <PlusIcon />
             {copy.newProject}

@@ -524,7 +524,7 @@ function TopbarAction({
       className={[
         "inline-flex h-8 items-center justify-center rounded-[8px] px-3 text-[12px] font-medium transition-colors",
         tone === "primary"
-          ? "bg-[var(--foreground)] text-white hover:opacity-90"
+          ? "bg-[var(--foreground)] !text-white hover:opacity-90 hover:!text-white"
           : "border border-[0.5px] border-[var(--border)] bg-white text-[var(--muted)] hover:text-[var(--foreground)]"
       ].join(" ")}
     >
