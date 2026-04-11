@@ -18,6 +18,7 @@ import {
   estimateBinaryTranslationFileWordCount,
   estimateTranslationFileWordCount
 } from "@/lib/translation/word-count";
+import { takePendingProjectUploads } from "@/lib/projects/pending-uploads";
 import {
   buildTranslatedArchivePath,
   createUniqueArchivePaths,
@@ -85,6 +86,7 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
   const [translationOutputs, setTranslationOutputs] = useState<ProjectTranslationOutput[]>([]);
   const [translationFailures, setTranslationFailures] = useState<ProjectTranslationFailure[]>([]);
   const autoDownloadedOutputIdsRef = useRef<Set<string>>(new Set());
+  const handleFilesSelectedRef = useRef<(files: File[]) => Promise<void>>(async () => {});
   const uploadInputId = `project-upload-${project?.id ?? "unknown"}`;
   const copy =
     locale === "de"
@@ -370,6 +372,24 @@ export function ProjectWorkspaceScreen({ project }: ProjectWorkspaceScreenProps)
       setIsPreparingUploads(false);
     }
   }
+
+  handleFilesSelectedRef.current = handleFilesSelected;
+
+  useEffect(() => {
+    const projectId = project?.id;
+
+    if (!projectId) {
+      return;
+    }
+
+    const pendingFiles = takePendingProjectUploads(projectId);
+
+    if (pendingFiles.length === 0) {
+      return;
+    }
+
+    void handleFilesSelectedRef.current(pendingFiles);
+  }, [project?.id]);
 
   const runtimeFiles = useMemo(() => {
     if (!project) {

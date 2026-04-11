@@ -5,6 +5,8 @@ import { startTransition, useMemo, useState } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
 import { translateProjectFilterLabel } from "@/lib/i18n";
+import { getLanguageOptions } from "@/lib/languages";
+import { setPendingProjectUploads } from "@/lib/projects/pending-uploads";
 import {
   getOverviewProjectDisplay,
   getOverviewStatsDisplay,
@@ -13,7 +15,9 @@ import {
 } from "@/lib/projects/display";
 import { formatProjectDate } from "@/lib/projects/formatters";
 import { PROJECT_FILTERS } from "@/lib/projects/mock-data";
+import { isZipFileName } from "@/lib/uploads/project-archive";
 import type { NewProjectInput, ProjectFilter, ProjectRecord } from "@/types/projects";
+import type { SettingsScreenData } from "@/types/workspace";
 
 import { NewProjectModal } from "@/components/projects/new-project-modal";
 import { ProgressBar } from "@/components/projects/progress-bar";
@@ -33,6 +37,7 @@ export function ProjectsOverviewScreen({
   const [filter, setFilter] = useState<ProjectFilter>("All");
   const [showModal, setShowModal] = useState(false);
   const [overviewFiles, setOverviewFiles] = useState<File[]>([]);
+  const [overviewUploadError, setOverviewUploadError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
@@ -57,6 +62,8 @@ export function ProjectsOverviewScreen({
     locale === "de"
       ? {
           createError: "Das Projekt konnte nicht erstellt werden.",
+          autoProjectDescription: "Automatisch aus einer ZIP-Datei erstellt.",
+          zipProjectCreateError: "Die ZIP-Datei konnte nicht automatisch als Projekt erstellt werden.",
           projectsEyebrow: "/ Projekte",
           heading: "Alle Projekte",
           newProject: "Neues Projekt",
@@ -79,6 +86,8 @@ export function ProjectsOverviewScreen({
         }
       : {
           createError: "Project could not be created.",
+          autoProjectDescription: "Automatically created from a ZIP file.",
+          zipProjectCreateError: "The ZIP file could not be turned into a project automatically.",
           projectsEyebrow: "/ Projects",
           heading: "All Projects",
           newProject: "New Project",
@@ -100,31 +109,125 @@ export function ProjectsOverviewScreen({
           renameFailed: "Project could not be renamed."
         };
 
+  async function createProjectRequest(input: NewProjectInput) {
+    const response = await fetch("/api/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(input)
+    });
+
+    const payload = (await response.json().catch(() => null)) as { error?: string; slug?: string } | null;
+
+    if (!response.ok) {
+      throw new Error(payload?.error ?? copy.createError);
+    }
+
+    return payload;
+  }
+
+  function navigateToCreatedProject(slug?: string) {
+    setShowModal(false);
+    if (slug) {
+      router.push(`/projects/${encodeURIComponent(slug)}`);
+      return;
+    }
+
+    startTransition(() => {
+      router.refresh();
+    });
+  }
+
+  async function resolveProjectLanguageDefaults() {
+    const fallbackSourceLanguage = "en";
+    const fallbackTargetLanguage = "de";
+
+    try {
+      const response = await fetch("/api/settings", {
+        method: "GET"
+      });
+      const payload = (await response.json().catch(() => null)) as SettingsScreenData | null;
+
+      if (!response.ok || !payload) {
+        return {
+          sourceLanguage: fallbackSourceLanguage,
+          targetLanguages: [fallbackTargetLanguage]
+        };
+      }
+
+      const sourceLanguage = payload.translation.sourceLanguage || fallbackSourceLanguage;
+      const preferredTargetLanguage = payload.translation.targetLanguage || fallbackTargetLanguage;
+      const fallbackTargetFromOptions =
+        getLanguageOptions("en").find((option) => option.code !== sourceLanguage)?.code ?? fallbackTargetLanguage;
+      const targetLanguage =
+        preferredTargetLanguage !== sourceLanguage ? preferredTargetLanguage : fallbackTargetFromOptions;
+
+      return {
+        sourceLanguage,
+        targetLanguages: [targetLanguage]
+      };
+    } catch {
+      return {
+        sourceLanguage: fallbackSourceLanguage,
+        targetLanguages: [fallbackTargetLanguage]
+      };
+    }
+  }
+
+  function deriveProjectNameFromZip(fileName: string) {
+    const withoutExtension = fileName.replace(/\.zip$/i, "").trim();
+    return withoutExtension.length > 0 ? withoutExtension : `project-${Date.now().toString(36)}`;
+  }
+
   async function handleCreateProject(input: NewProjectInput) {
     setCreateError(null);
     setIsCreatingProject(true);
 
     try {
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(input)
-      });
-
-      const payload = (await response.json()) as { error?: string };
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? copy.createError);
-      }
-
-      setShowModal(false);
-      startTransition(() => {
-        router.refresh();
-      });
+      const payload = await createProjectRequest(input);
+      navigateToCreatedProject(payload?.slug);
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : copy.createError);
+    } finally {
+      setIsCreatingProject(false);
+    }
+  }
+
+  async function handleOverviewFilesSelected(files: File[]) {
+    setOverviewFiles(files);
+    setOverviewUploadError(null);
+
+    if (files.length === 0 || isCreatingProject) {
+      return;
+    }
+
+    const zipFile = files.find((file) => isZipFileName(file.name));
+
+    if (!zipFile) {
+      return;
+    }
+
+    setIsCreatingProject(true);
+
+    try {
+      const languageDefaults = await resolveProjectLanguageDefaults();
+      const payload = await createProjectRequest({
+        name: deriveProjectNameFromZip(zipFile.name),
+        description: copy.autoProjectDescription,
+        sourceLanguage: languageDefaults.sourceLanguage,
+        targetLanguages: languageDefaults.targetLanguages
+      });
+      if (payload?.slug) {
+        setPendingProjectUploads(payload.slug, files);
+      }
+      navigateToCreatedProject(payload?.slug);
+    } catch (error) {
+      setOverviewUploadError(
+        error instanceof Error
+          ? `${copy.zipProjectCreateError} ${error.message}`
+          : copy.zipProjectCreateError
+      );
     } finally {
       setIsCreatingProject(false);
     }
@@ -221,9 +324,14 @@ export function ProjectsOverviewScreen({
           <ProjectUploadZone
             inputId="projects-overview-upload"
             files={overviewFiles}
-            onFilesSelected={setOverviewFiles}
+            onFilesSelected={handleOverviewFilesSelected}
             variant="strip"
           />
+          {overviewUploadError ? (
+            <div className="mt-2 rounded-[8px] border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-[12px] text-[var(--error)]">
+              {overviewUploadError}
+            </div>
+          ) : null}
 
           <section>
             <div className="mb-[10px] flex items-center justify-between gap-3">
