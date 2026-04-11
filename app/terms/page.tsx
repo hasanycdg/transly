@@ -64,8 +64,8 @@ export default function TermsPage() {
         <div className="mt-16 border-t border-[var(--border)] pt-8">
           <p className="text-[13px] text-[var(--muted-soft)]">
             {isDe
-              ? "Bei Fragen zu diesen AGB kontaktiere uns unter legal@translayr.dev."
-              : "If you have questions about these Terms, contact us at legal@translayr.dev."}
+              ? "Bei Fragen zu diesen AGB kontaktiere uns unter support@translayr.dev."
+              : "If you have questions about these Terms, contact us at support@translayr.dev."}
           </p>
         </div>
       </div>
@@ -171,7 +171,7 @@ const deContent = {
       id: "contact",
       heading: "10. Kontakt",
       paragraphs: [
-        "Bei Fragen zu diesen Bedingungen erreichst du uns unter legal@translayr.dev.",
+        "Bei Fragen zu diesen Bedingungen erreichst du uns unter support@translayr.dev.",
         "Verantwortlich im Sinne der DSGVO: Translayr GmbH, Musterstraße 1, 10115 Berlin, Deutschland."
       ]
     }
@@ -276,7 +276,7 @@ const enContent = {
       id: "contact",
       heading: "10. Contact",
       paragraphs: [
-        "For questions about these Terms, reach us at legal@translayr.dev.",
+        "For questions about these Terms, reach us at support@translayr.dev.",
         "Responsible entity under GDPR: Translayr GmbH, Musterstraße 1, 10115 Berlin, Germany."
       ]
     }
