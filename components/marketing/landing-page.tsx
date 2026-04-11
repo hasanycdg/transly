@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
+import { BrandIconBadge } from "@/components/brand-icon";
 import { BILLING_PLANS } from "@/lib/billing/plans";
 
 const DISPLAY_FONT_CLASS_NAME = "[font-family:var(--font-display)] font-medium tracking-[-0.065em]";
@@ -651,9 +652,7 @@ function MarketingHeader({
     <header className="sticky top-0 z-[120] border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.9)] backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-6 px-5 py-4 sm:px-7 lg:px-8">
         <Link href="/" className="flex items-center gap-3">
-          <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--foreground)]">
-            <BrandMark />
-          </span>
+          <BrandIconBadge />
           <span className="text-[16px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">Translayr</span>
         </Link>
 
@@ -1742,9 +1741,7 @@ function MarketingFooter({ footer, locale }: { footer: MarketingFooterCopy; loca
       <div className="mx-auto grid max-w-[1280px] gap-10 px-5 py-12 sm:px-7 lg:grid-cols-[1fr_0.7fr_0.7fr_1fr] lg:px-8">
         <div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-8 w-8 items-center justify-center text-[var(--foreground)]">
-              <BrandMark />
-            </span>
+            <BrandIconBadge />
             <div>
               <div className="text-[16px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">Translayr</div>
             </div>
@@ -2226,27 +2223,6 @@ function PricingVisual({ locale }: { locale: "de" | "en" }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function BrandMark() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-      <path
-        d="M3 4.2C3 3.53726 3.53726 3 4.2 3H13.8C14.4627 3 15 3.53726 15 4.2V6.3C15 6.96274 14.4627 7.5 13.8 7.5H4.2C3.53726 7.5 3 6.96274 3 6.3V4.2Z"
-        fill="currentColor"
-      />
-      <path
-        d="M3 11.7C3 11.0373 3.53726 10.5 4.2 10.5H9.15C9.81274 10.5 10.35 11.0373 10.35 11.7V13.8C10.35 14.4627 9.81274 15 9.15 15H4.2C3.53726 15 3 14.4627 3 13.8V11.7Z"
-        fill="currentColor"
-        opacity="0.78"
-      />
-      <path
-        d="M11.55 11.7C11.55 11.0373 12.0873 10.5 12.75 10.5H13.8C14.4627 10.5 15 11.0373 15 11.7V13.8C15 14.4627 14.4627 15 13.8 15H12.75C12.0873 15 11.55 14.4627 11.55 13.8V11.7Z"
-        fill="currentColor"
-        opacity="0.48"
-      />
-    </svg>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAppLocale } from "@/components/app-locale-provider";
+import { BrandIconBadge } from "@/components/brand-icon";
 
 const DISPLAY_FONT_CLASS_NAME = "[font-family:var(--font-display)] font-medium tracking-[-0.065em]";
 
@@ -15,6 +16,7 @@ export default function TermsPage() {
       <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.9)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-6 px-5 py-4 sm:px-7 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
+            <BrandIconBadge />
             <span className="text-[16px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">Translayr</span>
           </Link>
           <Link

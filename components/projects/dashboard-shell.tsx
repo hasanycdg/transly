@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
+import { BrandGlyph } from "@/components/brand-icon";
 import { createClient } from "@/lib/supabase/client";
 import type { DashboardShellData } from "@/types/workspace";
 
@@ -228,7 +229,7 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
         <aside className="hidden h-screen w-[224px] shrink-0 flex-col overflow-hidden border-r border-[0.5px] border-[var(--border)] bg-white lg:flex">
           <div className="flex items-center gap-[9px] border-b border-[0.5px] border-[var(--border-light)] px-4 py-4">
             <div className="flex h-7 w-7 items-center justify-center rounded-[6px] bg-[var(--foreground)] text-white">
-              <LogoIcon />
+              <BrandGlyph />
             </div>
             <span className="text-[14px] font-semibold tracking-[-0.3px] text-[var(--foreground)]">
               Translayr
@@ -389,19 +390,6 @@ function SidebarSection({
       </p>
       <div className="space-y-1">{children}</div>
     </section>
-  );
-}
-
-function LogoIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <path
-        d="M1 3h10M1 6h7M1 9h5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }
 
