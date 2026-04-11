@@ -1011,7 +1011,7 @@ function resolveBillingEmail(context: StripeWorkspaceContext) {
   const workspaceSlug = context.workspace.slug.trim().toLowerCase();
   const safeLocalPart = workspaceSlug.length > 0 ? workspaceSlug : "workspace";
 
-  return `${safeLocalPart}@translayr.app`;
+  return `${safeLocalPart}@translayr.dev`;
 }
 
 function sanitizeOrigin(origin: string) {

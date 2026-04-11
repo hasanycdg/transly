@@ -64,8 +64,8 @@ export default function TermsPage() {
         <div className="mt-16 border-t border-[var(--border)] pt-8">
           <p className="text-[13px] text-[var(--muted-soft)]">
             {isDe
-              ? "Bei Fragen zu diesen AGB kontaktiere uns unter legal@translayr.com."
-              : "If you have questions about these Terms, contact us at legal@translayr.com."}
+              ? "Bei Fragen zu diesen AGB kontaktiere uns unter legal@translayr.dev."
+              : "If you have questions about these Terms, contact us at legal@translayr.dev."}
           </p>
         </div>
       </div>
@@ -113,7 +113,7 @@ const deContent = {
       id: "pricing",
       heading: "4. Preise und Abrechnung",
       paragraphs: [
-        "Die Preise ergeben sich aus der jeweils aktuellen Preisübersicht auf translayr.com/pricing. Änderungen werden rechtzeitig angekündigt.",
+        "Die Preise ergeben sich aus der jeweils aktuellen Preisübersicht auf translayr.dev/pricing. Änderungen werden rechtzeitig angekündigt.",
         "Bezahlte Pläne werden monatlich oder jährlich abgerechnet. Bei jährlicher Abrechnung erhalten Nutzer:innen zwei Monate gratis.",
         "Ein Upgrade ist jederzeit möglich. Das neue Guthaben steht sofort zur Verfügung. Ein Downgrade wird zum Ende der aktuellen Abrechnungsperiode wirksam.",
         "Erstattungen erfolgen nur in den gesetzlich vorgeschriebenen Fällen."
@@ -171,7 +171,7 @@ const deContent = {
       id: "contact",
       heading: "10. Kontakt",
       paragraphs: [
-        "Bei Fragen zu diesen Bedingungen erreichst du uns unter legal@translayr.com.",
+        "Bei Fragen zu diesen Bedingungen erreichst du uns unter legal@translayr.dev.",
         "Verantwortlich im Sinne der DSGVO: Translayr GmbH, Musterstraße 1, 10115 Berlin, Deutschland."
       ]
     }
@@ -218,7 +218,7 @@ const enContent = {
       id: "pricing",
       heading: "4. Pricing and Billing",
       paragraphs: [
-        "Prices are as shown on translayr.com/pricing and may change with advance notice.",
+        "Prices are as shown on translayr.dev/pricing and may change with advance notice.",
         "Paid plans are billed monthly or annually. Annual billing includes two months free.",
         "Upgrades are available at any time with immediate credit availability. Downgrades take effect at the end of the current billing period.",
         "Refunds are provided only where required by law."
@@ -276,7 +276,7 @@ const enContent = {
       id: "contact",
       heading: "10. Contact",
       paragraphs: [
-        "For questions about these Terms, reach us at legal@translayr.com.",
+        "For questions about these Terms, reach us at legal@translayr.dev.",
         "Responsible entity under GDPR: Translayr GmbH, Musterstraße 1, 10115 Berlin, Germany."
       ]
     }

@@ -132,10 +132,10 @@ export function SupportScreen({ data }: SupportScreenProps) {
                 <SupportChannelCard
                   title={copy.emailSupport}
                   description={copy.emailSupportDescription}
-                  value="support@translayr.app"
+                  value="support@translayr.dev"
                   meta={copy.emailSupportMeta}
                   actionLabel={copy.emailSupportAction}
-                  href="mailto:support@translayr.app"
+                  href="mailto:support@translayr.dev"
                 />
                 <SupportChannelCard
                   title={copy.priorityChannel}

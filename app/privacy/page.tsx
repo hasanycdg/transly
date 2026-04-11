@@ -64,8 +64,8 @@ export default function PrivacyPage() {
         <div className="mt-16 border-t border-[var(--border)] pt-8">
           <p className="text-[13px] text-[var(--muted-soft)]">
             {isDe
-              ? "Bei Fragen zum Datenschutz kontaktiere uns unter privacy@translayr.com."
-              : "For privacy-related questions, contact us at privacy@translayr.com."}
+              ? "Bei Fragen zum Datenschutz kontaktiere uns unter privacy@translayr.dev."
+              : "For privacy-related questions, contact us at privacy@translayr.dev."}
           </p>
         </div>
       </div>
@@ -85,7 +85,7 @@ const deContent = {
       paragraphs: [
         "Verantwortlich für die Datenverarbeitung ist:",
         "Translayr GmbH, Musterstraße 1, 10115 Berlin, Deutschland",
-        "E-Mail: privacy@translayr.com"
+        "E-Mail: privacy@translayr.dev"
       ]
     },
     {
@@ -187,7 +187,7 @@ const deContent = {
       id: "contact",
       heading: "11. Kontakt",
       paragraphs: [
-        "Bei Fragen zum Datenschutz erreichst du uns unter privacy@translayr.com.",
+        "Bei Fragen zum Datenschutz erreichst du uns unter privacy@translayr.dev.",
         "Du kannst dich außerdem an die zuständige Aufsichtsbehörde wenden: Berliner Beauftragte für Datenschutz und Informationsfreiheit, Friedrichstr. 219, 10969 Berlin."
       ]
     }
@@ -206,7 +206,7 @@ const enContent = {
       paragraphs: [
         "The entity responsible for data processing is:",
         "Translayr GmbH, Musterstraße 1, 10115 Berlin, Germany",
-        "Email: privacy@translayr.com"
+        "Email: privacy@translayr.dev"
       ]
     },
     {
@@ -308,7 +308,7 @@ const enContent = {
       id: "contact",
       heading: "11. Contact",
       paragraphs: [
-        "For privacy-related questions, reach us at privacy@translayr.com.",
+        "For privacy-related questions, reach us at privacy@translayr.dev.",
         "You may also contact the relevant supervisory authority: Berliner Beauftragte für Datenschutz und Informationsfreiheit, Friedrichstr. 219, 10969 Berlin, Germany."
       ]
     }

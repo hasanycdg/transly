@@ -1189,7 +1189,7 @@ export async function getNotificationsScreenData(): Promise<NotificationsScreenD
       reviewReminders: settings.review_reminders,
       inAppNotifications: metadata.inAppNotifications ?? true
     },
-    routingEmail: metadata.profileEmail ?? `${workspace.slug}@translayr.app`,
+    routingEmail: metadata.profileEmail ?? `${workspace.slug}@translayr.dev`,
     routingCompany: metadata.company ?? ""
   };
 }
@@ -1297,7 +1297,7 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
   const cycleEnd = resolvedCycle.cycleEnd;
   const activeProjects = projects.filter((project) => project.status !== "Completed").length;
   const reviewProjects = projects.filter((project) => project.status === "In Review").length;
-  const billingEmail = metadata.profileEmail ?? `${workspace.slug}@translayr.app`;
+  const billingEmail = metadata.profileEmail ?? `${workspace.slug}@translayr.dev`;
   const manageBillingAvailable = Boolean(metadata.stripeCustomerId);
   const normalizedSubscriptionStatus = metadata.stripeSubscriptionStatus?.trim().toLowerCase();
   const canBuyCredits =
@@ -1687,7 +1687,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData> {
   return {
     profile: {
       name: metadata.profileName ?? workspace.name,
-      email: metadata.profileEmail ?? `${workspace.slug}@translayr.app`,
+      email: metadata.profileEmail ?? `${workspace.slug}@translayr.dev`,
       company: metadata.company ?? "",
       billingAddress: metadata.billingAddress ?? ""
     },
