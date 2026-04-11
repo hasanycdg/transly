@@ -684,19 +684,33 @@ function UsageTrendCard({
   updatedLabel: string;
 }) {
   const locale = useAppLocale();
-  const chartPoints = useMemo(() => buildChartPoints(trend, 520, 160), [trend]);
+  const chart = useMemo(() => buildTrendChartModel(trend), [trend]);
   const svgRef = useRef<SVGSVGElement>(null);
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
-  const activePoint = activePointIndex !== null ? chartPoints.points[activePointIndex] ?? null : null;
+  const activePoint = activePointIndex !== null ? chart.points[activePointIndex] ?? null : null;
 
   function handleChartMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
-    if (!svgRef.current || chartPoints.points.length === 0) {
+    if (!svgRef.current || chart.points.length === 0) {
       return;
     }
 
-    const bounds = svgRef.current.getBoundingClientRect();
-    const relativeX = ((event.clientX - bounds.left) / bounds.width) * 560;
-    setActivePointIndex(getClosestPointIndex(chartPoints.points, relativeX));
+    const screenCtm = svgRef.current.getScreenCTM();
+
+    if (!screenCtm) {
+      return;
+    }
+
+    const pointer = svgRef.current.createSVGPoint();
+    pointer.x = event.clientX;
+    pointer.y = event.clientY;
+
+    const relativeX = clamp(
+      pointer.matrixTransform(screenCtm.inverse()).x,
+      chart.padding.left,
+      chart.viewBox.width - chart.padding.right
+    );
+
+    setActivePointIndex(getClosestPointIndex(chart.points, relativeX));
   }
 
   function handleChartMouseLeave() {
@@ -704,18 +718,18 @@ function UsageTrendCard({
   }
 
   const tooltipClassName =
-    activePoint && activePoint.x < 84
+    activePoint && activePoint.x < chart.padding.left + 42
       ? "translate-x-0"
-      : activePoint && activePoint.x > 476
+      : activePoint && activePoint.x > chart.viewBox.width - chart.padding.right - 42
         ? "-translate-x-full"
         : "-translate-x-1/2";
   const tooltipStyle =
-    activePoint && activePoint.x < 84
+    activePoint && activePoint.x < chart.padding.left + 42
       ? { left: "20px", top: "16px" }
-      : activePoint && activePoint.x > 476
+      : activePoint && activePoint.x > chart.viewBox.width - chart.padding.right - 42
         ? { left: "calc(100% - 20px)", top: "16px" }
         : activePoint
-          ? { left: `${(activePoint.x / 560) * 100}%`, top: "16px" }
+          ? { left: `${(activePoint.x / chart.viewBox.width) * 100}%`, top: "16px" }
           : undefined;
 
   const copy =
@@ -776,8 +790,8 @@ function UsageTrendCard({
 
           <svg
             ref={svgRef}
-            viewBox="0 0 560 200"
-            className="h-[220px] w-full"
+            viewBox={`0 0 ${chart.viewBox.width} ${chart.viewBox.height}`}
+            className="h-[248px] w-full"
             role="img"
             aria-label={copy.aria}
             onMouseMove={handleChartMouseMove}
@@ -790,28 +804,34 @@ function UsageTrendCard({
               </linearGradient>
             </defs>
 
-            {[0, 1, 2, 3].map((index) => {
-              const y = 24 + index * 40;
-
-              return (
+            {chart.yTicks.map((tick, tickIndex) => (
+              <g key={`y-tick-${tickIndex}-${tick.value}`}>
                 <line
-                  key={y}
-                  x1="12"
-                  x2="548"
-                  y1={y}
-                  y2={y}
+                  x1={chart.padding.left}
+                  x2={chart.viewBox.width - chart.padding.right}
+                  y1={tick.y}
+                  y2={tick.y}
                   stroke="rgba(17,17,16,0.08)"
                   strokeWidth="1"
                 />
-              );
-            })}
+                <text
+                  x={chart.padding.left - 8}
+                  y={tick.y + 3}
+                  textAnchor="end"
+                  fill="var(--muted-soft)"
+                  fontSize="10.5"
+                >
+                  {formatCompactNumber(tick.value, locale)}
+                </text>
+              </g>
+            ))}
 
-            <path d={chartPoints.fillPath} fill="url(#usage-fill)" />
+            <path d={chart.fillPath} fill="url(#usage-fill)" />
             <path
-              d={chartPoints.linePath}
+              d={chart.linePath}
               fill="none"
               stroke="var(--processing)"
-              strokeWidth="2"
+              strokeWidth="2.4"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -820,15 +840,15 @@ function UsageTrendCard({
               <line
                 x1={activePoint.x}
                 x2={activePoint.x}
-                y1="20"
-                y2="176"
+                y1={chart.padding.top}
+                y2={chart.plotBottom}
                 stroke="rgba(26,79,175,0.18)"
                 strokeWidth="1"
                 strokeDasharray="4 4"
               />
             ) : null}
 
-            {chartPoints.points.map((point, index) => (
+            {chart.points.map((point, index) => (
               <g key={point.label}>
                 <circle
                   cx={point.x}
@@ -848,16 +868,16 @@ function UsageTrendCard({
               </g>
             ))}
 
-            {chartPoints.points.map((point, index) => (
+            {chart.points.map((point, index) => (
               <text
                 key={`${point.label}-axis`}
                 x={point.x}
-                y="188"
-                textAnchor={index === 0 ? "start" : index === chartPoints.points.length - 1 ? "end" : "middle"}
+                y={chart.plotBottom + 18}
+                textAnchor={index === 0 ? "start" : index === chart.points.length - 1 ? "end" : "middle"}
                 fill="var(--muted-soft)"
                 fontSize="10.5"
               >
-                {point.label}
+                {chart.shouldRenderXAxisLabel(index) ? point.label : ""}
               </text>
             ))}
           </svg>
@@ -943,38 +963,101 @@ function EmptyState({
   );
 }
 
-function buildChartPoints(data: UsageTrendPoint[], width: number, height: number) {
+function buildTrendChartModel(data: UsageTrendPoint[]) {
+  const viewBox = { width: 560, height: 220 };
+  const padding = { top: 20, right: 16, bottom: 34, left: 50 };
+  const plotWidth = viewBox.width - padding.left - padding.right;
+  const plotHeight = viewBox.height - padding.top - padding.bottom;
+  const plotBottom = padding.top + plotHeight;
+
   if (data.length === 0) {
     return {
+      viewBox,
+      padding,
+      plotBottom,
+      yTicks: [] as Array<{ y: number; value: number }>,
+      shouldRenderXAxisLabel: () => true,
       fillPath: "",
       linePath: "",
       points: []
     };
   }
 
-  const min = Math.min(...data.map((item) => item.value));
-  const max = Math.max(...data.map((item) => item.value));
-  const chartHeight = height;
-  const stepX = data.length > 1 ? width / (data.length - 1) : 0;
+  const maxValue = Math.max(...data.map((item) => item.value), 0);
+  const domainMax = maxValue > 0 ? Math.ceil(maxValue * 1.1) : 1;
+  const yTickCount = 4;
+  const yTicks = Array.from({ length: yTickCount + 1 }, (_, index) => {
+    const ratio = index / yTickCount;
+    const value = Math.round(domainMax * (1 - ratio));
+    const y = padding.top + plotHeight * ratio;
+    return { y, value };
+  });
+  const stepX = data.length > 1 ? plotWidth / (data.length - 1) : 0;
 
   const points = data.map((item, index) => {
-    const normalized = (item.value - min) / (max - min || 1);
-    const x = 20 + index * stepX;
-    const y = 16 + (1 - normalized) * (chartHeight - 24);
+    const normalized = clamp(item.value / domainMax, 0, 1);
+    const x = padding.left + index * stepX;
+    const y = padding.top + (1 - normalized) * plotHeight;
 
     return { ...item, x, y };
   });
 
-  const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ");
-  const fillPath = `${linePath} L ${points.at(-1)?.x ?? 0} ${height + 8} L ${points[0]?.x ?? 0} ${height + 8} Z`;
+  const linePath = buildSmoothLinePath(points);
+  const fillPath = `${linePath} L ${points.at(-1)?.x ?? padding.left} ${plotBottom} L ${points[0]?.x ?? padding.left} ${plotBottom} Z`;
+  const shouldRenderXAxisLabel = (index: number) => {
+    if (points.length <= 8) {
+      return true;
+    }
+
+    if (index === 0 || index === points.length - 1) {
+      return true;
+    }
+
+    const step = Math.ceil(points.length / 5);
+    return index % step === 0;
+  };
 
   return {
+    viewBox,
+    padding,
+    plotBottom,
+    yTicks,
+    shouldRenderXAxisLabel,
     fillPath,
     linePath,
     points
   };
+}
+
+function buildSmoothLinePath(points: Array<{ x: number; y: number }>) {
+  if (points.length === 0) {
+    return "";
+  }
+
+  if (points.length === 1) {
+    const point = points[0];
+    return `M ${point.x} ${point.y}`;
+  }
+
+  const segments: string[] = [`M ${points[0].x} ${points[0].y}`];
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const previous = points[index - 1] ?? points[index];
+    const current = points[index];
+    const next = points[index + 1];
+    const afterNext = points[index + 2] ?? next;
+
+    const controlPointOneX = current.x + (next.x - previous.x) / 6;
+    const controlPointOneY = current.y + (next.y - previous.y) / 6;
+    const controlPointTwoX = next.x - (afterNext.x - current.x) / 6;
+    const controlPointTwoY = next.y - (afterNext.y - current.y) / 6;
+
+    segments.push(
+      `C ${controlPointOneX} ${controlPointOneY} ${controlPointTwoX} ${controlPointTwoY} ${next.x} ${next.y}`
+    );
+  }
+
+  return segments.join(" ");
 }
 
 function getClosestPointIndex(points: Array<{ x: number }>, targetX: number) {
