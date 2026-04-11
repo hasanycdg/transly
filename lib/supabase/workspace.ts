@@ -697,7 +697,12 @@ export async function assertWorkspaceHasCredits(requiredCredits: number) {
     (cycleUsageData as Pick<DailyUsageRow, "usage_date" | "credits_used">[] | null) ?? [];
   const cycleUsageTotal = cycleUsageRows.reduce((sum, row) => sum + row.credits_used, 0);
   const planCreditsLimit = getBillingPlanDefinition(workspace.plan_name).creditsLimit;
-  const creditsLimit = activeCycle?.credits_limit ?? workspace.credits_limit ?? planCreditsLimit ?? DEFAULT_CREDITS_LIMIT;
+  const creditsLimit = Math.max(
+    activeCycle?.credits_limit ?? 0,
+    workspace.credits_limit ?? 0,
+    planCreditsLimit,
+    DEFAULT_CREDITS_LIMIT
+  );
   const creditsUsed = Math.max(
     resolvedCycle.activeCycleMatchesResolvedRange ? activeCycle?.credits_used ?? 0 : 0,
     cycleUsageTotal
@@ -878,6 +883,7 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
   }
 
   const usageRows = (dailyUsageData as DailyUsageRow[] | null) ?? [];
+  const currentPlan = getBillingPlanDefinition(workspace.plan_name);
   const derivedUsage = deriveUsageFromProjects(projects, now);
   const activeProjects = projects.filter((project) => project.status !== "Completed").length;
   const reviewProjects = projects.filter((project) => project.status === "In Review").length;
@@ -890,7 +896,12 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
     resolvedCycle.cycleStart
   );
   const mergedTotals = getUsageRowTotals(mergedUsageRows);
-  const creditsLimit = billingCycle?.credits_limit ?? workspace.credits_limit ?? DEFAULT_CREDITS_LIMIT;
+  const creditsLimit = Math.max(
+    billingCycle?.credits_limit ?? 0,
+    workspace.credits_limit ?? 0,
+    currentPlan.creditsLimit,
+    DEFAULT_CREDITS_LIMIT
+  );
   const creditsUsed = Math.max(
     resolvedCycle.activeCycleMatchesResolvedRange ? billingCycle?.credits_used ?? 0 : 0,
     mergedTotals.creditsUsed
@@ -1267,7 +1278,11 @@ export async function getBillingScreenData(): Promise<BillingScreenData> {
   const cycleUsageRows =
     (cycleUsageData as Pick<DailyUsageRow, "usage_date" | "credits_used">[] | null) ?? [];
   const cycleUsageTotal = cycleUsageRows.reduce((sum, row) => sum + row.credits_used, 0);
-  const creditsLimit = activeCycle?.credits_limit ?? workspace.credits_limit ?? currentPlan.creditsLimit;
+  const creditsLimit = Math.max(
+    activeCycle?.credits_limit ?? 0,
+    workspace.credits_limit ?? 0,
+    currentPlan.creditsLimit
+  );
   const creditsUsed = Math.max(
     resolvedCycle.activeCycleMatchesResolvedRange ? activeCycle?.credits_used ?? 0 : 0,
     cycleUsageTotal
@@ -5194,13 +5209,13 @@ function getLocalizedPlanFeatures(plan: BillingPlanDefinition, locale: AppLocale
 
   switch (plan.id) {
     case "free":
-      return ["1k Wörter pro Monat", "XLIFF-Kernübersetzung", "Glossar-Basisfunktionen"];
+      return ["5k Wörter pro Monat", "XLIFF-Kernübersetzung", "Glossar-Basisfunktionen"];
     case "starter":
-      return ["25k Wörter pro Monat", "Projekt-Workspaces", "Glossar-Unterstützung"];
+      return ["100k Wörter pro Monat", "Projekt-Workspaces", "Glossar-Unterstützung"];
     case "pro":
-      return ["150k Wörter pro Monat", "Review-Workflow", "Priorisierte Glossar-Injektion"];
+      return ["500k Wörter pro Monat", "Review-Workflow", "Priorisierte Glossar-Injektion"];
     case "scale":
-      return ["400k Wörter pro Monat", "Höherer Durchsatz", "Geteilte Team-Abläufe"];
+      return ["1M Wörter pro Monat", "Höherer Durchsatz", "Geteilte Team-Abläufe"];
     default:
       return plan.features;
   }
