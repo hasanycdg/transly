@@ -679,5 +679,5 @@ function getClientAppUrl() {
     return window.location.origin;
   }
 
-  return "http://localhost:3000";
+  throw new Error("Unable to resolve browser origin for authentication redirect.");
 }

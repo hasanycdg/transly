@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase/env";
+import { getRequestOrigin } from "@/lib/supabase/request-origin";
 
 const AUTH_PATHS = new Set(["/login", "/register"]);
 const PUBLIC_API_PATHS = new Set(["/api/stripe/webhook"]);
@@ -51,20 +52,21 @@ export async function updateSession(request: NextRequest) {
   const user = data?.user ?? null;
   const isAuthenticated = !error && Boolean(user);
   const pathname = request.nextUrl.pathname;
+  const requestOrigin = getRequestOrigin(request);
 
   if (!isAuthenticated && isProtectedApiPath(pathname)) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
   if (!isAuthenticated && isProtectedAppPath(pathname)) {
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = new URL("/login", requestOrigin);
     loginUrl.searchParams.set("redirectTo", getSafeRedirectTarget(request));
 
     return NextResponse.redirect(loginUrl);
   }
 
   if (isAuthenticated && AUTH_PATHS.has(pathname)) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/dashboard", requestOrigin));
   }
 
   return response;

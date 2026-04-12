@@ -8,6 +8,8 @@ export function getSupabaseUrl() {
   return url;
 }
 
+const DEFAULT_PRODUCTION_SITE_URL = "https://translayr.dev";
+
 export function getSupabasePublishableKey() {
   const key =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
@@ -36,29 +38,21 @@ export function requireSupabaseServiceRoleKey() {
 }
 
 export function getAppUrl() {
-  const configuredOrigin = normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL);
-
-  if (configuredOrigin && !isLocalhostOrigin(configuredOrigin)) {
-    return configuredOrigin;
-  }
-
   if (typeof window !== "undefined" && window.location?.origin) {
     return window.location.origin;
   }
+
+  const configuredOrigin =
+    normalizeOrigin(process.env.NEXT_PUBLIC_SITE_URL) ??
+    normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL) ??
+    normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL) ??
+    normalizeOrigin(process.env.VERCEL_URL);
 
   if (configuredOrigin) {
     return configuredOrigin;
   }
 
-  const vercelOrigin =
-    normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL) ??
-    normalizeOrigin(process.env.VERCEL_URL);
-
-  if (vercelOrigin) {
-    return vercelOrigin;
-  }
-
-  return "http://localhost:3000";
+  return DEFAULT_PRODUCTION_SITE_URL;
 }
 
 function normalizeOrigin(value: string | undefined) {
@@ -78,14 +72,5 @@ function normalizeOrigin(value: string | undefined) {
     return new URL(withProtocol).origin;
   } catch {
     return null;
-  }
-}
-
-function isLocalhostOrigin(origin: string) {
-  try {
-    const host = new URL(origin).hostname.toLowerCase();
-    return host === "localhost" || host === "127.0.0.1" || host === "::1";
-  } catch {
-    return false;
   }
 }

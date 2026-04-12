@@ -1143,7 +1143,7 @@ function getClientAppUrl() {
     return window.location.origin;
   }
 
-  return "http://localhost:3000";
+  throw new Error("Unable to resolve browser origin for password reset redirect.");
 }
 
 function ProfileIcon({ className = "h-4 w-4" }: IconProps) {
