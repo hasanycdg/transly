@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Bodoni_Moda, Manrope } from "next/font/google";
+import Script from "next/script";
 import type { ReactNode } from "react";
 
+import { AnalyticsEventsListener } from "@/components/analytics/analytics-events-listener";
 import { AppLocaleProvider } from "@/components/app-locale-provider";
 import { SITE_ORIGIN, SITE_URL } from "@/lib/seo/metadata";
 import { getCurrentAppLocale } from "@/lib/supabase/workspace";
@@ -39,6 +41,8 @@ const organizationSchema = {
   url: SITE_ORIGIN,
   logo: `${SITE_ORIGIN}/icon.svg`
 };
+
+const GOOGLE_TAG_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-HZWJCEPTQ0";
 
 export const metadata: Metadata = {
   metadataBase: SITE_URL,
@@ -86,6 +90,19 @@ export default async function RootLayout({
   return (
     <html lang={locale} className={`${manrope.variable} ${bodoni.variable}`} suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-tag" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GOOGLE_TAG_ID}');
+          `}
+        </Script>
+        <AnalyticsEventsListener measurementId={GOOGLE_TAG_ID} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}

@@ -173,7 +173,7 @@ const deContent = {
       id: "cookies",
       heading: "9. Cookies und lokale Speicherung",
       paragraphs: [
-        "Translayr verwendet nur technisch notwendige Cookies und lokale Speicherung (localStorage) für die Sprachpräferenz. Es werden keine Tracking- oder Analyse-Cookies eingesetzt."
+        "Translayr verwendet technisch notwendige Cookies und lokale Speicherung (localStorage) für Kernfunktionen sowie Analyse-Tracking mit Google Analytics (Google Tag), um Produktnutzung zu verstehen und zu verbessern."
       ]
     },
     {
@@ -294,7 +294,7 @@ const enContent = {
       id: "cookies",
       heading: "9. Cookies and Local Storage",
       paragraphs: [
-        "Translayr uses only technically necessary cookies and local storage (localStorage) for language preferences. No tracking or analytics cookies are used."
+        "Translayr uses technically necessary cookies and local storage (localStorage) for core functionality, and analytics tracking via Google Analytics (Google Tag) to understand and improve product usage."
       ]
     },
     {
