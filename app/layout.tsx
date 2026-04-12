@@ -43,6 +43,7 @@ const organizationSchema = {
 };
 
 const GOOGLE_TAG_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-HZWJCEPTQ0";
+const COOKIE_SCRIPT_SRC = "https://cdn.cookie-script.com/s/f049a14342a6bb80ad391e914c565e5f.js";
 
 export const metadata: Metadata = {
   metadataBase: SITE_URL,
@@ -90,6 +91,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} className={`${manrope.variable} ${bodoni.variable}`} suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <Script src={COOKIE_SCRIPT_SRC} strategy="beforeInteractive" type="text/javascript" charSet="UTF-8" />
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`}
           strategy="afterInteractive"
