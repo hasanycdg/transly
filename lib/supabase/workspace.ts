@@ -5042,12 +5042,34 @@ function normalizeMemberEmail(value: string | null | undefined) {
 
 function getRequestedWorkspaceName(user: User) {
   const metadata = user.user_metadata && typeof user.user_metadata === "object" ? user.user_metadata : {};
-  const value =
+  const explicitWorkspaceName =
     typeof metadata.workspace_name === "string" && metadata.workspace_name.trim()
       ? metadata.workspace_name.trim()
       : "";
 
-  return value || null;
+  if (explicitWorkspaceName) {
+    return explicitWorkspaceName;
+  }
+
+  const displayName = getUserDisplayName(user);
+
+  if (displayName) {
+    return displayName;
+  }
+
+  const normalizedEmail = normalizeMemberEmail(user.email);
+  const emailLocalPart = normalizedEmail.includes("@")
+    ? normalizedEmail.slice(0, normalizedEmail.indexOf("@"))
+    : normalizedEmail;
+  const fallbackWorkspaceName = emailLocalPart
+    .replace(/[._-]+/g, " ")
+    .trim();
+
+  if (fallbackWorkspaceName) {
+    return fallbackWorkspaceName;
+  }
+
+  return "Workspace";
 }
 
 function getUserDisplayName(user: User) {
