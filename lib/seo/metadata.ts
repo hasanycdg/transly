@@ -18,7 +18,9 @@ function normalizeSiteUrl(value: string | null | undefined): string {
   }
 }
 
-export const SITE_ORIGIN = normalizeSiteUrl(process.env.NEXT_PUBLIC_APP_URL);
+export const SITE_ORIGIN = normalizeSiteUrl(
+  process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL
+);
 export const SITE_URL = new URL(SITE_ORIGIN);
 
 type StaticPageMetadataInput = {

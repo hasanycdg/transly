@@ -12,6 +12,8 @@ export async function createServerSupabaseAuthClient() {
 
   return createServerClient(getSupabaseUrl(), getSupabasePublishableKey(), {
     cookies: {
+      // Keep auth cookies small enough for proxy/header limits during OAuth callbacks.
+      encode: "tokens-only",
       getAll() {
         return cookieStore.getAll();
       },

@@ -31,6 +31,7 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createServerClient(getSupabaseUrl(), getSupabasePublishableKey(), {
     cookies: {
+      encode: "tokens-only",
       getAll() {
         return request.cookies.getAll();
       },
