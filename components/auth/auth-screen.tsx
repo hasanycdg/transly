@@ -101,6 +101,8 @@ export function AuthScreen({ mode }: AuthScreenProps) {
           alternateCta: isRegister ? "Anmelden" : "Registrieren",
           alternateHref: isRegister ? "/login" : "/register",
           directNote: "Direkter Weitergang ins Dashboard.",
+          googleCta: "Mit Google fortfahren",
+          googleSubmitting: "Weiterleitung zu Google...",
           magicLink: "Magic Link senden",
           sendingMagicLink: "Magic Link wird gesendet...",
           forgotPassword: "Passwort vergessen?",
@@ -174,6 +176,8 @@ export function AuthScreen({ mode }: AuthScreenProps) {
           alternateCta: isRegister ? "Sign in" : "Register",
           alternateHref: isRegister ? "/login" : "/register",
           directNote: "Direct redirect into the dashboard.",
+          googleCta: "Continue with Google",
+          googleSubmitting: "Redirecting to Google...",
           magicLink: "Send magic link",
           sendingMagicLink: "Sending magic link...",
           forgotPassword: "Forgot password?",
@@ -309,6 +313,32 @@ export function AuthScreen({ mode }: AuthScreenProps) {
     }
   }
 
+  async function handleGoogleSignIn() {
+    if (isSubmitting) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Authentication failed.");
+      setIsSubmitting(false);
+    }
+  }
+
   async function handlePasswordReset() {
     if (isSubmitting) {
       return;
@@ -431,6 +461,22 @@ export function AuthScreen({ mode }: AuthScreenProps) {
                 {successMessage}
               </div>
             ) : null}
+
+            <button
+              type="button"
+              onClick={() => void handleGoogleSignIn()}
+              disabled={isSubmitting}
+              className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border border-[#dfd7cc] bg-white px-4 text-[14px] font-medium text-[#171412] transition hover:bg-[#faf7f2] disabled:cursor-progress disabled:opacity-70"
+            >
+              <GoogleIcon />
+              <span>{isSubmitting ? copy.googleSubmitting : copy.googleCta}</span>
+            </button>
+
+            <div className="mt-5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#9c9389]">
+              <span className="h-px flex-1 bg-[#ece3d8]" />
+              <span>{copy.formEyebrow}</span>
+              <span className="h-px flex-1 bg-[#ece3d8]" />
+            </div>
 
             <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
               {isRegister ? (
@@ -590,6 +636,29 @@ function BrandIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px] fill-current">
       <path d="M5 6.8A2.8 2.8 0 0 1 7.8 4h8.4A2.8 2.8 0 0 1 19 6.8v10.4A2.8 2.8 0 0 1 16.2 20H7.8A2.8 2.8 0 0 1 5 17.2V6.8Zm4.3 1.2v1.8h5.4V8H9.3Zm0 3.6v1.8h5.4v-1.8H9.3Zm0 3.6V17h3.6v-1.8H9.3Z" />
+    </svg>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4">
+      <path
+        fill="#EA4335"
+        d="M12 10.08v3.98h5.64c-.25 1.28-.98 2.37-2.04 3.11l3.3 2.56c1.93-1.77 3.05-4.38 3.05-7.48 0-.74-.07-1.45-.2-2.13H12Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 21.5c2.75 0 5.06-.91 6.74-2.47l-3.3-2.56c-.92.62-2.1.99-3.44.99-2.65 0-4.9-1.79-5.7-4.2l-3.42 2.64A10.17 10.17 0 0 0 12 21.5Z"
+      />
+      <path
+        fill="#4A90E2"
+        d="M6.3 13.26a6.08 6.08 0 0 1 0-3.52L2.88 7.1a10.17 10.17 0 0 0 0 8.8l3.42-2.64Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M12 6.54c1.5 0 2.84.52 3.89 1.55l2.92-2.92C17.05 3.53 14.74 2.5 12 2.5A10.17 10.17 0 0 0 2.88 7.1l3.42 2.64c.8-2.41 3.05-4.2 5.7-4.2Z"
+      />
     </svg>
   );
 }
