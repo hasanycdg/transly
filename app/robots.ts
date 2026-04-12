@@ -17,7 +17,6 @@ export default function robots(): MetadataRoute.Robots {
           "/billing",
           "/settings",
           "/support",
-          "/notifications",
           "/glossary",
           "/developer-api"
         ]

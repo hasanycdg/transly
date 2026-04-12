@@ -6,7 +6,7 @@ import { getRequestOrigin } from "@/lib/supabase/request-origin";
 
 const AUTH_PATHS = new Set(["/login", "/register"]);
 const PUBLIC_API_PATHS = new Set(["/api/stripe/webhook"]);
-const PROTECTED_APP_PATH_PREFIXES = ["/dashboard", "/projects", "/translate", "/usage", "/glossary", "/notifications", "/support", "/billing", "/settings"];
+const PROTECTED_APP_PATH_PREFIXES = ["/dashboard", "/projects", "/translate", "/usage", "/glossary", "/support", "/billing", "/settings"];
 
 function isProtectedAppPath(pathname: string) {
   return PROTECTED_APP_PATH_PREFIXES.some(

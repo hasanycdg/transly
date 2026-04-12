@@ -509,7 +509,7 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
 
                         <FieldBlock
                           label="Email"
-                          description="Primary login address for password recovery and product notifications."
+                          description="Primary login address for password recovery and account access."
                         >
                           <input
                             type="email"
@@ -1197,8 +1197,8 @@ function translateSettingsText(value: string, locale: string) {
     "Shown in internal activity, handoff notes, and review ownership.":
       "Wird in internen Aktivitäten, Übergabenotizen und Review-Zuständigkeiten angezeigt.",
     Email: "E-Mail",
-    "Primary login address for password recovery and product notifications.":
-      "Primäre Login-Adresse für Passwort-Wiederherstellung und Produktbenachrichtigungen.",
+    "Primary login address for password recovery and account access.":
+      "Primäre Login-Adresse für Passwort-Wiederherstellung und den Kontozugriff.",
     "/ Security": "/ Sicherheit",
     Password: "Passwort",
     "Simple access controls with no extra noise.": "Einfache Zugriffskontrollen ohne unnötigen Ballast.",
@@ -1330,7 +1330,6 @@ function isSettingsPayload(value: SettingsScreenData | { error?: string } | null
       "profile" in value &&
       "translation" in value &&
       "preferences" in value &&
-      "notifications" in value &&
       "dangerZone" in value
   );
 }

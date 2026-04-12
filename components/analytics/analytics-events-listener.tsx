@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 type EventParams = Record<string, string | number | boolean | undefined>;
 
@@ -15,16 +15,10 @@ declare global {
 export function AnalyticsEventsListener() {
   const pathname = usePathname() ?? "";
   const searchParams = useSearchParams();
-  const isFirstPageView = useRef(true);
   const search = searchParams.toString();
   const pagePath = search ? `${pathname}?${search}` : pathname;
 
   useEffect(() => {
-    if (isFirstPageView.current) {
-      isFirstPageView.current = false;
-      return;
-    }
-
     trackEvent("page_view", {
       page_path: pagePath,
       page_location: window.location.href,
@@ -47,7 +41,7 @@ export function AnalyticsEventsListener() {
         const eventName = normalizeEventName(customEventName || "interaction");
 
         trackEvent(eventName, {
-          page_path: window.location.pathname,
+          page_path: getCurrentPagePath(),
           element_id: explicitEventElement.id || undefined,
           element_label: getElementLabel(explicitEventElement)
         });
@@ -58,7 +52,7 @@ export function AnalyticsEventsListener() {
 
       if (link instanceof HTMLAnchorElement) {
         trackEvent("link_click", {
-          page_path: window.location.pathname,
+          page_path: getCurrentPagePath(),
           link_url: link.href,
           link_text: getElementLabel(link),
           is_external: isExternalLink(link)
@@ -70,7 +64,7 @@ export function AnalyticsEventsListener() {
 
       if (button instanceof HTMLButtonElement) {
         trackEvent("button_click", {
-          page_path: window.location.pathname,
+          page_path: getCurrentPagePath(),
           element_id: button.id || undefined,
           button_text: getElementLabel(button)
         });
@@ -85,7 +79,7 @@ export function AnalyticsEventsListener() {
       }
 
       trackEvent("form_submit", {
-        page_path: window.location.pathname,
+        page_path: getCurrentPagePath(),
         form_id: form.id || undefined,
         form_name: form.getAttribute("name") || undefined,
         form_action: form.action || undefined
@@ -109,9 +103,10 @@ function trackEvent(name: string, params: EventParams) {
     return;
   }
 
+  window.dataLayer = window.dataLayer || [];
+
   if (typeof window.gtag === "function") {
     window.gtag("event", name, params);
-    return;
   }
 
   if (Array.isArray(window.dataLayer)) {
@@ -155,4 +150,8 @@ function isExternalLink(link: HTMLAnchorElement) {
   } catch {
     return false;
   }
+}
+
+function getCurrentPagePath() {
+  return `${window.location.pathname}${window.location.search}`;
 }

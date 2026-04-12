@@ -22,7 +22,7 @@ export async function PATCH(request: Request) {
   try {
     const payload = (await request.json()) as Partial<SettingsScreenData>;
 
-    if (!payload.profile || !payload.translation || !payload.preferences || !payload.notifications || !payload.dangerZone) {
+    if (!payload.profile || !payload.translation || !payload.preferences || !payload.dangerZone) {
       return NextResponse.json(
         {
           error: "A complete settings payload is required."

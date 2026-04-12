@@ -48,12 +48,8 @@ import type {
   BillingScreenData,
   CreditPackOption,
   DashboardShellData,
-  NotificationChannelItem,
-  NotificationEventItem,
-  NotificationsScreenData,
   ProjectsOverviewData,
   SettingsFilenameFormat,
-  SettingsNotificationsData,
   SettingsQualityPreset,
   SettingsScreenData,
   SettingsToneStyle,
@@ -1035,205 +1031,6 @@ export async function getUsageScreenData(): Promise<UsageScreenData> {
   };
 }
 
-export async function getNotificationsScreenData(): Promise<NotificationsScreenData> {
-  noStore();
-
-  const now = new Date();
-  const { supabase, workspace, settings } = await getWorkspaceContext();
-  const metadata = parseWorkspaceSettingsMetadata(settings.metadata);
-  const locale = metadata.preferredLocale ?? DEFAULT_APP_LOCALE;
-  const [{ data: billingCycleData, error: billingError }, projects] = await Promise.all([
-    supabase
-      .from("workspace_billing_cycles")
-      .select("id, period_start, period_end, credits_limit, credits_used, projected_spend_cents, status")
-      .eq("workspace_id", workspace.id)
-      .eq("status", "active")
-      .order("period_start", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    getProjectRecords()
-  ]);
-
-  if (billingError) {
-    throw new Error(`Failed to load notification billing cycle: ${billingError.message}`);
-  }
-
-  const billingCycle = billingCycleData as BillingCycleRow | null;
-  const currentPlan = getBillingPlanDefinition(workspace.plan_name);
-  const resolvedCycle = resolveUsageCycleWindow({
-    activeCycle: billingCycle,
-    metadata,
-    workspaceCreatedAt: workspace.created_at,
-    now
-  });
-  const { data: cycleUsageData, error: cycleUsageError } = await supabase
-    .from("workspace_daily_usage")
-    .select("usage_date, credits_used")
-    .eq("workspace_id", workspace.id)
-    .gte("usage_date", resolvedCycle.cycleStartKey)
-    .lte("usage_date", resolvedCycle.cycleEndKey);
-
-  if (cycleUsageError) {
-    throw new Error(`Failed to load notification usage rows: ${cycleUsageError.message}`);
-  }
-
-  const cycleUsageRows =
-    (cycleUsageData as Pick<DailyUsageRow, "usage_date" | "credits_used">[] | null) ?? [];
-  const cycleUsageTotal = cycleUsageRows.reduce((sum, row) => sum + row.credits_used, 0);
-  const creditsLimit = Math.max(billingCycle?.credits_limit ?? 0, currentPlan.creditsLimit);
-  const creditsUsed = Math.max(
-    resolvedCycle.activeCycleMatchesResolvedRange ? billingCycle?.credits_used ?? 0 : 0,
-    cycleUsageTotal
-  );
-  const planPercent = creditsLimit > 0 ? Math.min(Math.round((creditsUsed / creditsLimit) * 100), 100) : 0;
-  const reviewQueue = projects.reduce(
-    (sum, project) => sum + project.files.filter((file) => file.status === "Review").length,
-    0
-  );
-  const failedFiles = projects.reduce(
-    (sum, project) => sum + project.files.filter((file) => file.status === "Error").length,
-    0
-  );
-
-  const channels: NotificationChannelItem[] = [
-    {
-      id: "translation_complete_email",
-      label: locale === "de" ? "Übersetzung fertig" : "Translation complete",
-      description: locale === "de" ? "E-Mail, wenn Datei- oder Textübersetzungen abgeschlossen sind." : "Email when file or text translations finish.",
-      enabled: settings.email_notifications,
-      type: "email"
-    },
-    {
-      id: "invoice_created_email",
-      label: locale === "de" ? "Rechnung erstellt" : "Invoice created",
-      description: locale === "de" ? "E-Mail bei neuen Rechnungen oder Abrechnungsbelegen." : "Email when a new invoice or billing document is issued.",
-      enabled: metadata.invoiceCreatedEmail ?? true,
-      type: "email"
-    },
-    {
-      id: "payment_failed_email",
-      label: locale === "de" ? "Zahlung fehlgeschlagen" : "Payment failed",
-      description: locale === "de" ? "E-Mail, wenn Stripe eine fehlgeschlagene Zahlung meldet." : "Email when Stripe reports a failed payment.",
-      enabled: metadata.paymentFailedEmail ?? true,
-      type: "email"
-    },
-    {
-      id: "spending_limit_email",
-      label: locale === "de" ? "Limit fast erreicht" : "Spending limit reached",
-      description: locale === "de" ? "E-Mail, wenn der Workspace sich dem Credit-Limit nähert." : "Email when the workspace gets close to its credit limit.",
-      enabled: metadata.spendingLimitEmail ?? true,
-      type: "email"
-    },
-    {
-      id: "review_reminders",
-      label: locale === "de" ? "Review-Erinnerungen" : "Review reminders",
-      description: locale === "de" ? "Erinnerungen für offene Review-Warteschlangen." : "Reminders for open review queues.",
-      enabled: settings.review_reminders,
-      type: "email"
-    },
-    {
-      id: "in_app_notifications",
-      label: locale === "de" ? "In-App Notifications" : "In-app notifications",
-      description: locale === "de" ? "Hinweise direkt im Produkt statt nur per E-Mail." : "Alerts inside the product instead of email only.",
-      enabled: metadata.inAppNotifications ?? true,
-      type: "in_app"
-    }
-  ];
-
-  const emailEnabledCount = channels.filter((channel) => channel.type === "email" && channel.enabled).length;
-  const totalChannelCount = channels.length;
-
-  const metrics: UsageMetricItem[] = [
-    {
-      value: `${channels.filter((channel) => channel.enabled).length}/${totalChannelCount}`,
-      label: locale === "de" ? "Kanäle aktiv" : "Channels active",
-      meta: locale === "de" ? "Über E-Mail und In-App" : "Across email and in-app",
-      tone: "positive"
-    },
-    {
-      value: String(emailEnabledCount),
-      label: locale === "de" ? "E-Mail-Alerts aktiv" : "Email alerts active",
-      meta: locale === "de" ? "Lieferung, Billing und Limits" : "Delivery, billing, and limits"
-    },
-    {
-      value: String(reviewQueue),
-      label: locale === "de" ? "Review-Hinweise offen" : "Review notifications open",
-      meta: locale === "de" ? "Dateien warten auf Prüfung" : "Files are waiting for review"
-    },
-    {
-      value: String(failedFiles),
-      label: locale === "de" ? "Fehler mit Signalwert" : "Failures to signal",
-      meta: locale === "de" ? "Dateien mit Fehlerstatus" : "Files currently in error state"
-    }
-  ];
-
-  const items: NotificationEventItem[] = buildNotificationEventItems({
-    projects,
-    locale,
-    now,
-    planPercent,
-    reviewQueue,
-    metadata
-  });
-
-  return {
-    metrics,
-    channels,
-    items,
-    updatedLabel: formatUpdatedLabel(now, locale),
-    preferences: {
-      translationCompleteEmail: settings.email_notifications,
-      invoiceCreatedEmail: metadata.invoiceCreatedEmail ?? true,
-      paymentFailedEmail: metadata.paymentFailedEmail ?? true,
-      spendingLimitEmail: metadata.spendingLimitEmail ?? true,
-      reviewReminders: settings.review_reminders,
-      inAppNotifications: metadata.inAppNotifications ?? true
-    },
-    routingEmail: metadata.profileEmail ?? `${workspace.slug}@translayr.dev`,
-    routingCompany: metadata.company ?? ""
-  };
-}
-
-export async function updateNotificationPreferences(
-  input: SettingsNotificationsData
-): Promise<SettingsNotificationsData> {
-  const { supabase, workspace, settings } = await getWorkspaceContext();
-  const currentMetadata = parseWorkspaceSettingsMetadata(settings.metadata);
-  const rawMetadata =
-    settings.metadata && typeof settings.metadata === "object" ? settings.metadata : {};
-  const nextPreferences: SettingsNotificationsData = {
-    translationCompleteEmail: Boolean(input.translationCompleteEmail),
-    invoiceCreatedEmail: Boolean(input.invoiceCreatedEmail),
-    paymentFailedEmail: Boolean(input.paymentFailedEmail),
-    spendingLimitEmail: Boolean(input.spendingLimitEmail),
-    reviewReminders: Boolean(input.reviewReminders),
-    inAppNotifications: Boolean(input.inAppNotifications)
-  };
-  const nextMetadata: WorkspaceSettingsMetadata = {
-    ...rawMetadata,
-    ...currentMetadata,
-    invoiceCreatedEmail: nextPreferences.invoiceCreatedEmail,
-    paymentFailedEmail: nextPreferences.paymentFailedEmail,
-    spendingLimitEmail: nextPreferences.spendingLimitEmail,
-    inAppNotifications: nextPreferences.inAppNotifications
-  };
-
-  const { error } = await supabase
-    .from("workspace_settings")
-    .update({
-      email_notifications: nextPreferences.translationCompleteEmail,
-      review_reminders: nextPreferences.reviewReminders,
-      metadata: nextMetadata
-    })
-    .eq("workspace_id", workspace.id);
-
-  if (error) {
-    throw new Error(`Failed to save notification preferences: ${error.message}`);
-  }
-
-  return nextPreferences;
-}
-
 export async function getBillingScreenData(): Promise<BillingScreenData> {
   noStore();
 
@@ -1707,14 +1504,6 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData> {
       autoDownloadAfterTranslation: settings.auto_export_after_completion,
       defaultFilenameFormat: metadata.defaultFilenameFormat ?? "Original + target locale"
     },
-    notifications: {
-      translationCompleteEmail: settings.email_notifications,
-      invoiceCreatedEmail: metadata.invoiceCreatedEmail ?? true,
-      paymentFailedEmail: metadata.paymentFailedEmail ?? true,
-      spendingLimitEmail: metadata.spendingLimitEmail ?? true,
-      reviewReminders: settings.review_reminders,
-      inAppNotifications: metadata.inAppNotifications ?? true
-    },
     dangerZone: {
       title: locale === "de" ? "Konto löschen" : "Delete account",
       description: locale === "de"
@@ -1771,11 +1560,7 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
     toneStyle,
     strictGlossaryMode: Boolean(input.translation.strictGlossaryMode),
     aiBehavior,
-    defaultFilenameFormat,
-    invoiceCreatedEmail: Boolean(input.notifications.invoiceCreatedEmail),
-    paymentFailedEmail: Boolean(input.notifications.paymentFailedEmail),
-    spendingLimitEmail: Boolean(input.notifications.spendingLimitEmail),
-    inAppNotifications: Boolean(input.notifications.inAppNotifications)
+    defaultFilenameFormat
   };
 
   const avatarLabel = buildAvatarLabel(profileName);
@@ -1799,8 +1584,6 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
       default_target_language: targetLanguage,
       inline_tag_validation_mode: inlineTagValidationMode,
       block_export_on_validation_failure: Boolean(input.translation.failOnTagMismatch),
-      email_notifications: Boolean(input.notifications.translationCompleteEmail),
-      review_reminders: Boolean(input.notifications.reviewReminders),
       auto_export_after_completion: Boolean(input.preferences.autoDownloadAfterTranslation),
       glossary_prompt_injection: Boolean(input.translation.useGlossaryAutomatically),
       translation_batch_size: translationBatchSize,
@@ -1834,14 +1617,6 @@ export async function updateSettings(input: SettingsScreenData): Promise<Setting
       locale: preferredLocale,
       autoDownloadAfterTranslation: Boolean(input.preferences.autoDownloadAfterTranslation),
       defaultFilenameFormat
-    },
-    notifications: {
-      translationCompleteEmail: Boolean(input.notifications.translationCompleteEmail),
-      invoiceCreatedEmail: Boolean(input.notifications.invoiceCreatedEmail),
-      paymentFailedEmail: Boolean(input.notifications.paymentFailedEmail),
-      spendingLimitEmail: Boolean(input.notifications.spendingLimitEmail),
-      reviewReminders: Boolean(input.notifications.reviewReminders),
-      inAppNotifications: Boolean(input.notifications.inAppNotifications)
     },
     dangerZone: {
       title: input.dangerZone.title,
@@ -4186,96 +3961,6 @@ function getLatestUsageTimestamp(projects: ProjectRecord[], cycle: ResolvedUsage
   return latestTimestamp;
 }
 
-function buildNotificationEventItems({
-  projects,
-  locale,
-  now,
-  planPercent,
-  reviewQueue,
-  metadata
-}: {
-  projects: ProjectRecord[];
-  locale: AppLocale;
-  now: Date;
-  planPercent: number;
-  reviewQueue: number;
-  metadata: WorkspaceSettingsMetadata;
-}): NotificationEventItem[] {
-  const items: Array<NotificationEventItem & { timestamp: string }> = [];
-
-  if (planPercent >= 80 && (metadata.spendingLimitEmail ?? true)) {
-    items.push({
-      id: "workspace-usage-warning",
-      title: locale === "de" ? "Workspace nähert sich dem Limit" : "Workspace is nearing the limit",
-      detail:
-        locale === "de"
-          ? `${Math.round(planPercent)}% des aktuellen Credit-Limits sind bereits verbraucht.`
-          : `${Math.round(planPercent)}% of the current credit limit has already been consumed.`,
-      projectName: locale === "de" ? "Workspace" : "Workspace",
-      timestampLabel: formatActivityTimestamp(now, locale),
-      href: "/billing",
-      tone: "warning",
-      timestamp: now.toISOString()
-    });
-  }
-
-  if (reviewQueue > 0) {
-    items.push({
-      id: "workspace-review-queue",
-      title: locale === "de" ? "Review-Warteschlange benötigt Aufmerksamkeit" : "Review queue needs attention",
-      detail:
-        locale === "de"
-          ? `${formatCompactNumber(reviewQueue, locale)} Dateien warten aktuell auf Freigabe oder QA.`
-          : `${formatCompactNumber(reviewQueue, locale)} files are currently waiting for approval or QA.`,
-      projectName: locale === "de" ? "Workspace" : "Workspace",
-      timestampLabel: formatActivityTimestamp(now, locale),
-      href: "/usage",
-      tone: "warning",
-      timestamp: now.toISOString()
-    });
-  }
-
-  if (metadata.stripeSubscriptionStatus && ["past_due", "unpaid", "incomplete"].includes(metadata.stripeSubscriptionStatus)) {
-    items.push({
-      id: "workspace-billing-issue",
-      title: locale === "de" ? "Billing benötigt Aufmerksamkeit" : "Billing needs attention",
-      detail:
-        locale === "de"
-          ? `Stripe meldet den Status ${formatStripeStatusLabel(metadata.stripeSubscriptionStatus, locale)}.`
-          : `Stripe currently reports ${formatStripeStatusLabel(metadata.stripeSubscriptionStatus, locale)}.`,
-      projectName: locale === "de" ? "Abrechnung" : "Billing",
-      timestampLabel: formatActivityTimestamp(now, locale),
-      href: "/billing",
-      tone: "danger",
-      timestamp: now.toISOString()
-    });
-  }
-
-  for (const project of projects) {
-    for (const activity of project.recentActivity) {
-      items.push({
-        id: `${project.id}-${activity.id}`,
-        title: activity.title,
-        detail: activity.detail,
-        projectName: project.name,
-        timestampLabel: formatActivityTimestamp(new Date(activity.timestamp), locale),
-        href: `/projects/${project.id}`,
-        tone: classifyNotificationTone(activity.title, activity.detail),
-        timestamp: activity.timestamp
-      });
-    }
-  }
-
-  return items
-    .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
-    .slice(0, 10)
-    .map((item) => {
-      const { timestamp, ...nextItem } = item;
-      void timestamp;
-      return nextItem;
-    });
-}
-
 function classifyUsageActivityKind(
   title: string,
   detail: string
@@ -4291,43 +3976,6 @@ function classifyUsageActivityKind(
   }
 
   return "translation";
-}
-
-function classifyNotificationTone(
-  title: string,
-  detail: string
-): NotificationEventItem["tone"] {
-  const normalized = `${title} ${detail}`.toLowerCase();
-
-  if (
-    normalized.includes("error") ||
-    normalized.includes("failed") ||
-    normalized.includes("fehl") ||
-    normalized.includes("block")
-  ) {
-    return "danger";
-  }
-
-  if (
-    normalized.includes("review") ||
-    normalized.includes("approval") ||
-    normalized.includes("prüfung") ||
-    normalized.includes("qa")
-  ) {
-    return "warning";
-  }
-
-  if (
-    normalized.includes("done") ||
-    normalized.includes("generated") ||
-    normalized.includes("export") ||
-    normalized.includes("synced") ||
-    normalized.includes("approved")
-  ) {
-    return "positive";
-  }
-
-  return "default";
 }
 
 function formatDateKey(date: Date) {

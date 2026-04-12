@@ -43,40 +43,6 @@ export interface ProjectsOverviewData {
   home: ProjectsHomeData;
 }
 
-export interface NotificationChannelItem {
-  id:
-    | "translation_complete_email"
-    | "invoice_created_email"
-    | "payment_failed_email"
-    | "spending_limit_email"
-    | "review_reminders"
-    | "in_app_notifications";
-  label: string;
-  description: string;
-  enabled: boolean;
-  type: "email" | "in_app";
-}
-
-export interface NotificationEventItem {
-  id: string;
-  title: string;
-  detail: string;
-  projectName: string;
-  timestampLabel: string;
-  href: string;
-  tone: "default" | "positive" | "warning" | "danger";
-}
-
-export interface NotificationsScreenData {
-  metrics: UsageMetricItem[];
-  channels: NotificationChannelItem[];
-  items: NotificationEventItem[];
-  updatedLabel: string;
-  preferences: SettingsNotificationsData;
-  routingEmail: string;
-  routingCompany: string;
-}
-
 export type WorkspaceMemberRole = "owner" | "admin" | "editor" | "reviewer" | "viewer";
 
 export type WorkspaceMemberStatus = "invited" | "active" | "disabled";
@@ -253,7 +219,6 @@ export type SettingsSectionId =
   | "profile"
   | "translation"
   | "preferences"
-  | "notifications"
   | "danger";
 
 export type SettingsToneStyle = "Neutral" | "Formal" | "Informal" | "Marketing" | "Technical";
@@ -290,15 +255,6 @@ export interface SettingsPreferencesData {
   defaultFilenameFormat: SettingsFilenameFormat;
 }
 
-export interface SettingsNotificationsData {
-  translationCompleteEmail: boolean;
-  invoiceCreatedEmail: boolean;
-  paymentFailedEmail: boolean;
-  spendingLimitEmail: boolean;
-  reviewReminders: boolean;
-  inAppNotifications: boolean;
-}
-
 export interface SettingsDangerZoneData {
   title: string;
   description: string;
@@ -309,7 +265,6 @@ export interface SettingsScreenData {
   profile: SettingsProfileData;
   translation: SettingsTranslationData;
   preferences: SettingsPreferencesData;
-  notifications: SettingsNotificationsData;
   dangerZone: SettingsDangerZoneData;
 }
 

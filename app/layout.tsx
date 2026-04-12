@@ -42,6 +42,7 @@ const organizationSchema = {
   logo: `${SITE_ORIGIN}/icon.svg`
 };
 
+const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() || null;
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID ?? "GTM-NK3MKMJN";
 const COOKIE_SCRIPT_SRC = "https://cdn.cookie-script.com/s/f049a14342a6bb80ad391e914c565e5f.js";
 
@@ -109,6 +110,25 @@ export default async function RootLayout({
           />
         </noscript>
         <Script src={COOKIE_SCRIPT_SRC} strategy="beforeInteractive" type="text/javascript" charSet="UTF-8" />
+        {GA_MEASUREMENT_ID ? (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
+                window.gtag('js', new Date());
+                window.gtag('config', '${GA_MEASUREMENT_ID}', {
+                  send_page_view: false,
+                  anonymize_ip: true
+                });
+              `}
+            </Script>
+          </>
+        ) : null}
         <AnalyticsEventsListener />
         <Script
           id="schema-website"

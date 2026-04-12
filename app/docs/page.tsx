@@ -17,7 +17,6 @@ type SectionId =
   | "projects"
   | "usage-billing"
   | "settings"
-  | "notifications"
   | "team-access"
   | "faq";
 
@@ -39,7 +38,6 @@ const DOC_SECTIONS: SectionDefinition[] = [
   { id: "projects", label: "Projects", labelDE: "Projekte" },
   { id: "usage-billing", label: "Usage & billing", labelDE: "Nutzung & Billing" },
   { id: "settings", label: "Settings", labelDE: "Einstellungen" },
-  { id: "notifications", label: "Notifications", labelDE: "Benachrichtigungen" },
   { id: "team-access", label: "Team access", labelDE: "Teamzugriff" },
   { id: "faq", label: "FAQ", labelDE: "FAQ" }
 ];
@@ -64,14 +62,6 @@ const TONE_OPTIONS = ["Neutral", "Formal", "Informal", "Marketing", "Technical"]
 const AI_BEHAVIORS = ["Fast", "Balanced", "High Quality"];
 const WORKSPACE_ROLES = ["owner", "admin", "editor", "reviewer", "viewer"];
 const MEMBER_STATUSES = ["invited", "active", "disabled"];
-const NOTIFICATION_CHANNELS = [
-  "translation_complete_email",
-  "invoice_created_email",
-  "payment_failed_email",
-  "spending_limit_email",
-  "review_reminders",
-  "in_app_notifications"
-];
 
 function t(locale: Locale, en: string, de: string) {
   return locale === "de" ? de : en;
@@ -133,8 +123,8 @@ export default function DocsPage() {
           <p className="mt-4 max-w-[700px] text-[15px] leading-8 text-[var(--muted)]">
             {t(
               locale,
-              "A complete product guide based on the current implementation: workflows, formats, glossary, billing, settings, notifications, and team access.",
-              "Ein vollständiger Produktleitfaden auf Basis der aktuellen Implementierung: Workflows, Formate, Glossar, Billing, Einstellungen, Benachrichtigungen und Teamzugriff."
+              "A complete product guide based on the current implementation: workflows, formats, glossary, billing, settings, and team access.",
+              "Ein vollständiger Produktleitfaden auf Basis der aktuellen Implementierung: Workflows, Formate, Glossar, Billing, Einstellungen und Teamzugriff."
             )}
           </p>
 
@@ -231,7 +221,6 @@ export default function DocsPage() {
               <UsageBillingSection locale={locale} planCards={planCards} />
             ) : null}
             {activeSection === "settings" ? <SettingsSection locale={locale} /> : null}
-            {activeSection === "notifications" ? <NotificationsSection locale={locale} /> : null}
             {activeSection === "team-access" ? <TeamAccessSection locale={locale} /> : null}
             {activeSection === "faq" ? <FaqSection locale={locale} /> : null}
           </div>
@@ -587,37 +576,6 @@ function SettingsSection({ locale }: { locale: Locale }) {
   );
 }
 
-function NotificationsSection({ locale }: { locale: Locale }) {
-  return (
-    <SectionCard
-      title={t(locale, "Notifications", "Benachrichtigungen")}
-      intro={t(
-        locale,
-        "Notification rules are managed on /notifications, separate from settings sections.",
-        "Benachrichtigungsregeln werden auf /notifications verwaltet, getrennt von den Einstellungsbereichen."
-      )}
-    >
-      <SubTitle>{t(locale, "Available channels", "Verfügbare Kanäle")}</SubTitle>
-      <BulletList items={NOTIFICATION_CHANNELS} />
-
-      <BulletList
-        items={[
-          t(
-            locale,
-            "Email and in-app channels can be enabled or disabled independently.",
-            "E-Mail- und In-App-Kanäle können unabhängig aktiviert oder deaktiviert werden."
-          ),
-          t(
-            locale,
-            "Notification feed includes events from workspace activity, billing, and project operations.",
-            "Der Benachrichtigungs-Feed enthält Ereignisse aus Workspace-Aktivität, Billing und Projektoperationen."
-          )
-        ]}
-      />
-    </SectionCard>
-  );
-}
-
 function TeamAccessSection({ locale }: { locale: Locale }) {
   return (
     <SectionCard
@@ -685,10 +643,6 @@ function FaqSection({ locale }: { locale: Locale }) {
           "Settings -> Preferences -> Default filename format.",
           "Einstellungen -> Präferenzen -> Standard-Dateinamenformat."
         )}
-      />
-      <FaqItem
-        question={t(locale, "Where are notification rules managed?", "Wo werden Benachrichtigungsregeln verwaltet?")}
-        answer={t(locale, "On /notifications.", "Auf /notifications.")}
       />
       <FaqItem
         question={t(

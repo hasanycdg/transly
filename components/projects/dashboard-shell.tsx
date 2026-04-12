@@ -44,7 +44,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           dashboard: "Dashboard",
           usage: "Nutzung",
           glossary: "Glossar",
-          notifications: "Benachrichtigungen",
           support: "Support",
           billing: "Abrechnung",
           settings: "Einstellungen",
@@ -65,7 +64,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
           dashboard: "Dashboard",
           usage: "Usage",
           glossary: "Glossary",
-          notifications: "Notifications",
           support: "Support",
           billing: "Billing",
           settings: "Settings",
@@ -88,13 +86,6 @@ export function DashboardShell({ children, shellData }: DashboardShellProps) {
     { label: copy.glossary, href: "/glossary", icon: GlossaryIcon, prefetch: shouldPrefetch }
   ];
   const utilityNavItems: SidebarItem[] = [
-    {
-      label: copy.notifications,
-      href: "/notifications",
-      icon: BellIcon,
-      prefetch: shouldPrefetch,
-      active: pathname.startsWith("/notifications")
-    },
     {
       label: copy.support,
       href: "/support",
@@ -458,20 +449,6 @@ function BillingIcon({ className }: NavIconProps) {
     <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
       <rect x="1.5" y="2.5" width="11" height="9" rx="1.75" stroke="currentColor" strokeWidth="1.2" />
       <path d="M1.5 5h11M3.8 8.6h3.2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function BellIcon({ className }: NavIconProps) {
-  return (
-    <svg className={className} viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path
-        d="M7 2.25A2.5 2.5 0 0 0 4.5 4.75v1.02c0 .48-.17.94-.49 1.3l-1.01 1.15c-.49.55-.09 1.41.65 1.41h6.7c.74 0 1.14-.86.65-1.4l-1-1.16a1.93 1.93 0 0 1-.5-1.3V4.75A2.5 2.5 0 0 0 7 2.25Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-      <path d="M5.75 11.25c.22.47.7.75 1.25.75s1.03-.28 1.25-.75" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }

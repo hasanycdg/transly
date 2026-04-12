@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useAppLocale } from "@/components/app-locale-provider";
 import type { ReactNode } from "react";
 import type { SettingsScreenData } from "@/types/workspace";
@@ -16,39 +18,33 @@ export function SupportScreen({ data }: SupportScreenProps) {
       ? {
           eyebrow: "/ Support",
           heading: "Support",
-          intro: "Hilfe, Kontaktwege und operative Hinweise in einer eigenen Fläche statt versteckt in den Einstellungen.",
+          intro: "Ein klarer Support-Einstieg mit einem Kontaktweg, direkter Dokumentation und einer kurzen Checkliste für schnellere Lösungen.",
           contactEyebrow: "/ Kontakt",
-          contactTitle: "Support-Kanäle",
+          contactTitle: "Support",
           contactDescription:
-            "Nutze den schnellsten Weg, je nachdem ob du Produkthilfe, operative Klarheit oder Konto-Unterstützung brauchst.",
+            "Für Produktfragen, Datei-Probleme, Billing-Themen und operative Blocker läuft alles über einen klaren Eingang.",
           emailSupport: "Support per E-Mail",
-          emailSupportDescription: "Am besten für Kontofragen, Produktprobleme und Workflow-Hilfe.",
+          emailSupportDescription: "Der richtige Kanal für Konto-Fragen, Übersetzungsfehler, Import-/Export-Probleme und Billing-Themen.",
           emailSupportMeta: "Übliche Antwort innerhalb eines Werktags.",
           emailSupportAction: "Support anschreiben",
-          priorityChannel: "Prioritätskanal",
-          priorityChannelDescription: "Für planspezifische Eskalationen und kritische Produktions-Blocker.",
-          priorityChannelMeta: "Anfragen werden über deine Workspace-Kontakt-E-Mail geroutet.",
-          priorityChannelAction: "Konto-E-Mail verwenden",
+          supportScopeTitle: "Womit wir schnell helfen können",
+          supportScopeItems: [
+            "Dateiimport, Übersetzungsausgabe, Export und QA-Blocker",
+            "Workspace-, Konto- und Billing-Themen",
+            "Glossar-, Tag- und Format-Probleme in produktiven Flows"
+          ],
           guidesEyebrow: "/ Hilfe",
           guidesTitle: "Guides und Dokumentation",
-          guidesDescription: "Eine kompakte Support-Fläche für Material, das Nutzer typischerweise vor einem Ticket brauchen.",
+          guidesDescription: "Die wichtigsten Einstiege, bevor du ein Ticket öffnest oder wenn du dir selbst sofort helfen willst.",
           gettingStarted: "Erste Schritte",
           gettingStartedDescription: "Projekt-Setup, Sprach-Standards und erster Übersetzungs-Workflow.",
+          gettingStartedAction: "Dokumentation öffnen",
           glossaryGuide: "Glossar-Guide",
           glossaryGuideDescription: "Wie geteilte Begriffe, strikter Glossar-Modus und Begriffsprüfung funktionieren.",
+          glossaryGuideAction: "Zum Glossar",
           fileHandling: "Dateiverarbeitung",
           fileHandlingDescription: "XLIFF-Importe, Tag-Schutz-Verhalten und Export-Standards.",
-          serviceEyebrow: "/ Service",
-          serviceTitle: "Betriebsstatus",
-          serviceDescription: "Halte die wichtigsten Service-Infos sichtbar, ohne die Oberfläche in ein Dashboard zu verwandeln.",
-          serviceStatusTitle: "API und Übersetzungswarteschlange",
-          serviceStatusDescription: "Aktuell keine Vorfälle. Die Kern-Übersetzungsdienste laufen normal.",
-          serviceHealthy: "Stabil",
-          workspaceContact: "Workspace-Kontakt",
-          supportWindow: "Support-Fenster",
-          supportWindowValue: "Mo-Fr, 09:00-17:00 CET",
-          criticalIssues: "Kritische Probleme",
-          criticalIssuesValue: "Mit Prioritäts-Triage behandelt",
+          fileHandlingAction: "API & Dateiformate",
           checklistEyebrow: "/ Best Practice",
           checklistTitle: "Bevor du den Support kontaktierst",
           checklistDescription: "Eine kurze Checkliste, die das übliche Hin und Her bei Übersetzungsproblemen reduziert.",
@@ -56,44 +52,41 @@ export function SupportScreen({ data }: SupportScreenProps) {
             "Nenne Projektnamen, Quellsprache, Zielsprache und den exakten Schritt, an dem das Problem aufgetreten ist.",
             "Bei Dateiproblemen gib an, ob das Problem aus Import, Übersetzungsausgabe, Glossar-Regeln oder Export stammt.",
             "Wenn das Problem die Auslieferung blockiert, sag das explizit, damit es korrekt triagiert werden kann."
-          ]
+          ],
+          checklistNoteTitle: "Hilfreich für schnellere Analyse",
+          checklistNoteBody:
+            "Wenn möglich, schicke die betroffene Datei, einen Screenshot oder den exakten Fehlertext direkt mit."
         }
       : {
           eyebrow: "/ Support",
           heading: "Support",
-          intro: "Help, contact paths, and operational guidance in a dedicated surface instead of burying them inside settings.",
+          intro: "A cleaner support entry point with one contact path, direct documentation, and a short checklist for faster resolution.",
           contactEyebrow: "/ Contact",
-          contactTitle: "Support channels",
+          contactTitle: "Support",
           contactDescription:
-            "Use the fastest path depending on whether you need product help, operational clarity, or account assistance.",
+            "Use one clear channel for product questions, file issues, billing topics, and operational blockers.",
           emailSupport: "Email support",
-          emailSupportDescription: "Best for account questions, product issues, and workflow guidance.",
+          emailSupportDescription: "The right channel for account questions, translation issues, import/export failures, and billing topics.",
           emailSupportMeta: "Typical response within one business day.",
           emailSupportAction: "Email support",
-          priorityChannel: "Priority channel",
-          priorityChannelDescription: "For plan-specific escalations and critical production blockers.",
-          priorityChannelMeta: "Requests are routed through your workspace contact email.",
-          priorityChannelAction: "Use account email",
+          supportScopeTitle: "Best handled here",
+          supportScopeItems: [
+            "Import, translation output, export, and QA blockers",
+            "Workspace, account, and billing issues",
+            "Glossary, tag, and file-format problems in production flows"
+          ],
           guidesEyebrow: "/ Help",
           guidesTitle: "Guides and documentation",
-          guidesDescription: "A compact support surface for the material users typically need before opening a ticket.",
+          guidesDescription: "The fastest references to check before opening a ticket or when you need an answer immediately.",
           gettingStarted: "Getting started",
           gettingStartedDescription: "Project setup, language defaults, and first translation workflow.",
+          gettingStartedAction: "Open docs",
           glossaryGuide: "Glossary guide",
           glossaryGuideDescription: "How shared terms, strict glossary mode, and term review work.",
+          glossaryGuideAction: "Open glossary",
           fileHandling: "File handling",
           fileHandlingDescription: "XLIFF imports, tag protection behavior, and export defaults.",
-          serviceEyebrow: "/ Service",
-          serviceTitle: "Operational status",
-          serviceDescription: "Keep the most relevant service information visible without turning the surface into a dashboard.",
-          serviceStatusTitle: "API and translation queue",
-          serviceStatusDescription: "No current incidents. Core translation services are operating normally.",
-          serviceHealthy: "Healthy",
-          workspaceContact: "Workspace contact",
-          supportWindow: "Support window",
-          supportWindowValue: "Mon-Fri, 09:00-17:00 CET",
-          criticalIssues: "Critical issues",
-          criticalIssuesValue: "Handled with priority triage",
+          fileHandlingAction: "API & file formats",
           checklistEyebrow: "/ Best Practice",
           checklistTitle: "Before you contact support",
           checklistDescription: "A short checklist that removes the usual back-and-forth for translation issues.",
@@ -101,7 +94,10 @@ export function SupportScreen({ data }: SupportScreenProps) {
             "Include the project name, source language, target language, and the exact step where the issue happened.",
             "For file issues, mention whether the problem came from import, translation output, glossary enforcement, or export.",
             "If the issue is blocking delivery, say that explicitly so it can be triaged correctly."
-          ]
+          ],
+          checklistNoteTitle: "Helpful for faster triage",
+          checklistNoteBody:
+            "If possible, attach the affected file, a screenshot, or the exact error message in the first message."
         };
 
   return (
@@ -128,7 +124,7 @@ export function SupportScreen({ data }: SupportScreenProps) {
               title={copy.contactTitle}
               description={copy.contactDescription}
             >
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,0.9fr)]">
                 <SupportChannelCard
                   title={copy.emailSupport}
                   description={copy.emailSupportDescription}
@@ -137,13 +133,7 @@ export function SupportScreen({ data }: SupportScreenProps) {
                   actionLabel={copy.emailSupportAction}
                   href="mailto:support@translayr.dev"
                 />
-                <SupportChannelCard
-                  title={copy.priorityChannel}
-                  description={copy.priorityChannelDescription}
-                  value={data.profile.email}
-                  meta={copy.priorityChannelMeta}
-                  actionLabel={copy.priorityChannelAction}
-                />
+                <SupportListCard title={copy.supportScopeTitle} items={copy.supportScopeItems} />
               </div>
             </SupportPanel>
 
@@ -156,14 +146,20 @@ export function SupportScreen({ data }: SupportScreenProps) {
                 <SupportResourceCard
                   title={copy.gettingStarted}
                   description={copy.gettingStartedDescription}
+                  href="/docs"
+                  actionLabel={copy.gettingStartedAction}
                 />
                 <SupportResourceCard
                   title={copy.glossaryGuide}
                   description={copy.glossaryGuideDescription}
+                  href="/glossary"
+                  actionLabel={copy.glossaryGuideAction}
                 />
                 <SupportResourceCard
                   title={copy.fileHandling}
                   description={copy.fileHandlingDescription}
+                  href="/developer-api"
+                  actionLabel={copy.fileHandlingAction}
                 />
               </div>
             </SupportPanel>
@@ -171,41 +167,20 @@ export function SupportScreen({ data }: SupportScreenProps) {
 
           <div className="space-y-5">
             <SupportPanel
-              eyebrow={copy.serviceEyebrow}
-              title={copy.serviceTitle}
-              description={copy.serviceDescription}
-            >
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3 rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
-                  <div>
-                    <p className="text-[13px] font-medium text-[var(--foreground)]">{copy.serviceStatusTitle}</p>
-                    <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">
-                      {copy.serviceStatusDescription}
-                    </p>
-                  </div>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--foreground)]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
-                    {copy.serviceHealthy}
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  <SupportDetailRow label={copy.workspaceContact} value={data.profile.email} />
-                  <SupportDetailRow label={copy.supportWindow} value={copy.supportWindowValue} />
-                  <SupportDetailRow label={copy.criticalIssues} value={copy.criticalIssuesValue} />
-                </div>
-              </div>
-            </SupportPanel>
-
-            <SupportPanel
               eyebrow={copy.checklistEyebrow}
               title={copy.checklistTitle}
               description={copy.checklistDescription}
             >
-              <div className="space-y-3 text-[12px] leading-6 text-[var(--muted)]">
-                {copy.checklistItems.map((item) => (
-                  <p key={item}>{item}</p>
-                ))}
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  {copy.checklistItems.map((item, index) => (
+                    <SupportChecklistItem key={item} index={index + 1} text={item} />
+                  ))}
+                </div>
+                <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
+                  <p className="text-[12px] font-medium text-[var(--foreground)]">{copy.checklistNoteTitle}</p>
+                  <p className="mt-2 text-[11.5px] leading-5 text-[var(--muted)]">{copy.checklistNoteBody}</p>
+                </div>
               </div>
             </SupportPanel>
           </div>
@@ -261,11 +236,11 @@ function SupportChannelCard({
     "inline-flex items-center justify-center rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]";
 
   return (
-    <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
+    <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-5 py-5">
       <p className="text-[13px] font-medium text-[var(--foreground)]">{title}</p>
       <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{description}</p>
-      <p className="mt-4 text-[14px] font-medium text-[var(--foreground)]">{value}</p>
-      <p className="mt-1 text-[11.5px] leading-5 text-[var(--muted)]">{meta}</p>
+      <p className="mt-5 text-[18px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">{value}</p>
+      <p className="mt-2 text-[11.5px] leading-5 text-[var(--muted)]">{meta}</p>
       {href ? (
         <a href={href} className={["mt-4", actionClassName].join(" ")}>
           {actionLabel}
@@ -277,32 +252,66 @@ function SupportChannelCard({
   );
 }
 
+function SupportListCard({
+  title,
+  items
+}: {
+  title: string;
+  items: string[];
+}) {
+  return (
+    <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-5 py-5">
+      <p className="text-[13px] font-medium text-[var(--foreground)]">{title}</p>
+      <div className="mt-4 space-y-3">
+        {items.map((item) => (
+          <div key={item} className="flex items-start gap-3 text-[11.5px] leading-5 text-[var(--muted)]">
+            <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-[var(--foreground)]" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SupportResourceCard({
   title,
-  description
+  description,
+  href,
+  actionLabel
 }: {
   title: string;
   description: string;
+  href: string;
+  actionLabel: string;
 }) {
   return (
     <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
       <p className="text-[13px] font-medium text-[var(--foreground)]">{title}</p>
       <p className="mt-2 text-[11.5px] leading-5 text-[var(--muted)]">{description}</p>
+      <Link
+        href={href}
+        className="mt-4 inline-flex items-center justify-center rounded-[12px] border border-[var(--border)] bg-white px-4 py-2.5 text-[12px] font-medium text-[var(--foreground)] transition hover:border-[var(--border-strong)]"
+      >
+        {actionLabel}
+      </Link>
     </div>
   );
 }
 
-function SupportDetailRow({
-  label,
-  value
+function SupportChecklistItem({
+  index,
+  text
 }: {
-  label: string;
-  value: string;
+  index: number;
+  text: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 text-[12px]">
-      <span className="text-[var(--muted-soft)]">{label}</span>
-      <span className="text-right font-medium text-[var(--foreground)]">{value}</span>
+    <div className="flex items-start gap-3 rounded-[14px] border border-[var(--border-light)] bg-[var(--background)] px-4 py-4">
+      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-white text-[11px] font-semibold text-[var(--foreground)]">
+        {index}
+      </span>
+      <p className="pt-[1px] text-[11.5px] leading-5 text-[var(--muted)]">{text}</p>
     </div>
   );
 }
