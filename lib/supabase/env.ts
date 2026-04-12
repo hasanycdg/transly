@@ -36,5 +36,43 @@ export function requireSupabaseServiceRoleKey() {
 }
 
 export function getAppUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  const configuredOrigin = normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL);
+
+  if (configuredOrigin) {
+    return configuredOrigin;
+  }
+
+  const vercelOrigin =
+    normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL) ??
+    normalizeOrigin(process.env.VERCEL_URL);
+
+  if (vercelOrigin) {
+    return vercelOrigin;
+  }
+
+  return "http://localhost:3000";
+}
+
+function normalizeOrigin(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    return new URL(withProtocol).origin;
+  } catch {
+    return null;
+  }
 }
