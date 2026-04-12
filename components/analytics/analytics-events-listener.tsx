@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 type EventParams = Record<string, string | number | boolean | undefined>;
 
@@ -13,10 +13,11 @@ declare global {
 }
 
 export function AnalyticsEventsListener() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const searchParams = useSearchParams();
   const isFirstPageView = useRef(true);
-  const search = useMemo(() => searchParams.toString(), [searchParams]);
+  const search = searchParams.toString();
+  const pagePath = search ? `${pathname}?${search}` : pathname;
 
   useEffect(() => {
     if (isFirstPageView.current) {
@@ -24,13 +25,12 @@ export function AnalyticsEventsListener() {
       return;
     }
 
-    const pagePath = search ? `${pathname}?${search}` : pathname;
     trackEvent("page_view", {
       page_path: pagePath,
       page_location: window.location.href,
       page_title: document.title
     });
-  }, [pathname, search]);
+  }, [pagePath]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {

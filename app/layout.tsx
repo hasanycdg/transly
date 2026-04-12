@@ -110,11 +110,13 @@ export default async function RootLayout({
         </noscript>
         <Script src={COOKIE_SCRIPT_SRC} strategy="beforeInteractive" type="text/javascript" charSet="UTF-8" />
         <AnalyticsEventsListener />
-        <script
+        <Script
+          id="schema-website"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
         />
-        <script
+        <Script
+          id="schema-organization"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
