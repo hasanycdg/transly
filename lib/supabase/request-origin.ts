@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 
+import { getAppUrl } from "@/lib/supabase/env";
+
 type RequestLike = Request | NextRequest;
 
 export function getRequestOrigin(request: RequestLike) {
@@ -18,6 +20,10 @@ export function getRequestOrigin(request: RequestLike) {
     }
   }
 
+  if (isLoopbackHost(url.hostname)) {
+    return getAppUrl();
+  }
+
   return url.origin;
 }
 
@@ -34,4 +40,10 @@ function getForwardedHeader(request: RequestLike, key: string) {
     .toLowerCase();
 
   return firstValue || null;
+}
+
+function isLoopbackHost(hostname: string) {
+  const normalizedHost = hostname.trim().toLowerCase();
+
+  return normalizedHost === "localhost" || normalizedHost === "127.0.0.1" || normalizedHost === "::1";
 }
