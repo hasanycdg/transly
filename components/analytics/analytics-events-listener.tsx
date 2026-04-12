@@ -8,15 +8,11 @@ type EventParams = Record<string, string | number | boolean | undefined>;
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
-    dataLayer?: unknown[];
+    dataLayer?: Array<Record<string, unknown>>;
   }
 }
 
-type AnalyticsEventsListenerProps = {
-  measurementId: string;
-};
-
-export function AnalyticsEventsListener({ measurementId }: AnalyticsEventsListenerProps) {
+export function AnalyticsEventsListener() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isFirstPageView = useRef(true);
@@ -32,10 +28,9 @@ export function AnalyticsEventsListener({ measurementId }: AnalyticsEventsListen
     trackEvent("page_view", {
       page_path: pagePath,
       page_location: window.location.href,
-      page_title: document.title,
-      send_to: measurementId
+      page_title: document.title
     });
-  }, [measurementId, pathname, search]);
+  }, [pathname, search]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -110,11 +105,21 @@ export function AnalyticsEventsListener({ measurementId }: AnalyticsEventsListen
 }
 
 function trackEvent(name: string, params: EventParams) {
-  if (typeof window === "undefined" || typeof window.gtag !== "function") {
+  if (typeof window === "undefined") {
     return;
   }
 
-  window.gtag("event", name, params);
+  if (typeof window.gtag === "function") {
+    window.gtag("event", name, params);
+    return;
+  }
+
+  if (Array.isArray(window.dataLayer)) {
+    window.dataLayer.push({
+      event: name,
+      ...params
+    });
+  }
 }
 
 function normalizeEventName(value: string) {
