@@ -6,7 +6,6 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { useAppLocale } from "@/components/app-locale-provider";
 import { createClient } from "@/lib/supabase/client";
-import { getAppUrl } from "@/lib/supabase/env";
 
 const DISPLAY_FONT_CLASS_NAME = "[font-family:var(--font-display)] font-medium tracking-[-0.06em]";
 const PRIMARY_BUTTON_CLASS_NAME =
@@ -235,11 +234,12 @@ export function AuthScreen({ mode }: AuthScreenProps) {
       setIsSubmitting(true);
 
       if (isRegister) {
+        const appUrl = getClientAppUrl();
         const { data, error } = await supabase.auth.signUp({
           email: formValues.email.trim(),
           password: formValues.password,
           options: {
-            emailRedirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+            emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
             data: {
               full_name: formValues.name.trim(),
               workspace_name: formValues.workspace.trim()
@@ -293,11 +293,12 @@ export function AuthScreen({ mode }: AuthScreenProps) {
       setIsSubmitting(true);
       setErrorMessage(null);
       setSuccessMessage(null);
+      const appUrl = getClientAppUrl();
 
       const { error } = await supabase.auth.signInWithOtp({
         email: formValues.email.trim(),
         options: {
-          emailRedirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+          emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(redirectTo)}`
         }
       });
 
@@ -322,11 +323,12 @@ export function AuthScreen({ mode }: AuthScreenProps) {
       setIsSubmitting(true);
       setErrorMessage(null);
       setSuccessMessage(null);
+      const appUrl = getClientAppUrl();
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+          redirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(redirectTo)}`
         }
       });
 
@@ -353,9 +355,10 @@ export function AuthScreen({ mode }: AuthScreenProps) {
       setIsSubmitting(true);
       setErrorMessage(null);
       setSuccessMessage(null);
+      const appUrl = getClientAppUrl();
 
       const { error } = await supabase.auth.resetPasswordForEmail(formValues.email.trim(), {
-        redirectTo: `${getAppUrl()}/reset-password`
+        redirectTo: `${appUrl}/reset-password`
       });
 
       if (error) {
@@ -669,4 +672,12 @@ function getSafeRedirectPath(redirectTo: string | null) {
   }
 
   return redirectTo;
+}
+
+function getClientAppUrl() {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  return "http://localhost:3000";
 }

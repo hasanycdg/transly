@@ -9,7 +9,6 @@ import { WorkspaceMembersPanel } from "@/components/settings/workspace-members-p
 import { getAppLocaleOptions } from "@/lib/i18n";
 import { getLanguageOptions } from "@/lib/languages";
 import { createClient } from "@/lib/supabase/client";
-import { getAppUrl } from "@/lib/supabase/env";
 import type {
   SettingsFilenameFormat,
   SettingsPreferencesData,
@@ -337,9 +336,10 @@ export function SettingsScreen({ data, initialSection = "translation" }: Setting
       setIsSendingPasswordReset(true);
       setErrorMessage(null);
       setSaveMessage(null);
+      const appUrl = getClientAppUrl();
 
       const { error } = await supabase.auth.resetPasswordForEmail(draft.profile.email, {
-        redirectTo: `${getAppUrl()}/reset-password`
+        redirectTo: `${appUrl}/reset-password`
       });
 
       if (error) {
@@ -1136,6 +1136,14 @@ function SelectField({
       </span>
     </div>
   );
+}
+
+function getClientAppUrl() {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  return "http://localhost:3000";
 }
 
 function ProfileIcon({ className = "h-4 w-4" }: IconProps) {
