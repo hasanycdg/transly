@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { getRequestOrigin } from "@/lib/supabase/request-origin";
 import { createServerSupabaseAuthClient } from "@/lib/supabase/server";
 
 const CALLBACK_EXCHANGE_TIMEOUT_MS = 10_000;
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const requestOrigin = getRequestOrigin(request);
+  const requestOrigin = requestUrl.origin;
   const code = requestUrl.searchParams.get("code");
   const next = getSafeRedirectPath(requestUrl.searchParams.get("next"));
 
